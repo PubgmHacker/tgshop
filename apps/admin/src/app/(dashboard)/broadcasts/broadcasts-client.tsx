@@ -6,8 +6,10 @@ import { PostStatus } from '@tgshop/db'
 import {
   upsertBroadcastAction,
   sendBroadcastAction,
+  cancelBroadcastAction,
   deleteBroadcastAction
 } from '../../../lib/actions/broadcasts'
+import { isBroadcastFrozen, isBroadcastCancellable, isBroadcastSendable } from '../../../lib/broadcasts-policy'
 import type { BroadcastSegment } from '../../../lib/schemas'
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
@@ -54,18 +56,17 @@ function statusVariant(status: PostStatus): BadgeTone {
       return 'success'
     case PostStatus.SENDING:
       return 'warning'
+    case PostStatus.QUEUED:
+      return 'warning'
     case PostStatus.FAILED:
+      return 'destructive'
+    case PostStatus.CANCELLED:
       return 'destructive'
     case PostStatus.SCHEDULED:
       return 'default'
     default:
       return 'secondary'
   }
-}
-
-/** SENDING/SENT posts are frozen by the server actions — mirror that in the UI. */
-function isLocked(status: PostStatus): boolean {
-  return status === PostStatus.SENDING || status === PostStatus.SENT
 }
 
 export function BroadcastsClient({
@@ -161,6 +162,22 @@ export function BroadcastsClient({
     try {
       await sendBroadcastAction({ id: post.id })
       setMessage('Broadcast queued')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function onCancel(post: BroadcastRow) {
+    if (!window.confirm('Pull this broadcast back out of the queue? Nothing has been sent yet.')) return
+    setPending(true)
+    setError(null)
+    setMessage(null)
+    try {
+      await cancelBroadcastAction({ id: post.id })
+      setMessage('Broadcast cancelled — edit and re-queue it when ready')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -295,7 +312,9 @@ export function BroadcastsClient({
         </TableHeader>
         <TableBody>
           {posts.map((post) => {
-            const locked = isLocked(post.status)
+            const frozen = isBroadcastFrozen(post.status)
+            const cancellable = isBroadcastCancellable(post.status)
+            const sendable = isBroadcastSendable(post.status)
             return (
               <TableRow key={post.id}>
                 <TableCell className="whitespace-nowrap">{formatDateTime(post.createdAt)}</TableCell>
@@ -329,22 +348,27 @@ export function BroadcastsClient({
                   )}
                 </TableCell>
                 <TableCell className="flex flex-wrap gap-2">
-                  {canCompose && !locked && (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => startEdit(post)} disabled={pending}>
-                        {t('common.edit')}
-                      </Button>
-                      <Button size="sm" onClick={() => void onSendExisting(post)} disabled={pending}>
-                        {post.scheduledAt ? t('broadcasts.schedule') : t('broadcasts.sendNow')}
-                      </Button>
-                    </>
+                  {canCompose && !frozen && (
+                    <Button size="sm" variant="outline" onClick={() => startEdit(post)} disabled={pending}>
+                      {t('common.edit')}
+                    </Button>
                   )}
-                  {canDelete && !locked && (
+                  {canCompose && sendable && (
+                    <Button size="sm" onClick={() => void onSendExisting(post)} disabled={pending}>
+                      {post.scheduledAt ? t('broadcasts.schedule') : t('broadcasts.sendNow')}
+                    </Button>
+                  )}
+                  {canCompose && cancellable && (
+                    <Button size="sm" variant="outline" onClick={() => void onCancel(post)} disabled={pending}>
+                      {t('common.cancel')}
+                    </Button>
+                  )}
+                  {canDelete && !frozen && (
                     <Button size="sm" variant="destructive" onClick={() => void onDelete(post.id)} disabled={pending}>
                       {t('common.delete')}
                     </Button>
                   )}
-                  {locked && <span className="text-xs text-muted-foreground">locked</span>}
+                  {frozen && <span className="text-xs text-muted-foreground">locked</span>}
                 </TableCell>
               </TableRow>
             )

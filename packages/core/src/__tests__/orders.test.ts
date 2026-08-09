@@ -167,7 +167,7 @@ describe('ALLOWED_TRANSITIONS', () => {
       [OrderStatus.DELIVERING, OrderStatus.FAILED, OrderStatus.REFUNDED].sort()
     )
     expect([...ALLOWED_TRANSITIONS[OrderStatus.DELIVERING]].sort()).toEqual(
-      [OrderStatus.DELIVERED, OrderStatus.FAILED].sort()
+      [OrderStatus.DELIVERED, OrderStatus.FAILED, OrderStatus.REFUNDED].sort()
     )
     expect([...ALLOWED_TRANSITIONS[OrderStatus.DELIVERED]]).toEqual([OrderStatus.REFUNDED])
     expect([...ALLOWED_TRANSITIONS[OrderStatus.FAILED]]).toEqual([OrderStatus.REFUNDED])

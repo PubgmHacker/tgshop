@@ -4,6 +4,8 @@ import { usdCentsToUsdt6 } from '@tgshop/core'
 import { createCryptoBotInvoice } from '../payments/cryptobot.js'
 import { amountCentsToStars } from '../payments/stars.js'
 import { allocateDepositAddress } from '../payments/tron.js'
+import { emitEvent } from './events.js'
+import { logger } from '../lib/logger.js'
 import { env } from '../config/env.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -129,6 +131,53 @@ async function createStarsPayment(input: CreateInvoiceInput): Promise<InvoiceRes
   })
 
   return { payment, payUrl: null, tron: null, stars }
+}
+
+/**
+ * Marks a Stars order's Payment row PAID and announces the money.
+ *
+ * Stars is the one rail with no reconciler behind it: CryptoBot has the
+ * payments:poll fallback and TRON has chain:scan, but a Stars charge is only
+ * ever reported once, in the successful_payment update. If this row is not
+ * settled here it stays PENDING forever and the order reads as unpaid in every
+ * admin payments view even though Telegram has taken the customer's Stars.
+ *
+ * The conditional updateMany is what makes a duplicate update harmless — grammY
+ * will redeliver an update whose handler threw, and the money must be announced
+ * exactly once.
+ */
+export async function settleStarsPayment(
+  orderId: string,
+  telegramChargeId: string,
+  rawPayload: object
+): Promise<void> {
+  const payment = await prisma.payment.findFirst({
+    where: { orderId, provider: PaymentProvider.STARS },
+    orderBy: { createdAt: 'desc' }
+  })
+  if (!payment) {
+    logger.error({ orderId }, 'Stars payment succeeded but no Payment row exists — order settles without one')
+    return
+  }
+
+  const settled = await prisma.payment.updateMany({
+    where: { id: payment.id, status: { not: PaymentStatus.PAID } },
+    data: { status: PaymentStatus.PAID, txHash: telegramChargeId, rawPayload }
+  })
+  if (settled.count === 0) return
+
+  await emitEvent('payment.received', {
+    paymentId: payment.id,
+    orderId,
+    userId: payment.userId,
+    provider: PaymentProvider.STARS,
+    // Whole Stars as a decimal string, matching the BigInt-safe wire contract.
+    amount: payment.amount.toString(),
+    asset: payment.asset,
+    // Telegram's charge id is the closest thing Stars has to a transaction
+    // hash, and it is what support quotes when reconciling a disputed charge.
+    txHash: telegramChargeId
+  })
 }
 
 async function createTronPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {

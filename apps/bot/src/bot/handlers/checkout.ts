@@ -15,7 +15,7 @@ import {
   getOrderById,
   markOrderPaidAndDeliver
 } from '../../domain/orders.js'
-import { createInvoice } from '../../domain/payments.js'
+import { createInvoice, settleStarsPayment } from '../../domain/payments.js'
 import { amountCentsToStars } from '../../payments/stars.js'
 import { allocateDepositAddress } from '../../payments/tron.js'
 import { logger } from '../../lib/logger.js'
@@ -176,7 +176,19 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
   })
 
   bot.on('message:successful_payment', async (ctx) => {
-    const orderId = ctx.message.successful_payment.invoice_payload
+    const payment = ctx.message.successful_payment
+    const orderId = payment.invoice_payload
+
+    // Settle the Payment row first, and outside the try below: Telegram has
+    // already taken the customer's Stars, so recording that is not conditional
+    // on delivery succeeding. Nothing else would ever settle this row — Stars
+    // has no reconciler sweep behind it the way CryptoBot and TRON do.
+    try {
+      await settleStarsPayment(orderId, payment.telegram_payment_charge_id, payment as unknown as object)
+    } catch (err) {
+      logger.error({ err, orderId }, 'failed to settle Stars payment row')
+    }
+
     try {
       await markOrderPaidAndDeliver(orderId)
     } catch (err) {

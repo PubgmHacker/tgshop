@@ -23,6 +23,7 @@ interface Strings {
   subRenewButton: string
   subAutoRenewed: (planTitle: string) => string
   subAutoRenewFailed: (planTitle: string) => string
+  subRenewPlanInactive: (planTitle: string) => string
 }
 
 const ru: Strings = {
@@ -42,7 +43,11 @@ const ru: Strings = {
   subRenewButton: '🔁 Продлить',
   subAutoRenewed: (planTitle) => `✅ Подписка «${planTitle}» автоматически продлена с вашего баланса.`,
   subAutoRenewFailed: (planTitle) =>
-    `⚠️ Не удалось автоматически продлить «${planTitle}»: недостаточно средств на балансе. Продлите вручную.`
+    `⚠️ Не удалось автоматически продлить «${planTitle}»: недостаточно средств на балансе. Продлите вручную.`,
+  // Отдельный текст: тариф снят с продажи, и совет «пополните баланс» здесь
+  // только сбил бы с толку — деньги не помогут, продлевать больше нечего.
+  subRenewPlanInactive: (planTitle) =>
+    `⚠️ Тариф «${planTitle}» больше не доступен, поэтому подписка не продлена. Напишите в поддержку — подберём замену.`
 }
 
 const en: Strings = {
@@ -62,7 +67,9 @@ const en: Strings = {
   subRenewButton: '🔁 Renew',
   subAutoRenewed: (planTitle) => `✅ Your "${planTitle}" subscription was auto-renewed from your balance.`,
   subAutoRenewFailed: (planTitle) =>
-    `⚠️ Could not auto-renew "${planTitle}": insufficient balance. Please renew manually.`
+    `⚠️ Could not auto-renew "${planTitle}": insufficient balance. Please renew manually.`,
+  subRenewPlanInactive: (planTitle) =>
+    `⚠️ The "${planTitle}" plan is no longer available, so your subscription was not renewed. Contact support and we'll find you an alternative.`
 }
 
 const catalogs: Record<Locale, Strings> = { ru, en }

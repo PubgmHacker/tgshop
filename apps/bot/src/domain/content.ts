@@ -47,12 +47,18 @@ export interface CreatePostInput {
 }
 
 /**
- * Creates a BroadcastPost. Status is SCHEDULED when a future `scheduledAt` is
- * supplied, otherwise DRAFT — a human still approves DRAFT posts before they
- * reach SENDING (docs/AGENT_PLAN.md safety gate).
+ * Creates a BroadcastPost. Status is SCHEDULED when a `scheduledAt` is supplied,
+ * otherwise DRAFT.
+ *
+ * An AGENT-authored post is DRAFT regardless of scheduledAt. The worker's sweep
+ * arms SCHEDULED posts by itself, so letting an agent write SCHEDULED would hand
+ * it a route to every customer with no human in the loop — exactly what the
+ * docs/AGENT_PLAN.md safety gate exists to prevent. The requested time is kept
+ * on the row; a human publishing the post is what arms it.
  */
 export async function createPost(input: CreatePostInput): Promise<BroadcastPost> {
   const scheduledAt = input.scheduledAt ?? null
+  const source = input.source ?? PostSource.MANUAL
   return prisma.broadcastPost.create({
     data: {
       text: input.text,
@@ -60,8 +66,8 @@ export async function createPost(input: CreatePostInput): Promise<BroadcastPost>
       segment: input.segment ?? null,
       mediaUrl: input.mediaUrl ?? null,
       scheduledAt,
-      source: input.source ?? PostSource.MANUAL,
-      status: scheduledAt ? PostStatus.SCHEDULED : PostStatus.DRAFT
+      source,
+      status: scheduledAt && source !== PostSource.AGENT ? PostStatus.SCHEDULED : PostStatus.DRAFT
     }
   })
 }
@@ -86,36 +92,49 @@ export class PostStateError extends Error {
 }
 
 /**
- * Publishes a post now: flips it to SCHEDULED with an immediate scheduledAt and
- * enqueues the worker job. Idempotent on postId — BullMQ dedupes on the
- * `broadcast-<postId>` jobId, and the worker itself skips posts already SENT.
+ * Publishes a post: flips it to QUEUED and hands it to the worker's queue,
+ * holding the job until `scheduledAt` when that is still in the future.
+ *
+ * QUEUED rather than SCHEDULED or SENDING, because those two mean different
+ * things now: SCHEDULED is "saved for a time, not armed", QUEUED is "armed, not
+ * a single message sent yet, still cancellable", and SENDING is written by the
+ * worker once it actually starts fanning out.
+ *
+ * Idempotent on postId — BullMQ dedupes on the `broadcast-<postId>` jobId, and
+ * the worker's claim refuses posts already SENT or CANCELLED.
  */
 export async function publishPost(postId: string): Promise<BroadcastPost> {
   const post = await prisma.broadcastPost.findUnique({ where: { id: postId } })
   if (!post) return Promise.reject(new PostStateError(PostStatus.FAILED))
 
-  if (post.status === PostStatus.SENDING || post.status === PostStatus.SENT) {
-    // Already in flight or done — return as-is rather than double-sending.
+  if (
+    post.status === PostStatus.QUEUED ||
+    post.status === PostStatus.SENDING ||
+    post.status === PostStatus.SENT
+  ) {
+    // Already armed, in flight, or done — return as-is rather than double-sending.
     return post
   }
 
+  const scheduledAt = post.scheduledAt ?? new Date()
   const updated = await prisma.broadcastPost.update({
     where: { id: postId },
-    data: { status: PostStatus.SCHEDULED, scheduledAt: post.scheduledAt ?? new Date() }
+    data: { status: PostStatus.QUEUED, scheduledAt }
   })
 
-  await enqueueBroadcast(postId)
+  await enqueueBroadcast(postId, Math.max(0, scheduledAt.getTime() - Date.now()))
   return updated
 }
 
 /** Adds the worker's `send-post` job, mirroring apps/worker's enqueueBroadcast. */
-export async function enqueueBroadcast(postId: string): Promise<void> {
+export async function enqueueBroadcast(postId: string, delayMs = 0): Promise<void> {
   const queue = getBroadcastQueue()
   await queue.add(
     BROADCAST_JOB_NAME,
     { postId },
     {
       jobId: `broadcast-${postId}`,
+      delay: delayMs,
       attempts: 5,
       backoff: { type: 'exponential', delay: 2_000 },
       removeOnComplete: { count: 1_000, age: 24 * 60 * 60 },

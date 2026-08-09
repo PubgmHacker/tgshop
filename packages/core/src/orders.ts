@@ -27,7 +27,12 @@ import {
 export const ALLOWED_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.PAID, OrderStatus.EXPIRED, OrderStatus.FAILED],
   [OrderStatus.PAID]: [OrderStatus.DELIVERING, OrderStatus.FAILED, OrderStatus.REFUNDED],
-  [OrderStatus.DELIVERING]: [OrderStatus.DELIVERED, OrderStatus.FAILED],
+  // DELIVERING -> REFUNDED exists for MANUAL_FALLBACK: deliver() parks those
+  // orders in DELIVERING indefinitely, waiting on a human, so without this edge
+  // a paid order nobody can fulfil would have no legal way back to the buyer's
+  // balance. A refund racing a real delivery attempt is safe either way — the
+  // loser hits assertTransition and its transaction rolls back.
+  [OrderStatus.DELIVERING]: [OrderStatus.DELIVERED, OrderStatus.FAILED, OrderStatus.REFUNDED],
   [OrderStatus.DELIVERED]: [OrderStatus.REFUNDED],
   [OrderStatus.FAILED]: [OrderStatus.REFUNDED],
   [OrderStatus.EXPIRED]: [],

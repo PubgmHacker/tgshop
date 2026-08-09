@@ -84,18 +84,23 @@ function createPrismaSweepLedger(log: ReturnType<typeof jobLogger>): SweepLedger
     },
 
     async commit({ address, txHash, amountSwept }): Promise<void> {
-      // isSwept is already true from `claim`; all that remains is recording the
-      // tx hash. DepositAddress has no txHash column, so the durable record
-      // goes to AuditLog, which exists for exactly this kind of system action
-      // and is what admins already read for provenance.
-      const row = await prisma.depositAddress.findUnique({ where: { address }, select: { id: true } })
+      // isSwept is already true from `claim`; all that remains is recording what
+      // actually went out. The hash goes on the row itself — that is what closes
+      // the `isSwept && txHash == null` gap an interrupted sweep leaves behind —
+      // and to AuditLog, which is where admins already read system provenance
+      // and which keeps the amount alongside it.
+      const row = await prisma.depositAddress.update({
+        where: { address },
+        data: { txHash, sweptAt: new Date() },
+        select: { id: true }
+      })
       await prisma.auditLog.create({
         data: {
           actorType: 'system',
           actorId: QueueName.ChainSweep,
           action: 'sweep_broadcast',
           entity: 'DepositAddress',
-          entityId: row?.id ?? address,
+          entityId: row.id,
           diff: { address, txHash, amountSwept: amountSwept.toString() }
         }
       })

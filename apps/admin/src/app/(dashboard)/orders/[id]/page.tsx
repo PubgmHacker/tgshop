@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { AdminRole, OrderStatus } from '@tgshop/db'
+import { AdminRole } from '@tgshop/db'
 import { getOrderDetailAction } from '../../../../lib/actions/orders'
+import { canRedeliverOrder, canRefundOrder } from '../../../../lib/orders-policy'
 import { hasRole, requireSession } from '../../../../lib/rbac'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { Badge } from '../../../../components/ui/badge'
@@ -12,8 +13,6 @@ import { formatCents, formatDateTime, formatJson } from '../../../../lib/format'
 
 export const dynamic = 'force-dynamic'
 
-const REDELIVERABLE: readonly OrderStatus[] = [OrderStatus.PAID, OrderStatus.DELIVERED, OrderStatus.FAILED]
-
 export default async function OrderDetailPage({ params }: { params: { id: string } }) {
   const session = requireSession()
 
@@ -21,8 +20,10 @@ export default async function OrderDetailPage({ params }: { params: { id: string
   if (!order) notFound()
 
   const canAct = hasRole(session.role, AdminRole.ADMIN)
-  const canRedeliver = REDELIVERABLE.includes(order.status) && order.stockItem !== null
-  const canRefund = order.status !== OrderStatus.REFUNDED
+  // Both predicates are the ones the server actions enforce, so a button is
+  // enabled exactly when the action behind it would succeed.
+  const canRedeliver = canRedeliverOrder(order)
+  const canRefund = canRefundOrder(order.status)
 
   return (
     <div className="flex flex-col gap-6">

@@ -30,7 +30,7 @@ export function OrderActions({
   }
 
   async function onRedeliver() {
-    if (!window.confirm('Re-send the stored payload to this user?')) return
+    if (!window.confirm('Re-attach the issued payload so the buyer can view it again?')) return
     setPending(true)
     setError(null)
     setMessage(null)
@@ -56,7 +56,9 @@ export function OrderActions({
     setMessage(null)
     try {
       const result = await refundOrderAction({ orderId, reason })
-      setMessage(`Refunded. New balance: ${result.ledgerResult.balanceAfterCents} cents`)
+      setMessage(
+        `Refunded ${result.refundedCents} cents. New balance: ${result.balanceAfterCents} cents`
+      )
       setReason('')
       router.refresh()
     } catch (err) {
@@ -88,10 +90,15 @@ export function OrderActions({
       </div>
       {!canRedeliver && (
         <p className="text-xs text-muted-foreground">
-          Re-delivery only applies to PAID / DELIVERED / FAILED orders that still have a stored payload.
+          Re-delivery needs a PAID / DELIVERING / DELIVERED order with a stored payload. A FAILED
+          order was already auto-refunded, so it must be re-purchased rather than re-delivered.
         </p>
       )}
-      {!canRefund && <p className="text-xs text-muted-foreground">This order is already refunded.</p>}
+      {!canRefund && (
+        <p className="text-xs text-muted-foreground">
+          This order cannot be refunded: it is unpaid, expired, or already refunded.
+        </p>
+      )}
       {message && <p className="text-sm text-success">{message}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>

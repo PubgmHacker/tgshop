@@ -103,6 +103,7 @@ sequenceDiagram
     B-->>U: order id + payment instructions
     P-->>B: webhook (CryptoBot) / B->>P: poll (TRON, via worker)
     B->>DB: Payment.status=PAID, Order.status=PAID
+    B->>Q: publish "payment.received" event (Redis Stream)
     B->>Q: enqueue "order.delivery" job
     W->>DB: reserve StockItem, decrypt+re-encrypt into Order.deliveredPayloadEnc
     W->>DB: Order.status=DELIVERED

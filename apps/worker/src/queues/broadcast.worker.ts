@@ -1,10 +1,15 @@
 import type { Job } from 'bullmq'
 import { prisma, PostStatus } from '@tgshop/db'
 import { parseSegment, resolveSegmentRecipients, type SegmentRecipient } from '@tgshop/core'
-import { createWorker, QueueName, newCorrelationId } from '../queue.js'
+import { createWorker, QueueName, newCorrelationId, getQueue, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
 import { sendTelegramMessage, TelegramBlockedError, TelegramRateLimitError } from '../telegram.js'
-import type { BroadcastJobData } from './broadcast.js'
+import {
+  enqueueBroadcast,
+  broadcastJobId,
+  BROADCAST_SWEEP_JOB_NAME,
+  type BroadcastJobData
+} from './broadcast.js'
 import { loadEnv } from '../env.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,7 +20,20 @@ import { loadEnv } from '../env.js'
 // retry_after by pausing the whole batch, and flagging User.isBlocked on 403.
 // Writes final counts to BroadcastPost.statsJson and moves status to SENT
 // (or FAILED if the post could not be sent to anyone).
+//
+// This queue also carries a periodic sweep (`broadcast-sweep`), because a
+// delayed BullMQ job is the ONLY thing standing between a scheduled post and
+// its audience, and that job lives in Redis:
+//
+//   • SCHEDULED posts — the bot/agent content path creates these and never arms
+//     them. Without the sweep a post scheduled through that path is delivered
+//     never, which is indistinguishable from the feature not existing.
+//   • QUEUED posts whose job has gone missing — a Redis flush or an eviction
+//     drops the delayed job while Postgres still says the post is armed. The
+//     sweep re-arms it rather than leaving the row lying about its own future.
 // ─────────────────────────────────────────────────────────────────────────────
+
+const SWEEP_INTERVAL_MS = 60 * 1000 // minute-granularity is enough for a schedule the operator types by hand
 
 interface BroadcastStats {
   total: number
@@ -24,6 +42,10 @@ interface BroadcastStats {
   failed: number
   startedAt: string
   finishedAt: string
+}
+
+export async function registerBroadcastRepeatables(): Promise<void> {
+  await upsertRepeatable(QueueName.Broadcast, BROADCAST_SWEEP_JOB_NAME, SWEEP_INTERVAL_MS)
 }
 
 /**
@@ -41,16 +63,93 @@ async function resolveSegmentUsers(segment: string | null): Promise<SegmentRecip
 async function processBroadcast(job: Job<BroadcastJobData>): Promise<void> {
   const correlationId = newCorrelationId()
   const log = jobLogger(QueueName.Broadcast, job.id, correlationId)
-  const env = loadEnv()
+
+  if (job.name === BROADCAST_SWEEP_JOB_NAME) {
+    await sweepDuePosts(log)
+    return
+  }
+
   const { postId } = job.data
+  if (!postId) {
+    log.error({ jobName: job.name }, 'broadcast job: no postId, dropping')
+    return
+  }
+  await sendPost(postId, log)
+}
+
+/**
+ * Arms every post whose delivery is due but has no live queue job behind it.
+ *
+ * Deliberately re-checks Redis rather than trusting the row: QUEUED means "a job
+ * was created for this post", and the point of the sweep is precisely the case
+ * where that job no longer exists.
+ */
+async function sweepDuePosts(log: ReturnType<typeof jobLogger>): Promise<void> {
+  const now = new Date()
+
+  // Uses the @@index([status, scheduledAt]) on broadcast_posts.
+  const due = await prisma.broadcastPost.findMany({
+    where: {
+      OR: [
+        { status: PostStatus.SCHEDULED, scheduledAt: { lte: now } },
+        { status: PostStatus.QUEUED }
+      ]
+    },
+    select: { id: true, status: true, scheduledAt: true }
+  })
+
+  let armed = 0
+  for (const post of due) {
+    try {
+      if (await hasPendingJob(post.id)) continue
+
+      // A QUEUED post still in the future keeps its delay; a SCHEDULED one is
+      // only picked up once due, so its delay is always zero.
+      const delayMs =
+        post.scheduledAt && post.scheduledAt.getTime() > now.getTime()
+          ? post.scheduledAt.getTime() - now.getTime()
+          : 0
+
+      await enqueueBroadcast(post.id, delayMs)
+      if (post.status === PostStatus.SCHEDULED) {
+        await prisma.broadcastPost.update({ where: { id: post.id }, data: { status: PostStatus.QUEUED } })
+      }
+      armed += 1
+      log.info({ postId: post.id, previousStatus: post.status, delayMs }, 'broadcast sweep: armed post')
+    } catch (err) {
+      log.error({ err, postId: post.id }, 'broadcast sweep: failed to arm post')
+    }
+  }
+
+  if (armed > 0) log.info({ armed, scanned: due.length }, 'broadcast sweep complete')
+}
+
+/**
+ * True when a job for this post is still waiting, delayed or running.
+ *
+ * A completed or failed job left in Redis by removeOnComplete/removeOnFail
+ * retention does NOT count: it is a record of a past send, and treating it as
+ * live would make the sweep skip a post forever.
+ */
+async function hasPendingJob(postId: string): Promise<boolean> {
+  const job = await getQueue<BroadcastJobData>(QueueName.Broadcast).getJob(broadcastJobId(postId))
+  if (!job) return false
+  const state = await job.getState()
+  if (state === 'completed' || state === 'failed') {
+    // Clear it so the deterministic jobId is free for the next arming —
+    // queue.add() with an id that already exists is silently a no-op.
+    await job.remove()
+    return false
+  }
+  return true
+}
+
+async function sendPost(postId: string, log: ReturnType<typeof jobLogger>): Promise<void> {
+  const env = loadEnv()
 
   const post = await prisma.broadcastPost.findUnique({ where: { id: postId } })
   if (!post) {
     log.warn({ postId }, 'broadcast job: post not found, dropping')
-    return
-  }
-  if (post.status === PostStatus.SENT) {
-    log.info({ postId }, 'broadcast job: already sent, skipping')
     return
   }
 
@@ -69,7 +168,18 @@ async function processBroadcast(job: Job<BroadcastJobData>): Promise<void> {
     return
   }
 
-  await prisma.broadcastPost.update({ where: { id: postId }, data: { status: PostStatus.SENDING } })
+  // Claim the post conditionally rather than with a bare update. The condition
+  // IS the cancel guard: an admin who cancels while this job is being picked up
+  // flips the row to CANCELLED, the claim then matches nothing, and not one
+  // message goes out. A read-then-write would have raced straight past that.
+  const claimed = await prisma.broadcastPost.updateMany({
+    where: { id: postId, status: { notIn: [PostStatus.SENT, PostStatus.CANCELLED] } },
+    data: { status: PostStatus.SENDING }
+  })
+  if (claimed.count === 0) {
+    log.info({ postId, status: post.status }, 'broadcast job: post already sent or cancelled, skipping')
+    return
+  }
 
   const text = post.mediaUrl ? `${post.text}\n\n${post.mediaUrl}` : post.text
 

@@ -91,8 +91,38 @@ jobs:
       - name: Build
         run: pnpm turbo run build
 
+      # Before Test, not after: `turbo run test` includes @tgshop/e2e, whose
+      # harness is written against a seeded database (see e2e/src/setup.ts —
+      # "never truncate, never delete anything the fixture did not create").
+      # Seeding first also lets the exact-count assertions in verify-seed below
+      # double as proof that the e2e suite kept that promise. Every write in
+      # seed.ts is an upsert, so re-running on a warm database is a no-op.
+      - name: Seed test database
+        run: pnpm db:seed
+
       - name: Test
         run: pnpm turbo run test -- --run
+
+      # The three verify-* scripts run after Build because they import from
+      # dist/ — scripts/ sits at the repo root, outside every workspace's
+      # node_modules, so it reaches the real production modules by relative
+      # path. Each prints PASS/FAIL per check and exits non-zero on failure.
+      #
+      # These cover what a typecheck structurally cannot: route registration and
+      # auth guards (verify-api), the seed.ts <-> @tgshop/core encryption
+      # contract (verify-seed), and cross-package agreement on BullMQ job
+      # names/ids between bot, worker and admin (verify-broadcast). Every one of
+      # those is a correct-looking call whose effect lands in Postgres or Redis.
+      - name: Verify API surface
+        run: node scripts/verify-api.mjs
+
+      - name: Verify seed
+        run: node scripts/verify-seed.mjs
+
+      # Writes and cleans up its own rows and queue jobs. Safe here because this
+      # is a throwaway service container, not a shared database.
+      - name: Verify broadcast lifecycle
+        run: node scripts/verify-broadcast.mjs
 
   docker-build-check:
     name: docker build (sanity, no push)

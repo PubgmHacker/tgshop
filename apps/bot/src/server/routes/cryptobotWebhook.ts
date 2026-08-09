@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma, PaymentStatus } from '@tgshop/db'
+import { prisma, PaymentProvider, PaymentStatus } from '@tgshop/db'
 import { DomainError } from '@tgshop/core'
 import { verifyCryptoBotSignature } from '../../payments/cryptobot.js'
 import { creditTopup, findTopupPayment } from '../../domain/topup.js'
 import { markOrderPaidAndDeliver } from '../../domain/orders.js'
+import { emitEvent } from '../../domain/events.js'
 import { logger } from '../../lib/logger.js'
 
 const cryptoBotWebhookSchema = z.object({
@@ -17,6 +18,67 @@ const cryptoBotWebhookSchema = z.object({
     payload: z.string().optional()
   })
 })
+
+/**
+ * Announces settled money to the event bus, after the row is committed.
+ *
+ * A failed publish must never fail the webhook: emitEvent already swallows and
+ * logs, and answering 500 here would make CryptoBot redeliver a webhook whose
+ * financial effect has already been applied.
+ */
+async function emitPaymentReceived(payment: {
+  id: string
+  orderId: string | null
+  userId: string
+  amount: bigint
+  asset: string
+}): Promise<void> {
+  await emitEvent('payment.received', {
+    paymentId: payment.id,
+    orderId: payment.orderId,
+    userId: payment.userId,
+    provider: PaymentProvider.CRYPTOBOT,
+    // Smallest-unit BigInt as a decimal string; JSON cannot carry a BigInt.
+    amount: payment.amount.toString(),
+    asset: payment.asset,
+    // CryptoBot settles off-chain against its own ledger, so there is no
+    // on-chain hash to report — unlike the TRON rail, which always has one.
+    txHash: null
+  })
+}
+
+/**
+ * Marks an order's CryptoBot Payment row PAID and announces it.
+ *
+ * Conditional on the row still being PENDING, so a redelivered webhook that
+ * slipped past the idempotency record cannot announce the same money twice.
+ * A missing row is logged rather than thrown: the order settlement below is the
+ * part that must not be skipped, and CryptoBot has already been charged.
+ */
+async function settleOrderPayment(
+  invoiceId: string,
+  orderId: string,
+  rawPayload: object
+): Promise<void> {
+  const payment = await prisma.payment.findUnique({
+    where: {
+      provider_providerInvoiceId: { provider: PaymentProvider.CRYPTOBOT, providerInvoiceId: invoiceId }
+    }
+  })
+  if (!payment) {
+    logger.error({ invoiceId, orderId }, 'PAID CryptoBot invoice has no Payment row — order settles without one')
+    return
+  }
+  if (payment.status === PaymentStatus.PAID) return
+
+  const updated = await prisma.payment.updateMany({
+    where: { id: payment.id, status: { not: PaymentStatus.PAID } },
+    data: { status: PaymentStatus.PAID, rawPayload }
+  })
+  if (updated.count === 0) return
+
+  await emitPaymentReceived(payment)
+}
 
 export function registerCryptoBotWebhookRoute(app: FastifyInstance): void {
   app.post('/webhook/cryptobot', async (req, reply) => {
@@ -71,8 +133,16 @@ export function registerCryptoBotWebhookRoute(app: FastifyInstance): void {
             })
             const amountCents = Math.round(Number.parseFloat(parsed.data.payload.amount) * 100)
             await creditTopup(payment.userId, amountCents, payment.id)
+            await emitPaymentReceived(payment)
           }
         } else if (orderOrTopupRef) {
+          // Settle the Payment row before touching the order. Money has arrived
+          // whatever delivery does next, and nothing else would ever settle this
+          // row: payments:poll only reconsiders payments whose order is still
+          // PENDING, so a row left PENDING here stays PENDING forever and the
+          // order reads as unpaid in every admin payments view.
+          await settleOrderPayment(invoiceId, orderOrTopupRef, req.body as object)
+
           try {
             await markOrderPaidAndDeliver(orderOrTopupRef)
           } catch (err) {

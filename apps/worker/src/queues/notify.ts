@@ -1,4 +1,4 @@
-import { getQueue, QueueName, defaultJobOptions, upsertRepeatable } from '../queue.js'
+import { getQueue, QueueName, defaultJobOptions } from '../queue.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // notify queue: admin-facing operational alerts. Other queues enqueue jobs
@@ -19,7 +19,7 @@ export async function enqueueNotify(data: NotifyJobData): Promise<void> {
   await queue.add(data.kind, data, defaultJobOptions(QueueName.Notify))
 }
 
-/** Registers the manual-fallback SLA sweep as a repeatable job (checks every 5 min). */
-export async function registerNotifyRepeatables(): Promise<void> {
-  await upsertRepeatable(QueueName.Notify, 'manual-fallback-sla-sweep', 5 * 60 * 1000)
-}
+// The manual-fallback SLA sweep is registered by notify.worker.ts, next to the
+// SLA constant it is derived from. A second registration lived here with a
+// hardcoded 5-minute interval that no longer matched, and since upsertRepeatable
+// keys on the job name, whichever ran last silently redefined the schedule.

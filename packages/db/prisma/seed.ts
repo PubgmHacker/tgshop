@@ -1,6 +1,5 @@
-import { randomBytes, createCipheriv } from 'node:crypto'
+import { randomBytes, createCipheriv, createHash, hash } from 'node:crypto'
 import { PrismaClient, DeliveryType, StockStatus, AdminRole } from '@prisma/client'
-import { hash } from 'node:crypto'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock payload encryption (AES-256-GCM)
@@ -179,14 +178,27 @@ async function main(): Promise<void> {
   }
 
   // ── Stock items (~20 demo, encrypted) ───────────────────────────────────
+  // Idempotent like everything above: re-seeding re-encrypts the same payloads
+  // rather than minting a second batch of rows. StockItem has no natural key,
+  // so the deterministic link is (planId, payloadEnc): a demo payload of the
+  // same plan is assumed to be this seed's row from an earlier run.
   let stockCount = 0
   for (const plan of plans) {
     if (stockCount >= 20) break
     const itemsForPlan = 2
     for (let i = 0; i < itemsForPlan && stockCount < 20; i++) {
       const demoPayload = `demo-login:user${stockCount}@example.com|password:Demo${stockCount}!Pass`
-      await prisma.stockItem.create({
-        data: {
+      // Deterministic id derived from the payload: StockItem has no natural
+      // unique column, and payloadEnc cannot serve as one (a fresh IV per
+      // encrypt means the same plaintext yields different ciphertext each run).
+      const seedId = `seed-stock-${createHash('sha256').update(demoPayload).digest('hex').slice(0, 24)}`
+      await prisma.stockItem.upsert({
+        where: { id: seedId },
+        // Empty, like every other upsert here: a re-seed must not yank a row
+        // back to AVAILABLE if a real order already consumed it.
+        update: {},
+        create: {
+          id: seedId,
           planId: plan.id,
           payloadEnc: encryptPayload(demoPayload, key),
           status: StockStatus.AVAILABLE

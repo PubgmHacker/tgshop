@@ -7,6 +7,33 @@ export const loginSchema = z.object({
   totp: z.string().optional()
 })
 
+/**
+ * The Telegram Login Widget callback payload
+ * (https://core.telegram.org/widgets/login#receiving-authorization-data).
+ *
+ * Validated even though `verifyTelegramLogin()` re-derives the HMAC over it: it
+ * arrives as a raw query string, so a TypeScript type over it is a claim and
+ * nothing more. `id`/`auth_date` are numbers here to keep `tg:${id}` from being
+ * built out of something like `id=abc` (the HMAC itself is indifferent — the
+ * check string runs every value through String()).
+ *
+ * `.passthrough()`, not the default strip: the check string is built from every
+ * field except `hash`, so silently dropping a field Telegram adds later would
+ * break verification for everyone. Passing unknown fields through is safe —
+ * tampering with any of them fails the HMAC, which fails closed.
+ */
+export const telegramLoginSchema = z
+  .object({
+    id: z.number().int().positive(),
+    first_name: z.string().min(1),
+    last_name: z.string().optional(),
+    username: z.string().optional(),
+    photo_url: z.string().url().optional(),
+    auth_date: z.number().int().positive(),
+    hash: z.string().regex(/^[0-9a-f]{64}$/, 'hash must be 64 lowercase hex characters')
+  })
+  .passthrough()
+
 export const categoryUpsertSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1).max(200),
@@ -252,6 +279,7 @@ export const broadcastSendSchema = z.object({
 })
 
 export type LoginInput = z.infer<typeof loginSchema>
+export type TelegramLoginInput = z.infer<typeof telegramLoginSchema>
 export type CategoryUpsertInput = z.infer<typeof categoryUpsertSchema>
 export type ProductUpsertInput = z.infer<typeof productUpsertSchema>
 export type PlanUpsertInput = z.infer<typeof planUpsertSchema>

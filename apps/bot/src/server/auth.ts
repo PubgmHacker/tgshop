@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
@@ -52,7 +52,18 @@ export function validateTelegramInitData(initData: string, botToken: string): Va
   const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest()
   const computedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex')
 
-  if (computedHash !== hash) {
+  // Constant-time, like every other HMAC check in the repo (see
+  // packages/payments/src/cryptobot.ts and apps/admin/src/lib/telegram-auth.ts).
+  // `hash` is attacker-controlled, so a short-circuiting `!==` leaks how many
+  // leading hex digits were right, which is enough to forge a hash byte by byte
+  // and mint a JWT for any tgId. Length is compared first because
+  // timingSafeEqual throws on a length mismatch.
+  const providedHashBuf = Buffer.from(hash, 'utf8')
+  const computedHashBuf = Buffer.from(computedHash, 'utf8')
+  if (
+    providedHashBuf.length !== computedHashBuf.length ||
+    !timingSafeEqual(providedHashBuf, computedHashBuf)
+  ) {
     throw new InitDataError('hash mismatch')
   }
 

@@ -10,7 +10,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test --filter=@tgshop/core --filter=@tgshop/payments",
+    "test": "turbo run test --filter=@tgshop/core --filter=@tgshop/payments --filter=@tgshop/worker --filter=@tgshop/bot",
     "test:e2e": "turbo run test --filter=@tgshop/e2e",
     "db:migrate": "pnpm --filter @tgshop/db exec prisma migrate deploy",
     "db:push": "pnpm --filter @tgshop/db exec prisma db push",

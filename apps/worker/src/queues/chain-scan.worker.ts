@@ -3,6 +3,7 @@ import { prisma, PaymentProvider, PaymentStatus, OrderStatus, LedgerType } from 
 import { credit } from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
+import { emitEvent } from '../events.js'
 import { getTronGridClient } from '../lib/trongrid.js'
 import { loadEnv } from '../env.js'
 import { sendTelegramMessage } from '../telegram.js'
@@ -39,6 +40,36 @@ export async function registerChainScanRepeatables(): Promise<void> {
 // at the pegged rate without any additional scaling.
 function usdt6ToUsdCents(amountUsdt6: bigint): number {
   return Number(amountUsdt6 / 10_000n) // 10^6 usdt6 units per USDT / 100 cents per USD = 10_000
+}
+
+/**
+ * Announces that money actually landed on-chain, after the settling transaction
+ * has committed.
+ *
+ * `payment.received` and `payment.underpaid` are deliberately mutually
+ * exclusive: a consumer summing `payment.received.amount` is measuring revenue,
+ * and a short payment that also announced itself as received would inflate that
+ * total while the order was never paid for. An underpayment gets the underpaid
+ * event alone, which carries the expected/received pair a consumer needs.
+ *
+ * The amount travels as a decimal string because it is a 6-decimal USDT
+ * smallest-unit BigInt — JSON cannot represent it and a double would round it.
+ */
+async function emitPaymentReceived(
+  order: NonNullable<DepositAddressWithOrder['order']>,
+  paymentId: string,
+  receivedUsdt6: bigint,
+  txHash: string | null
+): Promise<void> {
+  await emitEvent('payment.received', {
+    paymentId,
+    orderId: order.id,
+    userId: order.userId,
+    provider: PaymentProvider.TRON_TRC20,
+    amount: receivedUsdt6.toString(),
+    asset: 'USDT',
+    txHash
+  })
 }
 
 async function processChainScan(job: Job<Record<string, never>>): Promise<void> {
@@ -124,6 +155,7 @@ async function scanOneAddress(
 
   const expectedUsdt6 = BigInt(order.amountCents) * 10_000n
   const isExpired = order.expiresAt !== null && order.expiresAt.getTime() < Date.now()
+  const txHash = transfers[0]?.transaction_id ?? null
 
   const existingPayment = order.payments.find((p) => p.status !== 'FAILED')
   const paymentId =
@@ -138,7 +170,7 @@ async function scanOneAddress(
           asset: 'USDT',
           network: 'TRON',
           address: depositAddress.address,
-          txHash: transfers[0]?.transaction_id,
+          txHash,
           confirmations: env.TRON_MIN_CONFIRMATIONS,
           status: PaymentStatus.CONFIRMING,
           rawPayload: transfers as unknown as object
@@ -147,7 +179,7 @@ async function scanOneAddress(
     ).id
 
   if (isExpired) {
-    await settleLatePayment(order, paymentId, totalReceivedUsdt6, log)
+    await settleLatePayment(order, paymentId, totalReceivedUsdt6, txHash, log)
     return
   }
 
@@ -157,17 +189,18 @@ async function scanOneAddress(
   }
 
   if (totalReceivedUsdt6 > expectedUsdt6) {
-    await settleOverpaid(order, paymentId, totalReceivedUsdt6, expectedUsdt6, log)
+    await settleOverpaid(order, paymentId, totalReceivedUsdt6, expectedUsdt6, txHash, log)
     return
   }
 
-  await settleExact(order, paymentId, totalReceivedUsdt6, log)
+  await settleExact(order, paymentId, totalReceivedUsdt6, txHash, log)
 }
 
 async function settleExact(
   order: NonNullable<DepositAddressWithOrder['order']>,
   paymentId: string,
   receivedUsdt6: bigint,
+  txHash: string | null,
   log: ReturnType<typeof jobLogger>
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
@@ -177,6 +210,7 @@ async function settleExact(
     })
     await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.PAID, paidAt: new Date() } })
   })
+  await emitPaymentReceived(order, paymentId, receivedUsdt6, txHash)
   await enqueueDelivery(order.id)
   log.info({ orderId: order.id }, 'TRON payment settled exactly, order PAID')
 }
@@ -207,6 +241,12 @@ async function settleUnderpaid(
     }
   })
   const shortfallUsdt6 = expectedUsdt6 - receivedUsdt6
+  await emitEvent('payment.underpaid', {
+    paymentId,
+    orderId: order.id,
+    expected6: expectedUsdt6.toString(),
+    received6: receivedUsdt6.toString()
+  })
   const shortfallDisplay = (Number(shortfallUsdt6) / 1_000_000).toFixed(2)
   await notifyUser(order, (locale) => t(locale).orderUnderpaid(shortfallDisplay, 'USDT'), log)
   log.warn({ orderId: order.id, shortfallUsdt6: shortfallUsdt6.toString() }, 'TRON payment underpaid')
@@ -217,6 +257,7 @@ async function settleOverpaid(
   paymentId: string,
   receivedUsdt6: bigint,
   expectedUsdt6: bigint,
+  txHash: string | null,
   log: ReturnType<typeof jobLogger>
 ): Promise<void> {
   const surplusUsdt6 = receivedUsdt6 - expectedUsdt6
@@ -239,6 +280,7 @@ async function settleOverpaid(
       })
     }
   })
+  await emitPaymentReceived(order, paymentId, receivedUsdt6, txHash)
   await enqueueDelivery(order.id)
   const surplusDisplay = (Number(surplusUsdt6) / 1_000_000).toFixed(2)
   await notifyUser(order, (locale) => t(locale).orderOverpaidCredited(surplusDisplay, 'USDT'), log)
@@ -249,6 +291,7 @@ async function settleLatePayment(
   order: NonNullable<DepositAddressWithOrder['order']>,
   paymentId: string,
   receivedUsdt6: bigint,
+  txHash: string | null,
   log: ReturnType<typeof jobLogger>
 ): Promise<void> {
   const creditedCents = usdt6ToUsdCents(receivedUsdt6)
@@ -270,6 +313,7 @@ async function settleLatePayment(
     }
   })
   const amountDisplay = (Number(receivedUsdt6) / 1_000_000).toFixed(2)
+  await emitPaymentReceived(order, paymentId, receivedUsdt6, txHash)
   await notifyUser(order, (locale) => t(locale).latePaymentCredited(amountDisplay, 'USDT', order.id), log)
   log.warn({ orderId: order.id }, 'TRON payment arrived after expiry, credited to balance without delivery')
 }

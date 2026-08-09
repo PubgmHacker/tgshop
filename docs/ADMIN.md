@@ -15,18 +15,67 @@
 ## Logging in
 
 Navigate to `https://admin.<domain>` and sign in with an `AdminUser.email` +
-password. **The seed script (`packages/db/prisma/seed.ts`) inserts a demo
-`AdminUser` with a placeholder `passwordHash` (`seed$<sha256>`, not a real
-bcrypt hash) — this is not a usable login as-is.** Before going live:
+password, or — if the Telegram widget is configured (below) — with the
+"Sign in with Telegram" button underneath the form.
 
-1. Implement (or confirm `@tgshop/core`/the admin app's auth flow
-   implements) real password hashing (bcrypt/argon2) and a "first login sets
-   your real password" or a proper admin-invite flow.
-2. Replace the seeded placeholder row via that real flow, or delete it and
-   create a fresh `OWNER` account through it — never ship the seed hash to
-   production.
-3. Optionally enable TOTP (`AdminUser.totpSecret` is already in the schema)
-   for second-factor login.
+Hashing is already implemented and needs nothing from you: `loginAction()`
+compares the submitted password against a real bcrypt hash, and against a
+static dummy hash when the email is unknown, so response timing does not reveal
+which accounts exist. A `totpSecret` on the account makes a valid 6-digit code
+mandatory as well.
+
+What does **not** exist is any way to create an account from the UI. There is no
+"manage admins" page, the Telegram widget path deliberately never creates
+admins, and the `admin@tgshop.local` row written by the seed carries a
+`seed$<sha256>` placeholder that is not a bcrypt hash at all, so
+`bcrypt.compare()` can never match it. **A fresh deployment therefore has no
+usable login until you create one**, using `scripts/create-admin.mjs` — it needs
+`DATABASE_URL` in the environment and a prior `pnpm build`:
+
+```bash
+set -a; source .env; set +a
+
+# 1. Create a real OWNER. Omitting --password generates a strong one and prints
+#    it exactly once; only its bcrypt hash is ever stored.
+node scripts/create-admin.mjs --email you@example.com --role OWNER
+
+# 2. Sign in, confirm it works, then remove the unusable seeded demo account.
+node scripts/create-admin.mjs --delete admin@tgshop.local
+```
+
+Do those in that order: the script refuses to delete the last remaining `OWNER`,
+which is what stops step 2 from locking everyone out. Re-running step 1 for an
+existing email resets that account's password, which is also the recovery path
+for a locked-out owner — there is no self-service password reset.
+
+### Optional: sign in with Telegram instead of a password
+
+1. Set `BOT_TOKEN` and `BOT_USERNAME` for the admin app. The login page hides
+   the widget entirely when `BOT_USERNAME` is unset.
+2. In [@BotFather](https://t.me/BotFather): `/setdomain` → your bot → the admin
+   domain (`admin.<domain>`). Telegram refuses to render the widget on any
+   other origin.
+3. Provision the account. The `tg:<telegram_id>` email is a hard convention —
+   `telegramLoginAction()` looks up exactly that string, so a typo produces an
+   account that exists but can never sign in:
+   ```bash
+   node scripts/create-admin.mjs --telegram-id 123456789 --role ADMIN
+   ```
+
+Telegram redirects back to `/api/telegram-login`, which re-derives the HMAC
+over the signed payload with the bot token, rejects anything older than 24
+hours, and issues a session only if that `tg:<id>` row already exists.
+
+### Optional: TOTP second factor
+
+The verification path is wired (`AdminUser.totpSecret`, checked on every
+password login), but **enrolment has no UI yet**. The helpers exist in
+`apps/admin/src/lib/totp.ts` — `generateTotpSecret()` and `totpKeyUri()`, the
+latter producing an `otpauth://` URI for a QR code — so enabling 2FA today means
+generating a secret, writing it to the row yourself, and scanning the URI.
+Note that a TOTP secret is a bearer credential in plaintext in the database;
+treat adding an enrolment flow and encrypting the column as prerequisites for
+relying on it.
 
 ## What's manageable from the admin panel
 
@@ -61,10 +110,19 @@ bcrypt hash) — this is not a usable login as-is.** Before going live:
 
 ## Operational notes
 
-- All admin mutations should go through `/internal/*` or an
-  admin-authenticated subset of `/api/*` on `apps/bot`, never write to
-  Postgres directly from `apps/admin` — this keeps `AuditLog` writes and
-  domain invariants (order state machine, ledger idempotency) in one place.
+- Admin mutations write to Postgres directly, through `'use server'` actions in
+  `apps/admin/src/lib/actions/*`. Each action is responsible for calling
+  `requireRole()` first, validating its input with the Zod schema in
+  `apps/admin/src/lib/schemas.ts`, and calling `writeAuditLog()` after the
+  write — the three things an HTTP hop to `apps/bot` would otherwise have
+  enforced for it.
+- What must NOT be reimplemented here is domain logic. Anything that touches
+  the order state machine, the balance ledger, or stock reservation goes
+  through `@tgshop/core` (`refundOrder`, `expireOrder`, `assertTransition`,
+  `releasePromoUse`), because those carry invariants — idempotency keys,
+  promo-use release, allowed transitions — that a second implementation
+  silently drops. The admin refund action calling core's `refundOrder` rather
+  than writing `status: REFUNDED` itself is the pattern to follow.
 - Refunds and catalog edits performed by an agent (see
   `docs/AGENT_PLAN.md`) show up in the same admin **Audit log** view with
   `actorType="agent"`, so operators have one place to review both human and

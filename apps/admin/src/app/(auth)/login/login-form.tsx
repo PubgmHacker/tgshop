@@ -22,6 +22,12 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
+  // A failed Telegram widget sign-in redirects back here as ?error=telegram
+  // (see app/api/telegram-login/route.ts). It reuses the same deliberately vague
+  // message as the password path: telling the operator which half failed would
+  // also tell an attacker whether that Telegram account is an admin.
+  const telegramFailed = searchParams.get('error') === 'telegram'
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setPending(true)
@@ -78,7 +84,9 @@ export function LoginForm() {
           onChange={(e) => setTotp(e.target.value)}
         />
       </div>
-      {error && <p className="text-sm text-destructive">{t('auth.login.error')}</p>}
+      {(error || telegramFailed) && (
+        <p className="text-sm text-destructive">{t('auth.login.error')}</p>
+      )}
       <Button type="submit" disabled={pending}>
         {t('auth.login.submit')}
       </Button>

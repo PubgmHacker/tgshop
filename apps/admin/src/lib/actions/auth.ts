@@ -4,10 +4,10 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { compare } from 'bcryptjs'
 import { prisma } from '@tgshop/db'
-import { loginSchema, type LoginInput } from '../schemas'
+import { loginSchema, telegramLoginSchema, type LoginInput } from '../schemas'
 import { createSessionValue, SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from '../session'
 import { verifyTotp } from '../totp'
-import { verifyTelegramLogin, type TelegramLoginPayload } from '../telegram-auth'
+import { verifyTelegramLogin } from '../telegram-auth'
 import { writeAuditLog } from '../audit'
 import { getEnv } from '../env'
 
@@ -68,14 +68,25 @@ export async function loginAction(input: LoginInput): Promise<LoginResult> {
  * Server-side verification + session issuance for the Telegram Login Widget.
  * Only succeeds if an AdminUser row exists whose email matches
  * `tg:<telegram_id>` (the convention used when provisioning Telegram-linked
- * admins) — this widget path never creates new admins.
+ * admins — see `scripts/create-admin.mjs --telegram-id`) — this widget path
+ * never creates new admins.
+ *
+ * Takes `unknown` on purpose: the payload arrives from the browser as a query
+ * string, so a declared parameter type would be a claim, not a guarantee. The
+ * Zod parse below is the only thing standing between the request and the HMAC
+ * check, and it has to run before `verifyTelegramLogin()` can be trusted.
  */
-export async function telegramLoginAction(payload: TelegramLoginPayload): Promise<LoginResult> {
-  if (!verifyTelegramLogin(payload)) {
+export async function telegramLoginAction(payload: unknown): Promise<LoginResult> {
+  const parsed = telegramLoginSchema.safeParse(payload)
+  if (!parsed.success) {
     return { ok: false, error: 'auth.login.error' }
   }
 
-  const linkedEmail = `tg:${payload.id}`
+  if (!verifyTelegramLogin(parsed.data)) {
+    return { ok: false, error: 'auth.login.error' }
+  }
+
+  const linkedEmail = `tg:${parsed.data.id}`
   const admin = await prisma.adminUser.findUnique({ where: { email: linkedEmail } })
   if (!admin) {
     return { ok: false, error: 'auth.login.error' }

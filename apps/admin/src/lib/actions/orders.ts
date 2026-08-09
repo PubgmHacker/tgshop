@@ -1,10 +1,17 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { prisma, AdminRole, OrderStatus, StockStatus, LedgerType, type Prisma } from '@tgshop/db'
-import { credit } from '@tgshop/core'
+import { prisma, AdminRole, OrderStatus, type Prisma } from '@tgshop/db'
+import {
+  getBalance,
+  markDelivered,
+  markDelivering,
+  refundOrder,
+  OrderStateError
+} from '@tgshop/core'
 import { requireRole } from '../rbac'
 import { writeAuditLog } from '../audit'
+import { canRedeliverOrder, canRefundOrder } from '../orders-policy'
 import {
   orderFilterSchema,
   orderRedeliverSchema,
@@ -15,15 +22,18 @@ import {
 } from '../schemas'
 
 /**
- * Statuses a re-delivery is allowed from. Widened to `OrderStatus[]` on purpose:
- * a bare array literal narrows to its members, and `.includes(order.status)`
- * would then be a type error rather than a runtime check.
+ * Turns core's state-machine error into something an operator can act on.
+ *
+ * OrderStateError's own message names the graph edge ("PENDING -> REFUNDED"),
+ * which is the right text for a log and the wrong text for a support agent
+ * staring at a button that just failed.
  */
-const REDELIVERABLE_STATUSES: readonly OrderStatus[] = [
-  OrderStatus.DELIVERED,
-  OrderStatus.PAID,
-  OrderStatus.FAILED
-]
+function describeStateError(err: unknown, action: string, orderId: string): never {
+  if (err instanceof OrderStateError) {
+    throw new Error(`Order ${orderId} is in status ${err.from} and cannot be ${action}`)
+  }
+  throw err
+}
 
 export async function listOrdersAction(input: OrderFilterInput) {
   requireRole(AdminRole.SUPPORT)
@@ -78,36 +88,47 @@ export async function getOrderDetailAction(orderId: string) {
 }
 
 /**
- * Re-delivers an order: re-attaches the already-reserved StockItem's ciphertext
- * (or, if none, throws) to Order.deliveredPayloadEnc and marks it DELIVERED again.
- * Does not touch stock counts — this is for resending an existing delivery, not
- * granting a new item.
+ * Re-delivers an order: re-attaches the already-issued ciphertext to
+ * Order.deliveredPayloadEnc and marks it DELIVERED again.
+ *
+ * This is for re-sending something the buyer already owns — a lost message, a
+ * MANUAL_FALLBACK order an admin has now fulfilled by hand — so it deliberately
+ * claims NO new stock. The payload comes from the order itself when it has one
+ * (template-minted UNIQUE_CODE plans never touch the pool) and otherwise from
+ * the stock item already reserved for it.
+ *
+ * Both status writes go through core's mutators inside one transaction, so the
+ * state machine is enforced here exactly as it is on the delivery path. A
+ * MANUAL_FALLBACK order sitting in DELIVERING needs no first hop; a PAID one
+ * does, which is why markDelivering() runs first (it is a no-op when the order
+ * is already DELIVERING).
  */
 export async function redeliverOrderAction(input: OrderRedeliverInput) {
   const session = requireRole(AdminRole.ADMIN)
   const data = orderRedeliverSchema.parse(input)
 
-  const order = await prisma.order.findUnique({ where: { id: data.orderId }, include: { stockItem: true } })
+  const order = await prisma.order.findUnique({
+    where: { id: data.orderId },
+    include: { stockItem: true }
+  })
   if (!order) {
     throw new Error(`Order not found: ${data.orderId}`)
   }
-  if (!REDELIVERABLE_STATUSES.includes(order.status)) {
-    throw new Error(`Order ${data.orderId} is in status ${order.status} and cannot be re-delivered`)
+  if (!canRedeliverOrder(order)) {
+    throw new Error(
+      `Order ${data.orderId} cannot be re-delivered: status ${order.status} with no stored payload`
+    )
   }
 
-  const payloadEnc = order.deliveredPayloadEnc ?? order.stockItem?.payloadEnc
-  if (!payloadEnc) {
-    throw new Error(`Order ${data.orderId} has no stored payload to re-deliver`)
-  }
+  // Non-null by canRedeliverOrder(), which required one of the two to exist.
+  const payloadEnc = (order.deliveredPayloadEnc ?? order.stockItem?.payloadEnc) as string
 
-  const updated = await prisma.order.update({
-    where: { id: data.orderId },
-    data: {
-      status: OrderStatus.DELIVERED,
-      deliveredPayloadEnc: payloadEnc,
-      deliveredAt: new Date()
-    }
-  })
+  const updated = await prisma
+    .$transaction(async (tx) => {
+      await markDelivering(tx, data.orderId)
+      return markDelivered(tx, data.orderId, payloadEnc)
+    })
+    .catch((err: unknown) => describeStateError(err, 're-delivered', data.orderId))
 
   await writeAuditLog({
     actorId: session.adminId,
@@ -122,48 +143,38 @@ export async function redeliverOrderAction(input: OrderRedeliverInput) {
 }
 
 /**
- * Refunds an order: releases its stock item back to AVAILABLE (so it can be
- * resold), credits the user's balance via the ledger (append-only,
- * LedgerType.REFUND), and marks the order REFUNDED. All in one transaction.
+ * Refunds an order to the user's internal balance and marks it REFUNDED.
+ *
+ * The work is core's `refundOrder()` rather than a local transaction, because
+ * the four things that make a refund correct are all easy to omit and were all
+ * omitted here before: stock is released ONLY when still RESERVED (a credential
+ * the buyer already received must never go back on sale), a capped promo's use
+ * is returned, the state machine is consulted, and a zero-amount order is not
+ * pushed through the ledger's positive-amount guard.
+ *
+ * Idempotent on the ledger key `refund:<orderId>` — shared with every other
+ * refund path — so a double-clicked button credits the buyer exactly once.
  */
 export async function refundOrderAction(input: OrderRefundInput) {
   const session = requireRole(AdminRole.ADMIN)
   const data = orderRefundSchema.parse(input)
 
-  const order = await prisma.order.findUnique({ where: { id: data.orderId }, include: { stockItem: true } })
+  const order = await prisma.order.findUnique({ where: { id: data.orderId } })
   if (!order) {
     throw new Error(`Order not found: ${data.orderId}`)
   }
-  if (order.status === OrderStatus.REFUNDED) {
-    throw new Error(`Order ${data.orderId} is already refunded`)
+  if (!canRefundOrder(order.status)) {
+    throw new Error(`Order ${data.orderId} is in status ${order.status} and cannot be refunded`)
   }
 
-  const idempotencyKey = `refund:${data.orderId}`
+  const updatedOrder = await prisma
+    .$transaction((tx) => refundOrder(tx, data.orderId, data.reason))
+    .catch((err: unknown) => describeStateError(err, 'refunded', data.orderId))
 
-  const result = await prisma.$transaction(async (tx) => {
-    const ledgerResult = await credit(tx, {
-      userId: order.userId,
-      amountCents: order.amountCents,
-      type: LedgerType.REFUND,
-      orderId: order.id,
-      comment: data.reason,
-      idempotencyKey
-    })
-
-    if (order.stockItem) {
-      await tx.stockItem.update({
-        where: { id: order.stockItem.id },
-        data: { status: StockStatus.AVAILABLE, orderId: null, reservedUntil: null }
-      })
-    }
-
-    const updatedOrder = await tx.order.update({
-      where: { id: order.id },
-      data: { status: OrderStatus.REFUNDED }
-    })
-
-    return { ledgerResult, updatedOrder }
-  })
+  // Read after the commit: refundOrder() credits nothing for a zero-amount
+  // order, so there is no ledger row to report and the balance is the only
+  // number that is always true.
+  const balanceAfterCents = await getBalance(prisma, order.userId)
 
   await writeAuditLog({
     actorId: session.adminId,
@@ -175,5 +186,5 @@ export async function refundOrderAction(input: OrderRefundInput) {
 
   revalidatePath(`/orders/${data.orderId}`)
   revalidatePath('/orders')
-  return result
+  return { updatedOrder, refundedCents: order.amountCents, balanceAfterCents }
 }

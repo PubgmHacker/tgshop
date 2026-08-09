@@ -231,10 +231,30 @@ frontend-only development.
 | `pnpm dev` | Run all apps in watch mode via Turborepo |
 | `pnpm build` | Build all apps/packages |
 | `pnpm lint` / `pnpm typecheck` | Lint / typecheck the whole monorepo |
-| `pnpm test` | Unit + integration tests (`@tgshop/core`, `@tgshop/payments`) |
+| `pnpm test` | Unit + integration tests (`@tgshop/core`, `@tgshop/payments`, `@tgshop/worker`, `@tgshop/bot`) |
 | `pnpm test:e2e` | End-to-end tests against a real Postgres (see `e2e/`) |
 | `pnpm db:migrate` / `db:push` / `db:seed` / `db:studio` / `db:generate` | Prisma workflows against `@tgshop/db` |
 | `./scripts/gen-keys.sh` | Generate `ENCRYPTION_KEY`/`JWT_SECRET`/`SESSION_SECRET`/`WEBHOOK_SECRET`/`SERVICE_TOKEN` |
 | `./scripts/setup-webhook.sh [set\|info\|delete]` | Manage the Telegram webhook |
 | `./scripts/backup-postgres.sh` | Nightly `pg_dump` + gzip + rotation |
 | `./scripts/restore-postgres.sh <file.sql.gz>` | Restore from a backup |
+| `node scripts/create-admin.mjs --email <email> --role OWNER` | Create (or reset) an admin account with a real bcrypt hash — **the only way to get a usable login**, see `docs/ADMIN.md` |
+| `node scripts/verify-api.mjs` | Smoke-tests the bot's `/api` + `/internal` auth surface against a booted Fastify instance |
+| `node scripts/verify-seed.mjs` | Checks the seeded catalog counts and decrypts a `StockItem` payload end-to-end |
+| `node scripts/verify-broadcast.mjs` | Drives the broadcast lifecycle (arm → cancel → re-arm → sweep) against real Postgres + Redis |
+| `node scripts/fake-trongrid.mjs` | Stub TronGrid server for exercising `chain:scan` without touching a real chain |
+
+The three `verify-*` scripts and `create-admin.mjs` need a live Postgres/Redis
+and the environment loaded first (`set -a; source .env; set +a`), and they
+import from `dist/`, so run `pnpm build` before them. Each prints `PASS`/`FAIL` per check and exits
+non-zero on the first failure, so they drop straight into CI. `verify-broadcast`
+cleans up every row and queue job it creates, but it does write to the database
+it is pointed at — point it at a dev database, not production.
+
+Never commit a `*.tsbuildinfo` file (they are gitignored — keep it that way).
+`tsc -b` trusts that cache to decide what to re-emit, and `dist/` is gitignored,
+so a clone that has the cache but no output builds "successfully" while emitting
+nothing — and then every `dist/` import above fails with
+`ERR_MODULE_NOT_FOUND`. If a build ever looks suspiciously empty, delete the
+caches and rebuild: `find . -name '*.tsbuildinfo' -not -path '*/node_modules/*'
+-delete && pnpm build`.

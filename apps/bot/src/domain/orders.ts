@@ -2,24 +2,20 @@ import { prisma, LedgerType, OrderStatus, PaymentProvider } from '@tgshop/db'
 import type { Order, Prisma } from '@tgshop/db'
 import {
   computeOrderTotal,
-  countAvailable,
   createOrder as coreCreateOrder,
-  createSubscriptionForOrder,
-  credit,
   creditReferralBonus,
   debit,
   decrypt,
-  deliver,
   encrypt,
   expireOrder,
-  isPoolBacked,
-  markFailed,
+  fulfillOrder,
   markPaid,
+  renewFromBalance,
   DeliveryFailedError,
-  ManualFallbackRequiredError,
   OrderNotFoundError,
-  OrderStateError,
-  type PricingBreakdown
+  type FulfillmentEmitter,
+  type PricingBreakdown,
+  type RenewResult
 } from '@tgshop/core'
 import { emitEvent } from './events.js'
 import { externalSupplier } from './supplier.js'
@@ -39,7 +35,8 @@ import { newId } from '../lib/ids.js'
 //   state transitions  core ALLOWED_TRANSITIONS via markPaid/markFailed/…
 //   promo counting     core createOrder() / expireOrder() / refundOrder()
 //   pricing            core computeOrderTotal()
-//   subscriptions      core createSubscriptionForOrder()
+//   delivery + refund  core fulfillOrder()
+//   subscriptions      core createSubscriptionForOrder(), via fulfillOrder()
 //   referral bonuses   core creditReferralBonus()
 //
 // What is left here is adaptation: opening transactions, shaping results for the
@@ -50,16 +47,33 @@ import { newId } from '../lib/ids.js'
 // compile:
 //
 //   • core's order mutators (createOrder, markPaid, markFailed, expireOrder,
-//     createSubscriptionForOrder, creditReferralBonus, credit/debit) take a
-//     TRANSACTION CLIENT. They must be handed the `tx` from prisma.$transaction()
-//     so their reads and writes commit or roll back as one unit.
+//     creditReferralBonus, credit/debit) take a TRANSACTION CLIENT. They must be
+//     handed the `tx` from prisma.$transaction() so their reads and writes commit
+//     or roll back as one unit.
 //
-//   • core's deliver() takes the PRISMA CLIENT. It opens its own transaction for
-//     the stock claim because the row lock taken by FOR UPDATE SKIP LOCKED has
-//     to be held until that transaction commits. Handing it a `tx` would nest a
-//     transaction inside a transaction and give up exactly the guarantee that
-//     makes double-selling impossible.
+//   • core's fulfillOrder()/deliver() take the PRISMA CLIENT. Delivery opens its
+//     own transaction for the stock claim because the row lock taken by FOR
+//     UPDATE SKIP LOCKED has to be held until that transaction commits. Handing
+//     it a `tx` would nest a transaction inside a transaction and give up exactly
+//     the guarantee that makes double-selling impossible.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The bot's wiring into core's fulfilment pipeline: the external-API supplier,
+ * the domain-event sink, and structured logging. Shared by every settle path so
+ * a Stars purchase and a balance purchase cannot diverge.
+ */
+const fulfillOptions = {
+  supplier: externalSupplier,
+  emit: {
+    orderDelivered: (e) => emitEvent('order.delivered', e),
+    orderFailed: (e) => emitEvent('order.failed', e),
+    stockLow: (e) => emitEvent('stock.low', e)
+  } satisfies FulfillmentEmitter,
+  onWarning: (message: string, context: Record<string, unknown>): void => {
+    logger.error(context, message)
+  }
+}
 
 export interface CreateOrderInput {
   userId: string
@@ -211,149 +225,24 @@ export async function deliverOrder(orderId: string): Promise<Order> {
 }
 
 /**
- * The single delivery path for the whole bot: core's deliver(), plus everything
- * that must happen once it has succeeded or definitively failed.
+ * The single delivery path for the whole bot: core's fulfillOrder(), which owns
+ * delivery, the subscription row, the fail-and-refund settlement, and the domain
+ * events. apps/worker calls the very same function, so a purchase settles
+ * identically whichever rail paid for it.
  *
  * `prisma` — the client, not a transaction — is passed on purpose; see the
  * transaction contract at the top of this file.
  */
 async function deliverAndSettle(orderId: string): Promise<Order> {
-  const before = await requireOrder(orderId)
-  const alreadyDelivered = before.status === OrderStatus.DELIVERED
+  const outcome = await fulfillOrder(prisma, orderId, fulfillOptions)
 
-  try {
-    await deliver(prisma, orderId, { supplier: externalSupplier })
-  } catch (err) {
-    if (err instanceof ManualFallbackRequiredError) {
-      // Not a failure. core leaves the order in DELIVERING deliberately and an
-      // admin completes it out of band, so there is nothing to fail or refund —
-      // the throw is an alert signal, not an error condition.
-      logger.warn({ orderId }, 'order requires manual delivery by an admin')
-      return requireOrder(orderId)
-    }
-    return settleFailedDelivery(orderId, err)
+  if (outcome.status === 'manual') {
+    // Not a failure. core leaves the order in DELIVERING deliberately and an
+    // admin completes it out of band, so there is nothing to fail or refund.
+    logger.warn({ orderId }, 'order requires manual delivery by an admin')
   }
 
-  const delivered = await requireOrder(orderId)
-
-  // Post-delivery bookkeeping. The payload is already committed to the order
-  // row, so nothing below may throw its way back to the caller and turn a
-  // completed purchase into an error the buyer sees.
-  try {
-    // Idempotent in core (Subscription.orderId is unique), so this also repairs
-    // an earlier run that crashed between delivery and subscription creation.
-    await prisma.$transaction((tx) => createSubscriptionForOrder(tx, orderId))
-
-    // Events describe transitions, not readings: re-delivering an order that was
-    // already DELIVERED (a resent webhook) is not a new delivery, and it did not
-    // consume a stock item either, so neither event applies.
-    if (!alreadyDelivered) {
-      await emitEvent('order.delivered', {
-        orderId: delivered.id,
-        userId: delivered.userId,
-        planId: delivered.planId,
-        deliveredAt: (delivered.deliveredAt ?? new Date()).toISOString()
-      })
-      await emitStockLow(delivered.planId)
-    }
-  } catch (err) {
-    logger.error({ err, orderId }, 'post-delivery bookkeeping failed; order is delivered')
-  }
-
-  return delivered
-}
-
-/**
- * Settles an order whose delivery failed: FAILED plus a refund, then re-throws
- * the original error so the caller can tell the buyer what went wrong.
- */
-async function settleFailedDelivery(orderId: string, cause: unknown): Promise<never> {
-  // An order that was never deliverable in the first place — already EXPIRED or
-  // REFUNDED, or never paid — took no money for this attempt. Marking it FAILED
-  // and crediting it here would invent a payout out of a caller's mistake.
-  if (cause instanceof OrderStateError || cause instanceof OrderNotFoundError) throw cause
-
-  const reason = cause instanceof Error ? cause.message : String(cause)
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { id: orderId } })
-      if (!order) return
-
-      // core's EXTERNAL_API path already fails AND refunds the order itself
-      // before throwing. Re-running that here would attempt an illegal
-      // FAILED -> FAILED transition, so only settle an order still in flight.
-      if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.DELIVERING) return
-
-      // markFailed() also returns any stock merely RESERVED for this order to
-      // the pool and writes the audit row — another reason not to hand-roll it.
-      await markFailed(tx, orderId, reason)
-
-      // The money left the balance in the payment transaction, so the only
-      // acceptable end state is "refunded". The key is the one core's own
-      // auto-refund and apps/worker both use: whichever of the three gets here
-      // first, the ledger's idempotency means the user is credited exactly once.
-      if (order.amountCents > 0) {
-        await credit(tx, {
-          userId: order.userId,
-          amountCents: order.amountCents,
-          type: LedgerType.REFUND,
-          orderId,
-          idempotencyKey: `delivery-failed-refund:${orderId}`,
-          comment: `Auto-refund: delivery failed (${reason})`
-        })
-      }
-    })
-  } catch (settleErr) {
-    // Never let a bookkeeping error mask the delivery error the caller needs to
-    // see and act on.
-    logger.error({ err: settleErr, orderId }, 'could not mark a failed delivery FAILED/refunded')
-  }
-
-  const order = await prisma.order.findUnique({ where: { id: orderId } })
-  if (order) {
-    await emitEvent('order.failed', {
-      orderId,
-      userId: order.userId,
-      reason,
-      // Read back rather than assumed: core may have issued the refund itself.
-      refundedCents: await refundedCentsFor(orderId)
-    })
-  }
-
-  throw cause
-}
-
-/**
- * Publishes stock.low when a delivery has drawn a pool down to (or below) the
- * plan's own threshold.
- *
- * Only pool-backed plans have a finite level. An EXTERNAL_API plan — or a
- * UNIQUE_CODE plan that mints codes from a template — would otherwise report
- * zero available forever and fire this alert on every single sale.
- */
-async function emitStockLow(planId: string): Promise<void> {
-  const plan = await prisma.plan.findUnique({
-    where: { id: planId },
-    select: {
-      id: true,
-      productId: true,
-      lowStockThreshold: true,
-      product: { select: { deliveryType: true, externalConfig: true } }
-    }
-  })
-  if (!plan) return
-  if (!isPoolBacked(plan.product.deliveryType, plan.product.externalConfig)) return
-
-  const available = await countAvailable(prisma, plan.id)
-  if (available > plan.lowStockThreshold) return
-
-  await emitEvent('stock.low', {
-    planId: plan.id,
-    productId: plan.productId,
-    available,
-    threshold: plan.lowStockThreshold
-  })
+  return outcome.order
 }
 
 /**
@@ -383,21 +272,6 @@ async function emitOrderPaid(order: Order): Promise<void> {
     provider: order.provider,
     amountCents: order.amountCents
   })
-}
-
-/** Total already credited back for an order, whoever issued it (core, worker, or here). */
-async function refundedCentsFor(orderId: string): Promise<number> {
-  const result = await prisma.balanceTransaction.aggregate({
-    where: { orderId, type: LedgerType.REFUND },
-    _sum: { amountCents: true }
-  })
-  return result._sum.amountCents ?? 0
-}
-
-async function requireOrder(orderId: string): Promise<Order> {
-  const order = await prisma.order.findUnique({ where: { id: orderId } })
-  if (!order) throw new OrderNotFoundError(orderId)
-  return order
 }
 
 /** Decrypts an order's delivered payload for display to its owner. Throws if not yet delivered. */
@@ -461,6 +335,40 @@ export async function listUserSubscriptions(userId: string) {
     orderBy: { expiresAt: 'desc' },
     include: { plan: { include: { product: true } } }
   })
+}
+
+export async function getSubscriptionForUser(subscriptionId: string, userId: string) {
+  // Scoped by userId, not just id: the subscription id travels in callback data,
+  // which the client controls, so an id belonging to someone else must read as
+  // "not found" rather than as a subscription this user may spend money on.
+  return prisma.subscription.findFirst({
+    where: { id: subscriptionId, userId },
+    include: { plan: { include: { product: true } } }
+  })
+}
+
+/**
+ * The subscription period a renewal order bought.
+ *
+ * Renewing does not extend the existing row — core closes it out as EXPIRED and
+ * writes a fresh ACTIVE one — so the only handle on the new period is the order
+ * that paid for it (`Subscription.orderId` is unique).
+ */
+export async function getSubscriptionByOrderId(orderId: string) {
+  return prisma.subscription.findUnique({ where: { orderId } })
+}
+
+/**
+ * Renews one subscription period from the user's internal balance.
+ *
+ * Straight through to core, which owns the debit, the order, the period stacking
+ * and — critically — the idempotency key. The worker's hourly auto-renew sweep
+ * calls the SAME function, so a user tapping "Renew" at the moment the sweep is
+ * renewing the same period is deduplicated by the ledger instead of being
+ * charged twice.
+ */
+export async function renewSubscriptionFromBalance(subscriptionId: string): Promise<RenewResult> {
+  return renewFromBalance(prisma, subscriptionId)
 }
 
 /**

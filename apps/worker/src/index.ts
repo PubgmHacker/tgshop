@@ -11,7 +11,7 @@ import { startChainSweepWorker, registerChainSweepRepeatables } from './queues/c
 import { startDeliveryWorker } from './queues/delivery.worker.js'
 import { startOrdersExpireWorker, registerOrdersExpireRepeatables } from './queues/orders-expire.worker.js'
 import { startSubsRemindWorker, registerSubsRemindRepeatables } from './queues/subs-remind.worker.js'
-import { startBroadcastWorker } from './queues/broadcast.worker.js'
+import { startBroadcastWorker, registerBroadcastRepeatables } from './queues/broadcast.worker.js'
 import { startNotifyWorker, registerNotifyRepeatables } from './queues/notify.worker.js'
 
 export { enqueueDelivery } from './queues/delivery.js'
@@ -43,6 +43,7 @@ async function main(): Promise<void> {
     registerChainSweepRepeatables(),
     registerOrdersExpireRepeatables(),
     registerSubsRemindRepeatables(),
+    registerBroadcastRepeatables(),
     registerNotifyRepeatables()
   ])
 

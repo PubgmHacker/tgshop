@@ -2,6 +2,7 @@ import type { Job } from 'bullmq'
 import { prisma, PaymentProvider, PaymentStatus, OrderStatus } from '@tgshop/db'
 import { createWorker, QueueName, newCorrelationId, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
+import { emitEvent } from '../events.js'
 import { getCryptoBotClient } from '../lib/cryptobot.js'
 import { enqueueDelivery } from './delivery.js'
 
@@ -53,8 +54,7 @@ async function processPaymentsPoll(job: Job<Record<string, never>>): Promise<voi
     if (!invoice) continue
 
     if (invoice.status === 'paid') {
-      await settlePaidInvoice(payment.id, payment.orderId, payment.userId, log)
-      settledCount += 1
+      if (await settlePaidInvoice(payment, log)) settledCount += 1
     } else if (invoice.status === 'expired' && payment.status === PaymentStatus.PENDING) {
       await prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.EXPIRED } })
     }
@@ -63,32 +63,61 @@ async function processPaymentsPoll(job: Job<Record<string, never>>): Promise<voi
   log.info({ checked: pending.length, settled: settledCount }, 'payments:poll sweep complete')
 }
 
+/**
+ * Settles one polled-and-found-paid invoice. Returns whether THIS call is the
+ * one that settled it.
+ *
+ * The return value is not cosmetic: the transaction below is a no-op when the
+ * order has already left PENDING (the webhook beat the poll to it), and
+ * announcing `payment.received` for that no-op would tell every consumer a
+ * second payment arrived for an order that was only ever paid once.
+ */
 async function settlePaidInvoice(
-  paymentId: string,
-  orderId: string | null,
-  userId: string,
+  payment: { id: string; orderId: string | null; userId: string; amount: bigint; asset: string },
   log: ReturnType<typeof jobLogger>
-): Promise<void> {
+): Promise<boolean> {
+  const { id: paymentId, orderId, userId } = payment
+
   if (!orderId) {
     log.warn({ paymentId }, 'paid CryptoBot invoice has no linked order, marking payment PAID only')
     await prisma.payment.update({ where: { id: paymentId }, data: { status: PaymentStatus.PAID } })
-    return
+    return false
   }
 
-  await prisma.$transaction(async (tx) => {
+  const settled = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } })
-    if (!order || order.status !== OrderStatus.PENDING) return
+    if (!order || order.status !== OrderStatus.PENDING) return false
 
     await tx.payment.update({ where: { id: paymentId }, data: { status: PaymentStatus.PAID } })
     await tx.order.update({ where: { id: orderId }, data: { status: OrderStatus.PAID, paidAt: new Date() } })
+    return true
   })
+
+  if (!settled) {
+    log.debug({ orderId, paymentId }, 'CryptoBot invoice already settled elsewhere, poll is a no-op')
+    return false
+  }
 
   // Ledger entries are not written here: CryptoBot direct purchases settle
   // straight to delivery without touching the balance ledger (ledger only
   // tracks balance top-ups/spend, not direct order payments).
 
+  // After commit — an event published from inside the transaction would survive
+  // a rollback the consumer cannot see. CryptoBot settles off-chain, so there is
+  // no txHash to report.
+  await emitEvent('payment.received', {
+    paymentId,
+    orderId,
+    userId,
+    provider: PaymentProvider.CRYPTOBOT,
+    amount: payment.amount.toString(),
+    asset: payment.asset,
+    txHash: null
+  })
+
   await enqueueDelivery(orderId)
   log.info({ orderId, paymentId, userId }, 'settled missed CryptoBot payment via poll fallback')
+  return true
 }
 
 export function startPaymentsPollWorker() {

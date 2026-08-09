@@ -6,6 +6,14 @@ node_modules
 dist
 **/dist
 
+# TypeScript incremental build caches. These MUST NOT be committed: `tsc -b`
+# trusts the cache to decide what to re-emit, but dist/ is ignored above, so a
+# fresh clone has the cache and no output — tsc then reports success and emits
+# nothing, leaving every `dist/` import (the verify-* scripts, the bot and
+# worker images) to fail with ERR_MODULE_NOT_FOUND.
+*.tsbuildinfo
+**/*.tsbuildinfo
+
 .env
 .env.*
 !.env.example

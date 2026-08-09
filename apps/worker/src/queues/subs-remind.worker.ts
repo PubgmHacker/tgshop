@@ -1,6 +1,6 @@
 import type { Job } from 'bullmq'
-import { prisma, SubStatus, OrderStatus, PaymentProvider, LedgerType } from '@tgshop/db'
-import { debit } from '@tgshop/core'
+import { prisma, SubStatus } from '@tgshop/db'
+import { renewFromBalance, type RenewFailureReason } from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
 import { sendTelegramMessage } from '../telegram.js'
@@ -12,11 +12,17 @@ import { loadEnv } from '../env.js'
 //   - expiring in ~3 days and not yet reminded at the 3-day mark: send a
 //     reminder with a one-tap renew button.
 //   - expiring in ~1 day: send an urgent reminder.
-//   - already expired: mark EXPIRED; if autoRenew is on, attempt to debit the
-//     plan price from balance and create a fresh renewal Order + Subscription;
-//     otherwise leave expired (user must renew manually).
+//   - already expired: mark EXPIRED; if autoRenew is on, attempt to renew from
+//     balance; otherwise leave expired (user must renew manually).
 // remindedAt tracks only the most recent reminder sent, to avoid duplicate
 // sends within the same day when the sweep runs more than once daily.
+//
+// The renewal itself is core's renewFromBalance(). This worker used to carry a
+// second copy of it, and the copy debited under a DIFFERENT idempotency key
+// (`sub-autorenew:` vs core's `sub-renew:`). Ledger idempotency is keyed on an
+// opaque string, so those two keys did not deduplicate against each other: a
+// user who tapped "Renew" while this sweep was auto-renewing the same period
+// would have been charged twice for it. One implementation, one key.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000 // hourly
@@ -89,10 +95,18 @@ async function sendReminder(
   })
 }
 
+/**
+ * Ends a subscription period: renews it from balance when the user asked for
+ * that, otherwise marks it EXPIRED. Returns true only when a renewal committed.
+ *
+ * core's renewFromBalance() closes the old period out itself as part of the
+ * renewal transaction, so EXPIRED is written here only on the paths where no
+ * renewal happened.
+ */
 async function tryExpireOrRenew(
   sub: Awaited<ReturnType<typeof prisma.subscription.findMany>>[number] & {
     user: { languageCode: string | null; tgId: bigint }
-    plan: { title: string; priceCents: number; durationDays: number | null }
+    plan: { title: string }
   },
   log: ReturnType<typeof jobLogger>
 ): Promise<boolean> {
@@ -100,66 +114,62 @@ async function tryExpireOrRenew(
   const locale = resolveLocale(sub.user.languageCode)
 
   if (!sub.autoRenew || !env.SUBS_AUTO_RENEW_ENABLED) {
-    await prisma.subscription.update({ where: { id: sub.id }, data: { status: SubStatus.EXPIRED } })
+    await expire(sub.id)
     return false
   }
 
+  let result
   try {
-    const durationDays = sub.plan.durationDays ?? 30
-    const idempotencyKey = `sub-autorenew:${sub.id}:${sub.expiresAt.toISOString()}`
+    result = await renewFromBalance(prisma, sub.id)
+  } catch (err) {
+    // Anything left is infrastructural (the ledger already answers a flat
+    // balance with a typed refusal rather than a throw), so the period still
+    // has to be closed — a subscription cannot stay ACTIVE past its expiry.
+    log.error({ err, subscriptionId: sub.id }, 'auto-renew errored')
+    await expire(sub.id)
+    await notifyRenewFailed(sub, locale, log)
+    return false
+  }
 
-    await prisma.$transaction(async (tx) => {
-      await debit(tx, {
-        userId: sub.userId,
-        amountCents: sub.plan.priceCents,
-        type: LedgerType.PURCHASE,
-        idempotencyKey,
-        comment: `Auto-renew subscription ${sub.id}`
-      })
-
-      const newOrder = await tx.order.create({
-        data: {
-          userId: sub.userId,
-          planId: sub.planId,
-          qty: 1,
-          amountCents: sub.plan.priceCents,
-          currency: 'USD',
-          provider: PaymentProvider.BALANCE,
-          status: OrderStatus.PAID,
-          idempotencyKey: `${idempotencyKey}:order`,
-          paidAt: new Date()
-        }
-      })
-
-      const startsAt = sub.expiresAt.getTime() > Date.now() ? sub.expiresAt : new Date()
-      const expiresAt = new Date(startsAt.getTime() + durationDays * DAY_MS)
-
-      await tx.subscription.update({ where: { id: sub.id }, data: { status: SubStatus.EXPIRED } })
-      await tx.subscription.create({
-        data: {
-          userId: sub.userId,
-          planId: sub.planId,
-          orderId: newOrder.id,
-          startsAt,
-          expiresAt,
-          autoRenew: true,
-          status: SubStatus.ACTIVE
-        }
-      })
-    })
-
+  if (result.ok) {
+    log.info({ subscriptionId: sub.id, orderId: result.orderId }, 'subscription auto-renewed')
     await sendTelegramMessage(sub.user.tgId, t(locale).subAutoRenewed(sub.plan.title)).catch((err) =>
       log.error({ err, subscriptionId: sub.id }, 'failed to notify user of auto-renewal')
     )
     return true
-  } catch (err) {
-    log.warn({ err, subscriptionId: sub.id }, 'auto-renew failed, likely insufficient balance')
-    await prisma.subscription.update({ where: { id: sub.id }, data: { status: SubStatus.EXPIRED } })
-    await sendTelegramMessage(sub.user.tgId, t(locale).subAutoRenewFailed(sub.plan.title)).catch((sendErr) =>
-      log.error({ sendErr, subscriptionId: sub.id }, 'failed to notify user of auto-renew failure')
-    )
-    return false
   }
+
+  log.warn({ subscriptionId: sub.id, reason: result.reason }, 'auto-renew declined')
+  await expire(sub.id)
+  // 'not_active' means something else already closed this period out, so the
+  // user has nothing to act on and does not need a message about it.
+  if (result.reason !== 'not_active') {
+    await notifyRenewFailed(sub, locale, log, result.reason)
+  }
+  return false
+}
+
+async function expire(subscriptionId: string): Promise<void> {
+  await prisma.subscription.update({
+    where: { id: subscriptionId },
+    data: { status: SubStatus.EXPIRED }
+  })
+}
+
+async function notifyRenewFailed(
+  sub: { id: string; user: { tgId: bigint }; plan: { title: string } },
+  locale: 'ru' | 'en',
+  log: ReturnType<typeof jobLogger>,
+  reason?: RenewFailureReason
+): Promise<void> {
+  const strings = t(locale)
+  const text =
+    reason === 'plan_inactive'
+      ? strings.subRenewPlanInactive(sub.plan.title)
+      : strings.subAutoRenewFailed(sub.plan.title)
+  await sendTelegramMessage(sub.user.tgId, text).catch((sendErr) =>
+    log.error({ sendErr, subscriptionId: sub.id }, 'failed to notify user of auto-renew failure')
+  )
 }
 
 export function startSubsRemindWorker() {

@@ -69,6 +69,14 @@
     "empty": "You have no purchases yet.",
     "item": "#{orderId} · {product} · {status} · {date}"
   },
+  "subscriptions": {
+    "title": "💳 <b>Subscriptions</b>",
+    "renew_confirm": "Renew \"{plan}\" for {price}? It will be charged to your balance.",
+    "renewed": "✅ Your \"{plan}\" subscription is renewed until {expiresAt}.",
+    "insufficient_balance": "⚠️ Not enough balance to renew \"{plan}\". Top up and try again.",
+    "not_active": "ℹ️ This subscription is no longer active, so there is nothing to renew. Grab a new one from the catalog.",
+    "plan_inactive": "⚠️ The \"{plan}\" plan is no longer available, so it cannot be renewed. Contact support and we will find you an alternative."
+  },
   "referrals": {
     "title": "🎁 <b>Referral program</b>\n\nInvite friends and earn a bonus from every purchase they make!\n\nYour link:\n{refLink}\n\nFriends invited: {count}\nEarned: {earnings}"
   },
