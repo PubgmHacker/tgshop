@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9.15.0"
+
+jobs:
+  ci:
+    name: lint / typecheck / build / test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tgshop
+          POSTGRES_PASSWORD: tgshop
+          POSTGRES_DB: tgshop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tgshop -d tgshop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://tgshop:tgshop@localhost:5432/tgshop_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000001
+      JWT_SECRET: ci-jwt-secret-not-for-prod
+      # The admin app enforces a 32-character minimum on this one.
+      SESSION_SECRET: ci-session-secret-not-for-prod-32c
+      WEBHOOK_SECRET: ci-webhook-secret-not-for-prod
+      SERVICE_TOKEN: ci-service-token-not-for-prod
+      BOT_TOKEN: 000000:CI-PLACEHOLDER-TOKEN
+      BOT_USERNAME: ci_placeholder_bot
+      # The bot validates these as URLs at boot; absent values fail env parsing.
+      MINIAPP_URL: https://miniapp.ci.invalid
+      LANDING_URL: https://ci.invalid
+      ADMIN_URL: https://admin.ci.invalid
+      NEXT_PUBLIC_API_URL: https://api.ci.invalid
+      NEXT_PUBLIC_BOT_USERNAME: ci_placeholder_bot
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm --filter @tgshop/db exec prisma generate
+
+      - name: Prisma migrate deploy (test DB)
+        run: pnpm --filter @tgshop/db exec prisma migrate deploy
+
+      - name: Lint
+        run: pnpm turbo run lint
+
+      - name: Typecheck
+        run: pnpm turbo run typecheck
+
+      - name: Build
+        run: pnpm turbo run build
+
+      - name: Test
+        run: pnpm turbo run test -- --run
+
+  docker-build-check:
+    name: docker build (sanity, no push)
+    runs-on: ubuntu-latest
+    needs: ci
+    strategy:
+      matrix:
+        app: [bot, worker, miniapp, landing, admin]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.app }} image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          tags: tgshop/${{ matrix.app }}:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

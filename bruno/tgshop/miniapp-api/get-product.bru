@@ -1,0 +1,24 @@
+meta {
+  name: Get product with plans
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{miniapp_base}}/api/products/:slug
+  body: none
+  auth: none
+}
+
+params:path {
+  slug: premium-vpn
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Returns a single product by slug with its active plans (price, duration,
+  discount, remaining stock count for STOCK_POOL plans).
+}

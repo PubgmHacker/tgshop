@@ -1,0 +1,27 @@
+# Keep the build context lean and, crucially, stop the host's macOS-built
+# node_modules / .next / dist from overwriting the Linux artifacts produced
+# inside the image (COPY . . does NOT honor .gitignore).
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+
+.git
+.github
+
+.env
+.env.*
+!.env.example
+
+.turbo
+**/.turbo
+
+coverage
+**/coverage
+
+bruno
+docs
+*.log
+.DS_Store

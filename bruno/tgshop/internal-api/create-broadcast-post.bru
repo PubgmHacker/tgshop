@@ -1,0 +1,33 @@
+meta {
+  name: Create broadcast post (agent)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{internal_base}}/internal/broadcasts
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{service_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "channelId": "@my_shop_channel",
+    "text": "🔥 Limited restock: Premium VPN 1-month plans are back in stock!",
+    "mediaUrl": null,
+    "scheduledAt": null,
+    "source": "AGENT"
+  }
+}
+
+docs {
+  Internal-only. Creates a BroadcastPost with status=DRAFT (or SCHEDULED if
+  scheduledAt is set), source=AGENT. A human admin still approves/sends DRAFT
+  posts from the admin panel unless auto-send is explicitly enabled — see
+  docs/AGENT_PLAN.md for the promo-post generation flow and safety gates.
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Reconcile payments (PLANNED - not implemented)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{internal_base}}/internal/reconcile
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{service_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "provider": "TRON_TRC20",
+    "sinceMinutes": 60
+  }
+}
+
+docs {
+  ⚠️ THIS ENDPOINT DOES NOT EXIST YET — sending this request returns 404.
+
+  It is kept as the agreed shape for an on-demand reconciliation trigger, as
+  described in docs/AGENT_PLAN.md. Today reconciliation runs ONLY as the
+  worker's scheduled `payments:poll` job, which re-checks CryptoBot invoices
+  for orders still PENDING; there is no HTTP entry point to force a pass.
+
+  To implement: add the route under apps/bot/src/server/routes/internal/,
+  behind the existing SERVICE_TOKEN guard, and have it enqueue the worker's
+  reconciliation job rather than doing the work in the request.
+}

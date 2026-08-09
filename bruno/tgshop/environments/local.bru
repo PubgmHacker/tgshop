@@ -1,0 +1,26 @@
+vars {
+  api_base: http://localhost:3000
+  miniapp_base: http://localhost:3000
+  internal_base: http://localhost:3000
+  trongrid_sim_base: http://localhost:8099
+  service_token: change-me-service-token
+  cryptobot_api_token: cryptobot-api-token-placeholder
+  jwt: paste-the-accessToken-from-Authenticate-here
+  tg_init_data: query_id=test&user=%7B%22id%22%3A111111111%2C%22first_name%22%3A%22Test%22%2C%22username%22%3A%22testuser%22%7D&auth_date=1735689600&hash=placeholder
+}
+
+docs {
+  `service_token` and `cryptobot_api_token` must match SERVICE_TOKEN and
+  CRYPTOBOT_API_TOKEN in the bot's .env — the CryptoBot webhook signature is
+  derived from the API token, not from CRYPTOBOT_WEBHOOK_SECRET.
+
+  `jwt` is filled by running miniapp-api/authenticate.bru, which stores it
+  automatically. Every /api/* route except /api/auth/telegram requires it.
+
+  `tg_init_data` is a placeholder with an invalid hash, so authenticate.bru
+  returns 401 against a real bot — see that request's docs for how to capture
+  genuine initData from a Telegram client.
+
+  `trongrid_sim_base` points at scripts/fake-trongrid.mjs (see the TRON
+  simulators under webhook-simulators/).
+}

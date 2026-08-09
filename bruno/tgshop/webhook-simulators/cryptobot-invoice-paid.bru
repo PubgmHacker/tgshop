@@ -1,0 +1,83 @@
+meta {
+  name: CryptoBot invoice paid webhook
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{api_base}}/webhook/cryptobot
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "update_id": 100001,
+    "update_type": "invoice_paid",
+    "request_date": "2026-08-06T12:00:00.000Z",
+    "payload": {
+      "invoice_id": 12345,
+      "hash": "sim-hash-12345",
+      "currency_type": "crypto",
+      "asset": "USDT",
+      "amount": "9.990000",
+      "paid_asset": "USDT",
+      "paid_amount": "9.990000",
+      "paid_usd_rate": "1.0",
+      "fee_asset": "USDT",
+      "fee_amount": "0.0199",
+      "status": "paid",
+      "created_at": "2026-08-06T11:58:00.000Z",
+      "paid_at": "2026-08-06T12:00:00.000Z",
+      "description": "tgshop order",
+      "payload": "REPLACE_WITH_ORDER_ID"
+    }
+  }
+}
+
+script:pre-request {
+  // ─────────────────────────────────────────────────────────────────────────
+  // CryptoBot webhook signature simulator.
+  //
+  // Signing scheme, exactly as apps/bot/src/payments/cryptobot.ts verifies it
+  // and as the Crypto Pay API documents it:
+  //   secret_key = SHA256(CRYPTOBOT_API_TOKEN)             // raw bytes
+  //   signature  = HMAC_SHA256(secret_key, RAW_BODY_BYTES) // hex digest
+  // sent in the "Crypto-Pay-API-Signature" header.
+  //
+  // The signature covers the RAW bytes on the wire. Signing a re-serialized
+  // copy of the body is the classic way to produce a signature that never
+  // verifies, so we serialize ONCE, sign that exact string, and send that
+  // same string as the body.
+  const CryptoJS = require('crypto-js');
+
+  const rawBody = JSON.stringify(req.getBody());
+  req.setBody(rawBody);
+
+  const secretKey = CryptoJS.SHA256(bru.getEnvVar('cryptobot_api_token'));
+  const signature = CryptoJS.HmacSHA256(rawBody, secretKey).toString(CryptoJS.enc.Hex);
+
+  req.setHeader('Crypto-Pay-API-Signature', signature);
+}
+
+docs {
+  Simulates a CryptoBot "invoice_paid" callback with a correctly computed
+  HMAC-SHA256 signature, so you can exercise the bot's /webhook/cryptobot
+  handler locally without a real CryptoBot account.
+
+  Before sending:
+  1. Set `cryptobot_api_token` in the `local` environment to the SAME value
+     the bot has in CRYPTOBOT_API_TOKEN. The key is derived from the API
+     token, NOT from CRYPTOBOT_WEBHOOK_SECRET.
+  2. Replace `payload.payload` (CryptoBot's own name for the client-supplied
+     string) with a real Order.id from your local database — the handler
+     looks the order up by that value.
+
+  Expected: 200 with an acknowledgement. Change any byte of the body by hand
+  after the script has run and the handler must reject it — that rejection is
+  the property this simulator exists to test.
+}

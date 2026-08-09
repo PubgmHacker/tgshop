@@ -1,0 +1,123 @@
+{
+  "common": {
+    "back": "◀️ Back",
+    "cancel": "Cancel",
+    "confirm": "✅ Confirm",
+    "loading": "Loading…",
+    "error_generic": "Something went wrong. Please try again shortly.",
+    "not_found": "Not found.",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "menu": {
+    "catalog": "🛍 Catalog",
+    "profile": "👤 Profile",
+    "topup": "💰 Top up",
+    "purchases": "📦 My purchases",
+    "referrals": "🎁 Referrals",
+    "faq": "❓ FAQ",
+    "open_miniapp": "🚀 Open Mini App"
+  },
+  "start": {
+    "welcome": "👋 Welcome to {shopName}!\n\nBuy digital goods quickly and securely. Pick a menu option to get started.",
+    "welcome_back": "Welcome back, {name}!",
+    "referral_applied": "🎁 Referral code applied! Your friend will get a bonus after your first purchase.",
+    "promo_applied": "🏷 Promo code \"{code}\" is ready to use at checkout."
+  },
+  "catalog": {
+    "title": "🛍 Choose a category:",
+    "empty": "Catalog is currently empty.",
+    "products_title": "Products in \"{category}\":",
+    "products_empty": "No products in this category yet.",
+    "plans_title": "Choose a plan for \"{product}\":",
+    "plans_empty": "This product has no available plans yet.",
+    "plan_button": "{title} — {price}",
+    "plan_details": "📦 <b>{product}</b>\n{planTitle}\n\n{description}\n\nPrice: <b>{price}</b>\nIn stock: {stock}",
+    "out_of_stock": "😔 This item is temporarily out of stock. Please check back later.",
+    "choose_qty": "How many would you like to buy?"
+  },
+  "order": {
+    "summary": "🧾 <b>Your order</b>\n\n{product} — {planTitle}\nQuantity: {qty}\nTotal: <b>{total}</b>\n\nChoose a payment method:",
+    "pay_balance": "💼 Balance ({balance})",
+    "pay_cryptobot": "🤖 CryptoBot",
+    "pay_stars": "⭐️ Telegram Stars",
+    "pay_usdt": "💵 USDT (TRC-20)",
+    "insufficient_balance": "Insufficient balance. Top up or choose another payment method.",
+    "created": "✅ Order #{orderId} created. Waiting for payment…",
+    "cancelled": "❌ Checkout cancelled.",
+    "paid_processing": "✅ Payment received! Preparing your delivery…",
+    "delivery_caption": "🎉 Your order #{orderId} has been delivered!\n\nYour code/data below (tap to copy):",
+    "delivery_footer": "\n\nℹ️ Save this data — repeated access may be restricted.",
+    "report_problem": "⚠️ Report a problem",
+    "report_received": "Thank you! We've received your report for order #{orderId} and will reach out soon.",
+    "stock_unavailable": "😔 Sorry, the item just sold out. You have not been charged.",
+    "expired": "⌛️ The payment window for this order has expired.",
+    "delivery_failed": "⚠️ There was a problem delivering order #{orderId}. Our support team has been notified and will handle it manually."
+  },
+  "topup": {
+    "prompt": "💰 Choose a top-up method:",
+    "enter_amount": "Enter the top-up amount in USD (e.g. 10.00):",
+    "invalid_amount": "Invalid amount. Enter a number between {min} and {max} USD.",
+    "created": "✅ Top-up invoice created for {amount}."
+  },
+  "profile": {
+    "title": "👤 <b>Your profile</b>\n\nBalance: <b>{balance}</b>\nTotal spent: {totalSpent}\n\n📦 Active subscriptions:\n{subscriptions}\n\n🎁 Referral link:\n{refLink}\nReferral earnings: {refEarnings}",
+    "no_subscriptions": "no active subscriptions"
+  },
+  "purchases": {
+    "title": "📦 <b>Your purchases</b>",
+    "empty": "You have no purchases yet.",
+    "item": "#{orderId} · {product} · {status} · {date}"
+  },
+  "referrals": {
+    "title": "🎁 <b>Referral program</b>\n\nInvite friends and earn a bonus from every purchase they make!\n\nYour link:\n{refLink}\n\nFriends invited: {count}\nEarned: {earnings}"
+  },
+  "faq": {
+    "title": "❓ <b>Frequently asked questions</b>\n\n{items}"
+  },
+  "errors": {
+    "generic": "⚠️ An error occurred. We're already looking into it, please try again later.",
+    "rate_limited": "⏳ Too many requests. Please slow down.",
+    "double_click": "⏳ Your previous request is still being processed.",
+    "blocked": "🚫 Your account is blocked. Please contact support."
+  },
+  "api": {
+    "errors": {
+      "internal": "Something went wrong on our side. Please try again shortly.",
+      "validation": "Some of the submitted data is invalid.",
+      "unauthorized": "Please reopen the app to sign in again.",
+      "forbidden": "You do not have access to this.",
+      "not_found": "Not found.",
+      "blocked": "🚫 Your account is blocked. Please contact support.",
+      "invalid_init_data": "Telegram sign-in could not be verified. Please reopen the app.",
+      "user_not_found": "Your account could not be found.",
+      "category_not_found": "This category is no longer available.",
+      "product_not_found": "This product is no longer available.",
+      "plan_not_found": "This plan is no longer available.",
+      "order_not_found": "Order not found.",
+      "post_not_found": "Broadcast post not found.",
+      "stock_unavailable": "😔 Sorry, this item just sold out. You have not been charged.",
+      "insufficient_balance": "Insufficient balance. Top up or choose another payment method.",
+      "promo_invalid": "This promo code cannot be applied.",
+      "order_state": "This order can no longer be changed.",
+      "delivery_failed": "We could not deliver your order. Our support team has been notified.",
+      "unknown_segment": "Unknown audience segment. Expected one of: {segments}."
+    }
+  },
+  "admin": {
+    "not_authorized": "🚫 You are not authorized to use this command.",
+    "panel": "🛠 <b>Admin panel</b>",
+    "stats": "📊 <b>Stats</b>\n\nUsers: {users}\nOrders: {orders}\nRevenue: {revenue}",
+    "usage_addstock": "Usage: /addstock <planId> <payload>",
+    "stock_added": "✅ Added one stock item for plan {planId}.",
+    "usage_broadcast": "Usage: /broadcast <text>",
+    "broadcast_scheduled": "✅ Broadcast scheduled ({count} recipients).",
+    "usage_user": "Usage: /user <telegramId>",
+    "user_not_found": "User not found.",
+    "user_info": "👤 {id}\nTG: {tgId}\nUsername: @{username}\nBalance: {balance}\nBlocked: {blocked}",
+    "usage_refund": "Usage: /refund <orderId>",
+    "refund_done": "✅ Order {orderId} refunded.",
+    "usage_grant": "Usage: /grant <userId> <amount>",
+    "grant_done": "✅ Granted {amount} to user {userId}."
+  }
+}

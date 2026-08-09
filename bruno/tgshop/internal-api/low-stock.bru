@@ -1,0 +1,21 @@
+meta {
+  name: Get low-stock plans
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{internal_base}}/internal/stock/low
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{service_token}}
+}
+
+docs {
+  Internal-only. Returns plans where the count of StockItem rows with
+  status=AVAILABLE is below Plan.lowStockThreshold. Used by the low-stock
+  promo agent (see docs/AGENT_PLAN.md) and by the admin dashboard.
+}

@@ -1,0 +1,394 @@
+// Prisma schema for @tgshop/db
+// Postgres NULL semantics: unique indexes in Postgres treat NULL as distinct from every other
+// NULL, so `@@unique([...])` on nullable columns below does NOT block multiple NULL rows — it
+// only enforces uniqueness when both values are present. That is the desired behavior here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DeliveryType {
+  STOCK_POOL
+  UNIQUE_CODE
+  EXTERNAL_API
+  MANUAL_FALLBACK
+}
+
+enum StockStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+}
+
+enum PaymentProvider {
+  BALANCE
+  CRYPTOBOT
+  STARS
+  TRON_TRC20
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  DELIVERING
+  DELIVERED
+  FAILED
+  REFUNDED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMING
+  PAID
+  UNDERPAID
+  EXPIRED
+  FAILED
+}
+
+enum LedgerType {
+  TOPUP
+  PURCHASE
+  REFUND
+  ADMIN_ADJUST
+  REFERRAL
+  SWEEP_ADJUST
+}
+
+enum SubStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum PromoType {
+  PERCENT
+  FIXED
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+enum PostSource {
+  MANUAL
+  AGENT
+}
+
+enum AdminRole {
+  OWNER
+  ADMIN
+  SUPPORT
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  tgId          BigInt   @unique
+  username      String?
+  firstName     String?
+  languageCode  String?
+  referredById  String?
+  isBlocked     Boolean  @default(false)
+  isAdmin       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  referredBy    User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]   @relation("Referrals")
+
+  orders               Order[]
+  payments             Payment[]
+  balanceTransactions  BalanceTransaction[]
+  depositAddresses     DepositAddress[]
+  subscriptions        Subscription[]
+
+  @@index([referredById])
+  @@map("users")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  emoji     String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+
+  products  Product[]
+
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  categoryId     String
+  title          String
+  slug           String       @unique
+  description    String
+  imageUrl       String?
+  deliveryType   DeliveryType
+  externalConfig Json?
+  isActive       Boolean      @default(true)
+  sortOrder      Int          @default(0)
+
+  category  Category @relation(fields: [categoryId], references: [id])
+  plans     Plan[]
+
+  @@index([categoryId, isActive, sortOrder])
+  @@map("products")
+}
+
+model Plan {
+  id                 String   @id @default(cuid())
+  productId          String
+  title              String
+  durationDays       Int?
+  priceCents         Int
+  priceStars         Int?
+  discountPercent    Int      @default(0)
+  lowStockThreshold  Int      @default(3)
+  isActive           Boolean  @default(true)
+  sortOrder          Int      @default(0)
+
+  product        Product          @relation(fields: [productId], references: [id])
+  stockItems      StockItem[]
+  orders          Order[]
+  subscriptions   Subscription[]
+  promos          Promo[]
+
+  @@index([productId, isActive, sortOrder])
+  @@map("plans")
+}
+
+model StockItem {
+  id             String      @id @default(cuid())
+  planId         String
+  payloadEnc     String
+  status         StockStatus @default(AVAILABLE)
+  orderId        String?     @unique
+  reservedUntil  DateTime?
+  createdAt      DateTime    @default(now())
+
+  plan  Plan   @relation(fields: [planId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
+
+  @@index([planId, status])
+  @@map("stock_items")
+}
+
+model Order {
+  id                    String          @id @default(cuid())
+  userId                String
+  planId                String
+  qty                   Int             @default(1)
+  amountCents           Int
+  currency              String
+  provider              PaymentProvider
+  status                OrderStatus     @default(PENDING)
+  externalId            String?
+  idempotencyKey        String          @unique
+  deliveredPayloadEnc   String?
+  promoId               String?
+  createdAt             DateTime        @default(now())
+  paidAt                DateTime?
+  deliveredAt           DateTime?
+  expiresAt             DateTime?
+
+  user          User           @relation(fields: [userId], references: [id])
+  plan          Plan           @relation(fields: [planId], references: [id])
+  promo         Promo?         @relation(fields: [promoId], references: [id])
+  stockItem     StockItem?
+  payments      Payment[]
+  ledgerEntries BalanceTransaction[]
+  depositAddress DepositAddress?
+  subscription  Subscription?
+
+  @@index([userId, status])
+  @@index([planId])
+  @@index([promoId])
+  @@map("orders")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String?
+  userId            String
+  provider          PaymentProvider
+  providerInvoiceId String?
+  amount            BigInt
+  asset             String
+  network           String?
+  address           String?
+  txHash            String?
+  confirmations     Int           @default(0)
+  status            PaymentStatus @default(PENDING)
+  rawPayload        Json
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  order Order? @relation(fields: [orderId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+
+  // NULLs do not collide in Postgres unique indexes, so these only enforce
+  // uniqueness for rows where the pair of values is actually present.
+  @@unique([provider, txHash])
+  @@unique([provider, providerInvoiceId])
+  @@index([orderId])
+  @@index([userId, status])
+  @@map("payments")
+}
+
+model BalanceTransaction {
+  id          String     @id @default(cuid())
+  userId      String
+  type        LedgerType
+  amountCents Int
+  orderId     String?
+  paymentId   String?
+  comment     String?
+  createdAt   DateTime   @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([orderId])
+  @@index([paymentId])
+  @@map("balance_transactions")
+}
+
+model DepositAddress {
+  id               String   @id @default(cuid())
+  userId           String
+  orderId          String?  @unique
+  network          String
+  address          String   @unique
+  derivationIndex  Int      @unique
+  isSwept          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+  @@index([network, isSwept])
+  @@map("deposit_addresses")
+}
+
+model Subscription {
+  id          String    @id @default(cuid())
+  userId      String
+  planId      String
+  orderId     String    @unique
+  startsAt    DateTime
+  expiresAt   DateTime
+  autoRenew   Boolean   @default(false)
+  remindedAt  DateTime?
+  status      SubStatus @default(ACTIVE)
+
+  user  User  @relation(fields: [userId], references: [id])
+  plan  Plan  @relation(fields: [planId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([userId, status])
+  @@index([planId])
+  @@index([expiresAt, status])
+  @@map("subscriptions")
+}
+
+model Promo {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  type        PromoType
+  value       Int
+  maxUses     Int?
+  usedCount   Int       @default(0)
+  expiresAt   DateTime?
+  planId      String?
+  isActive    Boolean   @default(true)
+
+  plan   Plan?   @relation(fields: [planId], references: [id])
+  orders Order[]
+
+  @@index([planId])
+  @@map("promos")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorType  String
+  actorId    String
+  action     String
+  entity     String
+  entityId   String
+  diff       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorType, actorId])
+  @@map("audit_logs")
+}
+
+model BroadcastPost {
+  id           String     @id @default(cuid())
+  channelId    String?
+  segment      String?
+  text         String
+  mediaUrl     String?
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  status       PostStatus @default(DRAFT)
+  source       PostSource @default(MANUAL)
+  statsJson    Json?
+  createdAt    DateTime   @default(now())
+
+  @@index([status, scheduledAt])
+  @@map("broadcast_posts")
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  totpSecret   String?
+  role         AdminRole @default(SUPPORT)
+  createdAt    DateTime  @default(now())
+
+  @@map("admin_users")
+}
+
+model IdempotencyRecord {
+  key        String   @id
+  scope      String
+  resultJson Json?
+  createdAt  DateTime @default(now())
+
+  @@index([scope])
+  @@map("idempotency_records")
+}

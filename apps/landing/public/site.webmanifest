@@ -1,0 +1,16 @@
+{
+  "name": "Souldawn Store",
+  "short_name": "Souldawn",
+  "description": "Instant digital goods and subscriptions inside Telegram.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "tgshop",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test --filter=@tgshop/core --filter=@tgshop/payments",
+    "test:e2e": "turbo run test --filter=@tgshop/e2e",
+    "db:migrate": "pnpm --filter @tgshop/db exec prisma migrate deploy",
+    "db:push": "pnpm --filter @tgshop/db exec prisma db push",
+    "db:seed": "pnpm --filter @tgshop/db exec prisma db seed",
+    "db:studio": "pnpm --filter @tgshop/db exec prisma studio",
+    "db:generate": "pnpm --filter @tgshop/db exec prisma generate"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.4.2"
+  }
+}

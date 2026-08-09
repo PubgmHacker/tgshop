@@ -1,0 +1,46 @@
+meta {
+  name: Authenticate (Telegram initData -> JWT)
+  type: http
+  seq: 0
+}
+
+post {
+  url: {{miniapp_base}}/api/auth/telegram
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "initData": "{{tg_init_data}}"
+  }
+}
+
+script:post-response {
+  // Store the JWT so every other /api/* request in this collection can use it.
+  if (res.getStatus() === 200 && res.getBody() && res.getBody().accessToken) {
+    bru.setEnvVar('jwt', res.getBody().accessToken);
+  }
+}
+
+docs {
+  Exchanges Telegram Mini App `initData` for a short-lived JWT. This is the
+  ONLY unauthenticated /api/* route — run it first, and the post-response
+  script saves the token into the `jwt` environment variable that the other
+  requests send as `Authorization: Bearer {{jwt}}`.
+
+  The server validates initData exactly as Telegram specifies:
+  secret = HMAC_SHA256("WebAppData", BOT_TOKEN), then the hash is checked over
+  the sorted data-check-string, and `auth_date` older than 24h is rejected.
+  The user id comes from that verified payload — a client-supplied userId is
+  never trusted anywhere in the API.
+
+  The `tg_init_data` placeholder in the local environment has an invalid hash
+  and will correctly return 401. To get real initData: open your Mini App in
+  a Telegram client, and in its devtools read
+  `window.Telegram.WebApp.initData`. That string is only valid for 24h.
+}

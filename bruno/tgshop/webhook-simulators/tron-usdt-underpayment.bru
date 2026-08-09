@@ -1,0 +1,37 @@
+meta {
+  name: TRON USDT deposit (underpayment)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{trongrid_sim_base}}/_sim/transfer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "to": "REPLACE_WITH_DEPOSIT_ADDRESS",
+    "amount6": "5000000",
+    "confirmations": 20
+  }
+}
+
+docs {
+  Same as tron-usdt-deposit.bru but with an `amount6` below the order total,
+  to exercise the UNDERPAID path (see docs/PAYMENTS.md, "Underpayment"): the
+  order is NOT delivered, a Payment row is recorded as UNDERPAID, the partial
+  amount is credited to the user's balance, and the user is notified so they
+  can top up the difference.
+
+  Requires `scripts/fake-trongrid.mjs` running and the worker pointed at it —
+  see the setup steps in tron-usdt-deposit.bru.
+
+  To test OVERpayment instead, raise `amount6` above the order total: the
+  surplus is credited to the user's balance rather than lost.
+}

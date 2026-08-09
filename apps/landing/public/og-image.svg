@@ -1,0 +1,21 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#05070d" />
+      <stop offset="100%" stop-color="#0f1420" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7c5cff" />
+      <stop offset="50%" stop-color="#6a8cff" />
+      <stop offset="100%" stop-color="#38d9c9" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <path d="M120 380 L200 200 L280 380 L200 340 Z" fill="url(#accent)" />
+  <text x="340" y="300" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#ffffff">
+    Souldawn Store
+  </text>
+  <text x="340" y="360" font-family="Arial, sans-serif" font-size="32" fill="#8b93a7">
+    Instant digital goods, delivered inside Telegram
+  </text>
+</svg>

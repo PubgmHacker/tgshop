@@ -1,0 +1,21 @@
+meta {
+  name: Get balance
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{miniapp_base}}/api/balance
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Returns the caller's current balance in USD cents, computed as
+  SUM(BalanceTransaction.amountCents) for the user (see @tgshop/core
+  ledger.getBalance).
+}

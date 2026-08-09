@@ -1,0 +1,20 @@
+# Local development override.
+#
+# The production compose file keeps Postgres and Redis on the internal network
+# only — nothing is published to the host. For local work (migrations, seeds,
+# `pnpm dev` running apps outside Docker) we need them reachable from the host,
+# so this override publishes them on non-default ports to avoid colliding with
+# any Postgres/Redis already running on 5432/6379.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
+#
+# These ports match DATABASE_URL / REDIS_URL in .env.example's local defaults.
+services:
+  postgres:
+    ports:
+      - '127.0.0.1:5433:5432'
+
+  redis:
+    ports:
+      - '127.0.0.1:6380:6379'

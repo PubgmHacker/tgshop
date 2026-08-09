@@ -1,0 +1,40 @@
+/**
+ * Optional CSS custom properties mirroring the design tokens, for consumers
+ * that need raw CSS (e.g. inline styles, non-Tailwind contexts). Import via
+ * `@tgshop/ui/styles.css`. Keep in sync with ./tokens/index.ts.
+ */
+:root {
+  --tgshop-accent-50: #fff4f2;
+  --tgshop-accent-100: #ffe4de;
+  --tgshop-accent-200: #ffc4b8;
+  --tgshop-accent-300: #ff9d8a;
+  --tgshop-accent-400: #fa7259;
+  --tgshop-accent-500: #e8552f;
+  --tgshop-accent-600: #c8441f;
+  --tgshop-accent-700: #a3371a;
+  --tgshop-accent-800: #7c2c16;
+  --tgshop-accent-900: #5c2212;
+
+  --tgshop-neutral-0: #ffffff;
+  --tgshop-neutral-50: #f7f7f8;
+  --tgshop-neutral-100: #eeeef0;
+  --tgshop-neutral-900: #121214;
+  --tgshop-neutral-950: #08080a;
+
+  --tgshop-success-500: #22a06b;
+  --tgshop-warning-500: #e0a020;
+  --tgshop-danger-500: #e0403f;
+  --tgshop-info-500: #3b8ce0;
+
+  --tgshop-radius-sm: 6px;
+  --tgshop-radius-md: 10px;
+  --tgshop-radius-lg: 16px;
+  --tgshop-radius-xl: 24px;
+
+  --tgshop-gradient-accent: linear-gradient(
+    135deg,
+    var(--tgshop-accent-400),
+    var(--tgshop-accent-500),
+    var(--tgshop-accent-700)
+  );
+}

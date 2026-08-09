@@ -1,0 +1,26 @@
+meta {
+  name: Get order status
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{miniapp_base}}/api/orders/:orderId
+  body: none
+  auth: none
+}
+
+params:path {
+  orderId: REPLACE_WITH_ORDER_ID
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Polls order status (PENDING -> PAID -> DELIVERING -> DELIVERED, or
+  FAILED/EXPIRED/REFUNDED). Once DELIVERED, includes the decrypted payload
+  for the calling user only (server decrypts deliveredPayloadEnc, never
+  returns ciphertext to the client).
+}

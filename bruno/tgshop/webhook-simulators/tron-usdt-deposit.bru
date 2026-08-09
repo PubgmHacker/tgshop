@@ -1,0 +1,46 @@
+meta {
+  name: TRON USDT-TRC20 deposit (via fake TronGrid)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{trongrid_sim_base}}/_sim/transfer
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "to": "REPLACE_WITH_DEPOSIT_ADDRESS",
+    "amount6": "9990000",
+    "confirmations": 20
+  }
+}
+
+docs {
+  Simulates a fully-confirmed TRC-20 USDT deposit.
+
+  TRON has NO push webhooks — the worker POLLS TronGrid — so this deliberately
+  does not post to the app. It queues a transfer inside
+  `scripts/fake-trongrid.mjs`, a local stand-in for api.trongrid.io, and the
+  REAL apps/worker polling path then discovers it. That exercises deposit
+  address matching, confirmation counting, settlement and delivery for real,
+  instead of pretending an ingestion endpoint exists.
+
+  Setup:
+  1. `node scripts/fake-trongrid.mjs`            # listens on :8099
+  2. `TRONGRID_API_BASE=http://localhost:8099 pnpm --filter @tgshop/worker dev`
+  3. Create a TRON order so a `DepositAddress` row exists, then put that
+     row's `address` into `to` above.
+
+  `amount6` is USDT in 6-decimal integer units — 9990000 = 9.99 USDT, never a
+  float. `confirmations` is how deep the transfer is mined: set it below
+  TRON_MIN_CONFIRMATIONS (default 19) to watch the worker correctly refuse to
+  settle, then `POST {{trongrid_sim_base}}/_sim/advance {"blocks": 20}` to
+  bury it deeper and see it settle.
+}

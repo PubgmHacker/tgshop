@@ -1,0 +1,22 @@
+meta {
+  name: List categories
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{miniapp_base}}/api/categories
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Returns active categories with their active products, ordered by sortOrder.
+  Auth: the short-lived JWT issued by authenticate.bru — run that request
+  first. The server derives the user from the token; a client-supplied userId
+  is never trusted.
+}

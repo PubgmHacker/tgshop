@@ -1,0 +1,34 @@
+meta {
+  name: Create order
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{miniapp_base}}/api/orders
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "planId": "REPLACE_WITH_PLAN_ID",
+    "qty": 1,
+    "provider": "CRYPTOBOT",
+    "promoCode": null,
+    "idempotencyKey": "order-{{$randomUUID}}"
+  }
+}
+
+docs {
+  Creates a PENDING order and, depending on provider, either an invoice
+  (CRYPTOBOT/STARS) or a deposit address (TRON_TRC20), or debits the balance
+  immediately (BALANCE). idempotencyKey must be unique per attempt from the
+  client (Order.idempotencyKey is @unique) — retries with the same key return
+  the original order instead of creating a duplicate.
+}

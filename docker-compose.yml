@@ -1,0 +1,171 @@
+name: tgshop
+
+# ─────────────────────────────────────────────────────────────────────────────
+# tgshop production compose file.
+#
+# Resource notes (size for a small/medium shop; tune to your VPS):
+#   postgres: 512MB-1GB RAM is enough for tens of thousands of orders.
+#   redis:    128-256MB RAM (appendonly persistence enabled below).
+#   bot:      single instance only (grammY long-poll or webhook, no horizontal
+#             scaling without a shared session store — not configured here).
+#   worker:   safe to scale horizontally (BullMQ workers are idempotent).
+#   miniapp/landing/admin: stateless Next.js, safe to scale horizontally.
+#
+# All services read secrets/config from a single .env file at the repo root
+# (copy .env.example -> .env and fill in real values before starting).
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tgshop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tgshop}
+      POSTGRES_DB: tgshop
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tgshop -d tgshop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - tgshop
+    # No public port mapping in prod; expose 5432:5432 locally if you need
+    # direct psql/Studio access from the host.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - tgshop
+
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tgshop
+    # Bot serves the Telegram webhook HTTP endpoint on PORT; routed by Caddy
+    # at bot.${DOMAIN} -> telegram/webhook path, see Caddyfile.
+    expose:
+      - "3000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tgshop
+    # BullMQ processors (payment reconciliation, delivery, TRON polling,
+    # broadcast sends). No inbound HTTP; safe to run multiple replicas via
+    # `docker compose up --scale worker=3`.
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+
+  miniapp:
+    build:
+      context: .
+      dockerfile: apps/miniapp/Dockerfile
+      # NEXT_PUBLIC_* values are inlined into the client bundle at build time,
+      # so they must be passed as build args — env_file alone reaches only the
+      # server runtime and would leave the browser calling an empty API URL.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_BOT_USERNAME: ${NEXT_PUBLIC_BOT_USERNAME}
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tgshop
+    expose:
+      - "3100"
+
+  landing:
+    build:
+      context: .
+      dockerfile: apps/landing/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - tgshop
+    expose:
+      - "3200"
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tgshop
+    expose:
+      - "3300"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:-example.com}
+    depends_on:
+      - bot
+      - worker
+      - miniapp
+      - landing
+      - admin
+    networks:
+      - tgshop
+
+networks:
+  tgshop:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

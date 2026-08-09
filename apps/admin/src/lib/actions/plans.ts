@@ -1,0 +1,58 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { prisma, AdminRole, type Prisma } from '@tgshop/db'
+import { requireRole } from '../rbac'
+import { writeAuditLog } from '../audit'
+import { planUpsertSchema, type PlanUpsertInput } from '../schemas'
+
+export async function listPlansAction(productId?: string) {
+  requireRole(AdminRole.SUPPORT)
+  return prisma.plan.findMany({
+    where: productId ? { productId } : undefined,
+    orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
+    include: {
+      product: true,
+      _count: { select: { stockItems: { where: { status: 'AVAILABLE' } } } }
+    }
+  })
+}
+
+export async function upsertPlanAction(input: PlanUpsertInput) {
+  const session = requireRole(AdminRole.ADMIN)
+  const data = planUpsertSchema.parse(input)
+
+  const fields = {
+    productId: data.productId,
+    title: data.title,
+    durationDays: data.durationDays ?? null,
+    priceCents: data.priceCents,
+    priceStars: data.priceStars ?? null,
+    discountPercent: data.discountPercent,
+    lowStockThreshold: data.lowStockThreshold,
+    isActive: data.isActive,
+    sortOrder: data.sortOrder
+  }
+
+  const plan = data.id
+    ? await prisma.plan.update({ where: { id: data.id }, data: fields })
+    : await prisma.plan.create({ data: fields })
+
+  await writeAuditLog({
+    actorId: session.adminId,
+    action: data.id ? 'plan.update' : 'plan.create',
+    entity: 'Plan',
+    entityId: plan.id,
+    diff: data as unknown as Prisma.InputJsonValue
+  })
+
+  revalidatePath('/plans')
+  return plan
+}
+
+export async function deletePlanAction(id: string) {
+  const session = requireRole(AdminRole.OWNER)
+  await prisma.plan.delete({ where: { id } })
+  await writeAuditLog({ actorId: session.adminId, action: 'plan.delete', entity: 'Plan', entityId: id })
+  revalidatePath('/plans')
+}

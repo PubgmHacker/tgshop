@@ -1,0 +1,194 @@
+import { prisma, PaymentProvider, PaymentStatus } from '@tgshop/db'
+import type { Payment } from '@tgshop/db'
+import { usdCentsToUsdt6 } from '@tgshop/core'
+import { createCryptoBotInvoice } from '../payments/cryptobot.js'
+import { amountCentsToStars } from '../payments/stars.js'
+import { allocateDepositAddress } from '../payments/tron.js'
+import { env } from '../config/env.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider-agnostic invoice creation shared by the Mini App order and top-up
+// routes, so both go through one pipeline instead of duplicating per-provider
+// branching in each handler.
+//
+// Every non-BALANCE provider gets a Payment row up front (status=PENDING) so
+// the reconciler/worker has something to match against even if the user
+// abandons checkout or a webhook is missed (docs/PAYMENTS.md).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** How long a crypto/TRON payment window stays open. */
+const PAYMENT_WINDOW_MS = 20 * 60 * 1000
+
+export interface TronPaymentDetails {
+  address: string
+  network: 'TRC20'
+  amountUsdt6: string
+  expiresAt: string
+}
+
+export interface InvoiceResult {
+  payment: Payment
+  /** Off-site payment page (CryptoBot). Null for providers without one. */
+  payUrl: string | null
+  /** On-chain payment instructions (TRON_TRC20). Null for other providers. */
+  tron: TronPaymentDetails | null
+  /** Whole Telegram Stars to charge (STARS). Null for other providers. */
+  stars: number | null
+}
+
+export interface CreateInvoiceInput {
+  userId: string
+  amountCents: number
+  provider: PaymentProvider
+  description: string
+  /** Opaque reference echoed back by the provider: an Order.id or a `topup_*` ref. */
+  reference: string
+  /** Set when this payment settles a specific order. */
+  orderId?: string | null
+}
+
+/**
+ * Creates (or reuses) a provider invoice plus its Payment row.
+ *
+ * Idempotency: keyed on `(provider, providerInvoiceId)` for CryptoBot, and on
+ * the linked orderId for TRON deposit addresses, so a retried checkout does not
+ * mint a second invoice for the same money.
+ */
+export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceResult> {
+  switch (input.provider) {
+    case PaymentProvider.CRYPTOBOT:
+      return createCryptoBotPayment(input)
+    case PaymentProvider.STARS:
+      return createStarsPayment(input)
+    case PaymentProvider.TRON_TRC20:
+      return createTronPayment(input)
+    case PaymentProvider.BALANCE:
+      throw new Error('createInvoice() must not be called for BALANCE; debit the ledger instead')
+  }
+}
+
+async function createCryptoBotPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
+  const existing = input.orderId
+    ? await prisma.payment.findFirst({
+        where: { orderId: input.orderId, provider: PaymentProvider.CRYPTOBOT, status: PaymentStatus.PENDING }
+      })
+    : null
+
+  if (existing) {
+    const rawUrl = readRawString(existing.rawPayload, 'payUrl')
+    if (rawUrl) {
+      return { payment: existing, payUrl: rawUrl, tron: null, stars: null }
+    }
+  }
+
+  const invoice = await createCryptoBotInvoice({
+    amountUsd: (input.amountCents / 100).toFixed(2),
+    description: input.description,
+    payload: input.reference
+  })
+
+  const payment = await prisma.payment.upsert({
+    where: {
+      provider_providerInvoiceId: {
+        provider: PaymentProvider.CRYPTOBOT,
+        providerInvoiceId: invoice.invoiceId
+      }
+    },
+    create: {
+      orderId: input.orderId ?? null,
+      userId: input.userId,
+      provider: PaymentProvider.CRYPTOBOT,
+      providerInvoiceId: invoice.invoiceId,
+      amount: BigInt(input.amountCents),
+      asset: 'USD',
+      status: PaymentStatus.PENDING,
+      rawPayload: { payUrl: invoice.payUrl, reference: input.reference }
+    },
+    update: { rawPayload: { payUrl: invoice.payUrl, reference: input.reference } }
+  })
+
+  return { payment, payUrl: invoice.payUrl, tron: null, stars: null }
+}
+
+async function createStarsPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
+  const stars = amountCentsToStars(input.amountCents)
+
+  // Stars invoices are sent through the Bot API in a chat, not via a web URL,
+  // so there is no payUrl: the Mini App shows its own "pay in chat" prompt and
+  // the bot's message:successful_payment handler settles the order.
+  const payment = await prisma.payment.create({
+    data: {
+      orderId: input.orderId ?? null,
+      userId: input.userId,
+      provider: PaymentProvider.STARS,
+      amount: BigInt(stars),
+      asset: 'XTR',
+      status: PaymentStatus.PENDING,
+      rawPayload: { stars, reference: input.reference }
+    }
+  })
+
+  return { payment, payUrl: null, tron: null, stars }
+}
+
+async function createTronPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
+  if (!input.orderId) {
+    throw new Error('TRON_TRC20 payments require an orderId to bind the deposit address to')
+  }
+
+  const address = await allocateDepositAddress(input.userId, input.orderId)
+  const amountUsdt6 = usdCentsToUsdt6(input.amountCents)
+  const expiresAt = new Date(Date.now() + PAYMENT_WINDOW_MS)
+
+  const payment = await prisma.payment.create({
+    data: {
+      orderId: input.orderId,
+      userId: input.userId,
+      provider: PaymentProvider.TRON_TRC20,
+      amount: amountUsdt6,
+      asset: 'USDT',
+      network: env.TRON_NETWORK,
+      address,
+      status: PaymentStatus.PENDING,
+      rawPayload: { reference: input.reference, expectedAmountUsdt6: amountUsdt6.toString() }
+    }
+  })
+
+  return {
+    payment,
+    payUrl: null,
+    stars: null,
+    tron: {
+      address,
+      network: 'TRC20',
+      amountUsdt6: amountUsdt6.toString(),
+      expiresAt: expiresAt.toISOString()
+    }
+  }
+}
+
+/** Reads a string field out of a Prisma Json column without asserting `any`. */
+function readRawString(raw: unknown, key: string): string | null {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const value = (raw as Record<string, unknown>)[key]
+    if (typeof value === 'string') return value
+  }
+  return null
+}
+
+/** Latest payment for an order, used to surface payment state on the checkout screen. */
+export async function getLatestPaymentForOrder(orderId: string): Promise<Payment | null> {
+  return prisma.payment.findFirst({ where: { orderId }, orderBy: { createdAt: 'desc' } })
+}
+
+/** Rebuilds TRON instructions for an existing pending payment (checkout polling). */
+export function tronDetailsFromPayment(payment: Payment): TronPaymentDetails | null {
+  if (payment.provider !== PaymentProvider.TRON_TRC20 || !payment.address) return null
+  const expiresAt = new Date(payment.createdAt.getTime() + PAYMENT_WINDOW_MS)
+  return {
+    address: payment.address,
+    network: 'TRC20',
+    amountUsdt6: payment.amount.toString(),
+    expiresAt: expiresAt.toISOString()
+  }
+}
