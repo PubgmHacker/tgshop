@@ -52,4 +52,7 @@ RUN addgroup -S tgshop && adduser -S tgshop -G tgshop
 USER tgshop
 EXPOSE 3000
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/index.js"]
+# Apply pending Prisma migrations before boot: `prisma` is a prod dependency of
+# @tgshop/db precisely so the CLI is present in this --prod node_modules tree.
+# `migrate deploy` is idempotent and a no-op when the schema is current.
+CMD ["sh", "-c", "(cd ../../packages/db && ./node_modules/.bin/prisma migrate deploy) && exec node dist/index.js"]
