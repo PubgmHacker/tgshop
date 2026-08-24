@@ -56,6 +56,7 @@ COPY --from=deps-prod /repo/apps/bot/node_modules ./apps/bot/node_modules
 COPY --from=build /repo/packages/db/dist ./packages/db/dist
 COPY --from=build /repo/packages/db/prisma ./packages/db/prisma
 COPY --from=build /repo/packages/core/dist ./packages/core/dist
+COPY --from=build /repo/packages/payments/dist ./packages/payments/dist
 COPY --from=build /repo/apps/bot/dist ./apps/bot/dist
 COPY --from=build /repo/apps/bot/package.json ./apps/bot/package.json
 
