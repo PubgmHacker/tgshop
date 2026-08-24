@@ -15,7 +15,10 @@ import {
   getOrderById,
   markOrderPaidAndDeliver
 } from '../../domain/orders.js'
+import { readRequiresEmail } from '@tgshop/core'
 import { createInvoice, settleStarsPayment } from '../../domain/payments.js'
+import { findStarsTopupPayment, settleStarsTopup } from '../../domain/topup.js'
+import { emitEvent } from '../../domain/events.js'
 import { amountCentsToStars } from '../../payments/stars.js'
 import { allocateDepositAddress } from '../../payments/tron.js'
 import { logger } from '../../lib/logger.js'
@@ -64,6 +67,115 @@ function escapeHtml(input: string): string {
   return input.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+const MAX_EMAIL_LENGTH = 254
+
+/** Reply-keyboard captions in every locale; the email prompt must never swallow them. */
+const MENU_CAPTIONS: ReadonlySet<string> = new Set(
+  (['catalog', 'profile', 'topup', 'purchases', 'referrals', 'faq', 'open_miniapp'] as const).flatMap(
+    (key) => [t('ru', `menu.${key}`), t('en', `menu.${key}`)]
+  )
+)
+
+interface CheckoutParams {
+  planId: string
+  qty: number
+  provider: PaymentProvider
+  customerEmail: string | null
+}
+
+/**
+ * Creates the order and starts the chosen payment rail. Shared by the direct
+ * pay-button path and the collect-email-first path (requiresEmail products),
+ * so the two can never drift in how an order is priced or invoiced.
+ */
+async function launchCheckout(ctx: BotContext, params: CheckoutParams): Promise<void> {
+  const locale = ctx.session.locale
+
+  const plan = await getPlanById(params.planId)
+  if (!plan) {
+    await ctx.reply(t(locale, 'common.not_found'))
+    return
+  }
+
+  const user = await requireUser(ctx)
+  const idempotencyKey = newIdempotencyKey(`order:${user.id}:${params.planId}`)
+
+  const { order, pricing } = await createOrder({
+    userId: user.id,
+    planId: params.planId,
+    qty: params.qty,
+    provider: params.provider,
+    promoCode: ctx.session.pendingPromoCode ?? null,
+    idempotencyKey,
+    customerEmail: params.customerEmail
+  })
+
+  switch (params.provider) {
+    case PaymentProvider.BALANCE: {
+      const balance = await getUserBalance(user.id)
+      if (balance < pricing.totalCents) {
+        await ctx.reply(t(locale, 'order.insufficient_balance'))
+        return
+      }
+      await ctx.reply(t(locale, 'order.created', { orderId: order.id }))
+      try {
+        await payOrderFromBalance(order)
+      } catch (err) {
+        logger.error({ err, orderId: order.id }, 'balance payment failed')
+      }
+      await deliverAndNotify(ctx, order.id)
+      return
+    }
+
+    case PaymentProvider.CRYPTOBOT: {
+      try {
+        // Via createInvoice() so the order gets a PENDING Payment row the
+        // reconciler can match, rather than only settling on a live webhook.
+        const invoice = await createInvoice({
+          userId: user.id,
+          amountCents: pricing.totalCents,
+          provider: PaymentProvider.CRYPTOBOT,
+          description: `${plan.product.title} — ${plan.title}`,
+          reference: order.id,
+          orderId: order.id
+        })
+        if (!invoice.payUrl) throw new Error('CryptoBot invoice returned no payUrl')
+        await ctx.reply(t(locale, 'order.created', { orderId: order.id }), {
+          reply_markup: new InlineKeyboard().url('💳 Pay', invoice.payUrl)
+        })
+      } catch (err) {
+        logger.error({ err, orderId: order.id }, 'CryptoBot invoice creation failed')
+        await ctx.reply(t(locale, 'common.error_generic'))
+      }
+      return
+    }
+
+    case PaymentProvider.STARS: {
+      const stars = amountCentsToStars(pricing.totalCents)
+      await ctx.api.sendInvoice(ctx.chat?.id ?? ctx.from?.id ?? 0, `${plan.product.title} — ${plan.title}`, plan.product.description, order.id, 'XTR', [
+        { label: plan.title, amount: stars }
+      ])
+      return
+    }
+
+    case PaymentProvider.TRON_TRC20: {
+      try {
+        const address = await allocateDepositAddress(user.id, order.id)
+        await ctx.reply(
+          t(locale, 'order.created', { orderId: order.id }) +
+            `\n\nSend ${formatUsd(pricing.totalCents)} worth of USDT (TRC-20) to:\n<code>${address}</code>`,
+          { parse_mode: 'HTML' }
+        )
+      } catch (err) {
+        logger.error({ err, orderId: order.id }, 'USDT deposit address allocation failed')
+        await ctx.reply(t(locale, 'common.error_generic'))
+      }
+      return
+    }
+  }
+}
+
 export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery('order:cancel', async (ctx) => {
     await ctx.answerCallbackQuery()
@@ -85,89 +197,70 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
       return
     }
 
-    const user = await requireUser(ctx)
-    const provider = PaymentProvider[providerRaw]
-    const idempotencyKey = newIdempotencyKey(`order:${user.id}:${planId}`)
+    // requiresEmail products (delivered by an operator onto the buyer's own
+    // account) collect the address BEFORE the order exists, so the admin sees
+    // it on the order from the first second it appears in the panel.
+    if (readRequiresEmail(plan.product.externalConfig)) {
+      ctx.session.checkout = { planId, qty, provider: providerRaw, awaitingEmail: true }
+      await ctx.reply(t(locale, 'order.enter_email'))
+      return
+    }
 
-    const { order, pricing } = await createOrder({
-      userId: user.id,
+    await launchCheckout(ctx, {
       planId,
       qty,
-      provider,
-      promoCode: ctx.session.pendingPromoCode ?? null,
-      idempotencyKey
+      provider: PaymentProvider[providerRaw],
+      customerEmail: null
     })
-
-    switch (provider) {
-      case PaymentProvider.BALANCE: {
-        const balance = await getUserBalance(user.id)
-        if (balance < pricing.totalCents) {
-          await ctx.reply(t(locale, 'order.insufficient_balance'))
-          return
-        }
-        await ctx.reply(t(locale, 'order.created', { orderId: order.id }))
-        try {
-          await payOrderFromBalance(order)
-        } catch (err) {
-          logger.error({ err, orderId: order.id }, 'balance payment failed')
-        }
-        await deliverAndNotify(ctx, order.id)
-        return
-      }
-
-      case PaymentProvider.CRYPTOBOT: {
-        try {
-          // Via createInvoice() so the order gets a PENDING Payment row the
-          // reconciler can match, rather than only settling on a live webhook.
-          const invoice = await createInvoice({
-            userId: user.id,
-            amountCents: pricing.totalCents,
-            provider: PaymentProvider.CRYPTOBOT,
-            description: `${plan.product.title} — ${plan.title}`,
-            reference: order.id,
-            orderId: order.id
-          })
-          if (!invoice.payUrl) throw new Error('CryptoBot invoice returned no payUrl')
-          await ctx.reply(t(locale, 'order.created', { orderId: order.id }), {
-            reply_markup: new InlineKeyboard().url('💳 Pay', invoice.payUrl)
-          })
-        } catch (err) {
-          logger.error({ err, orderId: order.id }, 'CryptoBot invoice creation failed')
-          await ctx.reply(t(locale, 'common.error_generic'))
-        }
-        return
-      }
-
-      case PaymentProvider.STARS: {
-        const stars = amountCentsToStars(pricing.totalCents)
-        await ctx.api.sendInvoice(ctx.chat?.id ?? ctx.from?.id ?? 0, `${plan.product.title} — ${plan.title}`, plan.product.description, order.id, 'XTR', [
-          { label: plan.title, amount: stars }
-        ])
-        return
-      }
-
-      case PaymentProvider.TRON_TRC20: {
-        try {
-          const address = await allocateDepositAddress(user.id, order.id)
-          await ctx.reply(
-            t(locale, 'order.created', { orderId: order.id }) +
-              `\n\nSend ${formatUsd(pricing.totalCents)} worth of USDT (TRC-20) to:\n<code>${address}</code>`,
-            { parse_mode: 'HTML' }
-          )
-        } catch (err) {
-          logger.error({ err, orderId: order.id }, 'USDT deposit address allocation failed')
-          await ctx.reply(t(locale, 'common.error_generic'))
-        }
-        return
-      }
-    }
   })
 
-  // Telegram Stars payment flow
+  // The email step parked by the pay button above. Passes anything that is not
+  // its own reply straight through (next()), so commands and reply-keyboard
+  // buttons registered later keep working even mid-prompt.
+  bot.on('message:text', async (ctx, next) => {
+    const pending = ctx.session.checkout
+    if (!pending?.awaitingEmail) return next()
+
+    const text = ctx.message.text.trim()
+    if (text.startsWith('/') || MENU_CAPTIONS.has(text)) {
+      // The buyer changed their mind — drop the prompt, run the real handler.
+      ctx.session.checkout = undefined
+      return next()
+    }
+
+    const locale = ctx.session.locale
+    if (text.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(text)) {
+      await ctx.reply(t(locale, 'order.invalid_email'))
+      return
+    }
+
+    ctx.session.checkout = undefined
+    await ctx.reply(t(locale, 'order.email_accepted', { email: text }))
+    await launchCheckout(ctx, {
+      planId: pending.planId,
+      qty: pending.qty,
+      provider: PaymentProvider[pending.provider],
+      customerEmail: text
+    })
+  })
+
+  // Telegram Stars payment flow. The invoice payload is either an Order.id or
+  // a `topup_*` balance top-up reference (domain/payments.ts writes both).
   bot.on('pre_checkout_query', async (ctx) => {
     // Must be answered within 10s per Telegram's API contract.
-    const orderId = ctx.preCheckoutQuery.invoice_payload
-    const order = await getOrderById(orderId)
+    const payload = ctx.preCheckoutQuery.invoice_payload
+
+    if (payload.startsWith('topup_')) {
+      const topup = await findStarsTopupPayment(payload)
+      if (!topup || topup.status === 'PAID') {
+        await ctx.answerPreCheckoutQuery(false, 'This top-up invoice is no longer valid.')
+        return
+      }
+      await ctx.answerPreCheckoutQuery(true)
+      return
+    }
+
+    const order = await getOrderById(payload)
     if (!order || order.status !== 'PENDING') {
       await ctx.answerPreCheckoutQuery(false, 'Order is no longer valid.')
       return
@@ -177,7 +270,38 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
 
   bot.on('message:successful_payment', async (ctx) => {
     const payment = ctx.message.successful_payment
-    const orderId = payment.invoice_payload
+    const payload = payment.invoice_payload
+
+    if (payload.startsWith('topup_')) {
+      // Balance top-up: credit and confirm. settleStarsTopup is repeat-safe
+      // (guarded claim + idempotent ledger key), so a redelivered update
+      // cannot double-credit.
+      try {
+        const settled = await settleStarsTopup(
+          payload,
+          payment.telegram_payment_charge_id,
+          payment as unknown as object
+        )
+        if (settled) {
+          await emitEvent('payment.received', {
+            paymentId: settled.payment.id,
+            orderId: null,
+            userId: settled.payment.userId,
+            provider: PaymentProvider.STARS,
+            amount: settled.payment.amount.toString(),
+            asset: settled.payment.asset,
+            txHash: payment.telegram_payment_charge_id
+          })
+          const locale = ctx.session.locale
+          await ctx.reply(t(locale, 'topup.credited', { amount: formatUsd(settled.amountCents) }))
+        }
+      } catch (err) {
+        logger.error({ err, reference: payload }, 'failed to settle Stars top-up')
+      }
+      return
+    }
+
+    const orderId = payload
 
     // Settle the Payment row first, and outside the try below: Telegram has
     // already taken the customer's Stars, so recording that is not conditional

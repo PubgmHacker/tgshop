@@ -12,7 +12,7 @@ import { enqueueDelivery } from './delivery.js'
 import { enqueueNotify } from './notify.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// chain:scan — repeatable TRON watcher. For every DepositAddress with an
+// chain-scan — repeatable TRON watcher. For every DepositAddress with an
 // unswept balance interest (i.e. linked to an order still awaiting payment,
 // or generally still active), scans TronGrid for TRC-20 transfers of the
 // configured USDT contract to that address since the address's payment
@@ -85,7 +85,7 @@ async function processChainScan(job: Job<Record<string, never>>): Promise<void> 
     })
 
     if (addresses.length === 0) {
-      log.info('chain:scan sweep: no active deposit addresses')
+      log.info('chain-scan sweep: no active deposit addresses')
       return
     }
 
@@ -95,14 +95,14 @@ async function processChainScan(job: Job<Record<string, never>>): Promise<void> 
       try {
         await scanOneAddress(depositAddress, latestBlock, client, env, log)
       } catch (err) {
-        log.error({ err, address: depositAddress.address }, 'chain:scan failed for address')
+        log.error({ err, address: depositAddress.address }, 'chain-scan failed for address')
       }
     }
 
-    log.info({ scanned: addresses.length }, 'chain:scan sweep complete')
+    log.info({ scanned: addresses.length }, 'chain-scan sweep complete')
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
-    log.error({ err }, 'chain:scan sweep errored')
+    log.error({ err }, 'chain-scan sweep errored')
     await enqueueNotify({ kind: 'chain_scan_error', reason })
     throw err
   }
@@ -148,7 +148,7 @@ async function scanOneAddress(
   const elapsedMs = Date.now() - newestTransferMs
   const requiredMs = env.TRON_MIN_CONFIRMATIONS * 3_000
   if (elapsedMs < requiredMs) {
-    log.debug({ orderId: order.id, elapsedMs, requiredMs }, 'chain:scan: awaiting confirmations')
+    log.debug({ orderId: order.id, elapsedMs, requiredMs }, 'chain-scan: awaiting confirmations')
     return
   }
   void latestBlock
@@ -325,7 +325,7 @@ async function notifyUser(
 ): Promise<void> {
   const locale = resolveLocale(order.user.languageCode)
   await sendTelegramMessage(order.user.tgId, buildText(locale)).catch((err) =>
-    log.error({ err, orderId: order.id }, 'failed to notify user from chain:scan')
+    log.error({ err, orderId: order.id }, 'failed to notify user from chain-scan')
   )
 }
 

@@ -16,7 +16,9 @@
     "db:push": "pnpm --filter @tgshop/db exec prisma db push",
     "db:seed": "pnpm --filter @tgshop/db exec prisma db seed",
     "db:studio": "pnpm --filter @tgshop/db exec prisma studio",
-    "db:generate": "pnpm --filter @tgshop/db exec prisma generate"
+    "db:generate": "pnpm --filter @tgshop/db exec prisma generate",
+    "dev:api": "node scripts/dev-api-server.mjs",
+    "dev:miniapp": "pnpm --filter @tgshop/miniapp dev"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

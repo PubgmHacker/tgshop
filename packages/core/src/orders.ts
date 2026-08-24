@@ -55,6 +55,8 @@ export interface CreateOrderInput {
   promoCode?: string
   idempotencyKey: string
   expiresInMinutes?: number
+  /** Delivery address for requiresEmail products; most orders carry none. */
+  customerEmail?: string | null
 }
 
 const DEFAULT_ORDER_EXPIRY_MINUTES = 20
@@ -181,6 +183,7 @@ export async function createOrder(tx: PrismaTx, input: CreateOrderInput): Promis
         provider: input.provider,
         status: OrderStatus.PENDING,
         idempotencyKey: input.idempotencyKey,
+        customerEmail: input.customerEmail?.trim() || null,
         promoId: promo?.id ?? null,
         expiresAt: new Date(Date.now() + expiryMinutes * MINUTE_MS)
       }
@@ -307,9 +310,12 @@ export async function expireOrder(tx: PrismaTx, orderId: string): Promise<Order>
 /**
  * Refunds an order to the user's balance and marks it REFUNDED.
  *
- * The credit is keyed `refund:<orderId>` so the ledger's own idempotency makes a
- * double refund impossible even if this runs twice; the REFUNDED terminal state
- * then blocks any further transition. Refunds always land on the internal
+ * The credit is gated on "no REFUND ledger row exists for this order yet", not
+ * merely on its own `refund:<orderId>` key. A failed delivery auto-refunds under
+ * a DIFFERENT key (`delivery-failed-refund:<orderId>`) and leaves the order
+ * FAILED — a legal source state here — so per-key idempotency alone would pay a
+ * manual/agent refund of that same order a second time. The REFUNDED terminal
+ * state then blocks any further transition. Refunds always land on the internal
  * balance rather than the original rail — reversing a chain transfer or a Stars
  * charge is a manual, provider-specific operation an admin performs separately.
  */
@@ -321,7 +327,14 @@ export async function refundOrder(tx: PrismaTx, orderId: string, reason: string)
   // A refunded purchase did not consume the promo, so give the use back.
   if (order.promoId) await releasePromoUse(tx, order.promoId)
 
-  if (order.amountCents > 0) {
+  // Return the money at most once per order, whichever path already ran. Keying
+  // the credit is not enough: the failed-delivery auto-refund uses a different
+  // ledger key, so gate on any REFUND already booked for this order instead.
+  const priorRefund = await tx.balanceTransaction.aggregate({
+    where: { orderId: order.id, type: LedgerType.REFUND },
+    _sum: { amountCents: true }
+  })
+  if (order.amountCents > 0 && (priorRefund._sum.amountCents ?? 0) === 0) {
     await credit(tx, {
       userId: order.userId,
       amountCents: order.amountCents,

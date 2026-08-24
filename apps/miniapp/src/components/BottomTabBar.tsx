@@ -4,26 +4,40 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/i18n/I18nProvider'
 import { triggerHaptic } from '@/lib/TelegramProvider'
+import { Icon, type IconName } from './Icons'
 
 interface TabDef {
   href: string
-  labelKey: 'tabs.home' | 'tabs.profile'
-  icon: string
+  labelKey: 'tabs.home' | 'tabs.catalog' | 'tabs.orders' | 'tabs.balance' | 'tabs.profile'
+  icon: IconName
   match: (path: string) => boolean
 }
 
 const TABS: TabDef[] = [
+  { href: '/', labelKey: 'tabs.home', icon: 'home', match: (path) => path === '/' },
   {
-    href: '/',
-    labelKey: 'tabs.home',
-    icon: '🏠',
-    match: (path) => path === '/' || path.startsWith('/category') || path.startsWith('/product')
+    href: '/catalog',
+    labelKey: 'tabs.catalog',
+    icon: 'grid',
+    match: (path) => path.startsWith('/catalog') || path.startsWith('/category') || path.startsWith('/product')
+  },
+  {
+    href: '/orders',
+    labelKey: 'tabs.orders',
+    icon: 'bag',
+    match: (path) => path.startsWith('/orders')
+  },
+  {
+    href: '/topup',
+    labelKey: 'tabs.balance',
+    icon: 'wallet',
+    match: (path) => path.startsWith('/topup')
   },
   {
     href: '/profile',
     labelKey: 'tabs.profile',
-    icon: '👤',
-    match: (path) => path.startsWith('/profile') || path.startsWith('/topup')
+    icon: 'user',
+    match: (path) => path.startsWith('/profile') || path.startsWith('/settings')
   }
 ]
 
@@ -33,25 +47,43 @@ export function BottomTabBar(): JSX.Element {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-white/5 bg-tg-header-bg/95 backdrop-blur"
-      style={{ paddingBottom: 'var(--safe-bottom)' }}
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4"
+      style={{ paddingBottom: 'calc(12px + var(--safe-bottom))' }}
     >
-      {TABS.map((tab) => {
-        const isActive = tab.match(pathname ?? '/')
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            onClick={() => triggerHaptic('light')}
-            className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px]"
-          >
-            <span className={`text-xl transition-opacity ${isActive ? 'opacity-100' : 'opacity-50'}`}>
-              {tab.icon}
-            </span>
-            <span className={isActive ? 'font-medium text-tg-text' : 'text-tg-hint'}>{t(tab.labelKey)}</span>
-          </Link>
-        )
-      })}
+      <div className="glass-nav pointer-events-auto flex w-full max-w-md items-center justify-around rounded-full px-1.5 py-1.5">
+        {TABS.map((tab) => {
+          const isActive = tab.match(pathname ?? '/')
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              onClick={() => triggerHaptic('light')}
+              className="flex h-[56px] w-[58px] flex-col items-center justify-end gap-0.5 pb-0.5"
+            >
+              <span className="flex h-10 w-10 items-center justify-center">
+                <span
+                  className={
+                    isActive
+                      ? 'tab-active flex h-10 w-10 items-center justify-center rounded-full'
+                      : 'flex h-7 w-7 items-center justify-center rounded-full text-faint'
+                  }
+                >
+                  <Icon name={tab.icon} size={isActive ? 22 : 16} strokeWidth={isActive ? 2.1 : 1.7} />
+                </span>
+              </span>
+              <span
+                className={
+                  isActive
+                    ? 'whitespace-nowrap text-[10px] font-bold leading-none tracking-[-0.02em] text-ink'
+                    : 'whitespace-nowrap text-[10px] font-medium leading-none text-faint'
+                }
+              >
+                {t(tab.labelKey)}
+              </span>
+            </Link>
+          )
+        })}
+      </div>
     </nav>
   )
 }

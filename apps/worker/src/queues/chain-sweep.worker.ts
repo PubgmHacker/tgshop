@@ -18,7 +18,7 @@ import { loadEnv, type WorkerEnv } from '../env.js'
 import { enqueueNotify } from './notify.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// chain:sweep — repeatable job that consolidates USDT sitting in per-invoice
+// chain-sweep — repeatable job that consolidates USDT sitting in per-invoice
 // DepositAddress rows into TRON_SWEEP_TO_ADDRESS.
 //
 // Key material and transaction construction live in @tgshop/payments; this
@@ -104,7 +104,7 @@ function createPrismaSweepLedger(log: ReturnType<typeof jobLogger>): SweepLedger
           diff: { address, txHash, amountSwept: amountSwept.toString() }
         }
       })
-      log.info({ address, txHash, amountSwept: amountSwept.toString() }, 'chain:sweep broadcast recorded')
+      log.info({ address, txHash, amountSwept: amountSwept.toString() }, 'chain-sweep broadcast recorded')
     }
   }
 }
@@ -145,11 +145,11 @@ async function processChainSweep(job: Job<Record<string, never>>): Promise<void>
   const env = loadEnv()
 
   if (!env.TRON_SWEEP_TO_ADDRESS) {
-    log.debug('TRON_SWEEP_TO_ADDRESS not configured, skipping chain:sweep')
+    log.debug('TRON_SWEEP_TO_ADDRESS not configured, skipping chain-sweep')
     return
   }
   if (!env.TRON_MASTER_XPUB) {
-    log.debug('TRON_MASTER_XPUB not configured, skipping chain:sweep')
+    log.debug('TRON_MASTER_XPUB not configured, skipping chain-sweep')
     return
   }
 
@@ -187,7 +187,7 @@ async function processChainSweep(job: Job<Record<string, never>>): Promise<void>
             balanceUsdt6: balanceUsdt6.toString(),
             reason: env.TRON_SWEEP_READ_ONLY ? 'TRON_SWEEP_READ_ONLY=true' : 'TRON_MASTER_XPRV not configured'
           },
-          'chain:sweep (read-only): would sweep — move these funds manually'
+          'chain-sweep (read-only): would sweep — move these funds manually'
         )
         continue
       }
@@ -235,13 +235,13 @@ async function processChainSweep(job: Job<Record<string, never>>): Promise<void>
             amountUsdt6: outcome.amountSwept,
             topUpTxHash: outcome.topUpTxHash
           },
-          'chain:sweep swept deposit address'
+          'chain-sweep swept deposit address'
         )
       } else {
         skippedCount += 1
         log.debug(
           { address: outcome.fromAddress, reason: outcome.reason, sweepable: outcome.sweepableAmount },
-          'chain:sweep skipped deposit address'
+          'chain-sweep skipped deposit address'
         )
       }
     } catch (err) {
@@ -260,7 +260,7 @@ async function processChainSweep(job: Job<Record<string, never>>): Promise<void>
       total: candidates.length,
       mode: liveMode ? 'live' : 'read-only'
     },
-    'chain:sweep sweep complete'
+    'chain-sweep sweep complete'
   )
 }
 
@@ -272,7 +272,7 @@ async function handleSweepError(
 ): Promise<void> {
   if (err instanceof ManualSweepRequired) {
     // Expected in read-only mode; not an operational failure.
-    log.info({ address, balance: err.balance.toString() }, 'chain:sweep: manual sweep required')
+    log.info({ address, balance: err.balance.toString() }, 'chain-sweep: manual sweep required')
     return
   }
   if (err instanceof LowTrxError) {
@@ -283,7 +283,7 @@ async function handleSweepError(
     const shortfallTrx = (Number(err.requiredSunEstimate) / 1_000_000).toFixed(2)
     log.warn(
       { address: err.address, shortfallTrx },
-      'chain:sweep: insufficient TRX for energy, skipping without broadcasting'
+      'chain-sweep: insufficient TRX for energy, skipping without broadcasting'
     )
     // The alert template reports a balance, so read the real one rather than
     // rendering the shortfall as a negative number.
@@ -291,13 +291,13 @@ async function handleSweepError(
     try {
       balanceTrxDisplay = (Number(await client.getTrxBalanceSun(err.address)) / 1_000_000).toFixed(2)
     } catch (balanceErr) {
-      log.debug({ balanceErr }, 'chain:sweep: could not read TRX balance for the low-TRX alert')
+      log.debug({ balanceErr }, 'chain-sweep: could not read TRX balance for the low-TRX alert')
     }
     await enqueueNotify({ kind: 'low_trx', address: err.address, balanceTrxDisplay })
     return
   }
   const reason = err instanceof Error ? err.message : String(err)
-  log.error({ err, address }, 'chain:sweep failed for address')
+  log.error({ err, address }, 'chain-sweep failed for address')
   await enqueueNotify({ kind: 'sweep_failed', address, reason })
 }
 
@@ -315,7 +315,7 @@ async function checkLowTrx(
       await enqueueNotify({ kind: 'low_trx', address: env.TRON_SWEEP_TO_ADDRESS, balanceTrxDisplay })
     }
   } catch (err) {
-    log.error({ err }, 'chain:sweep: failed to check TRX balance for low-TRX alert')
+    log.error({ err }, 'chain-sweep: failed to check TRX balance for low-TRX alert')
   }
 }
 

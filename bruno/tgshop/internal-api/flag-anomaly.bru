@@ -1,0 +1,47 @@
+meta {
+  name: Flag anomaly
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{internal_base}}/internal/anomalies
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{service_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "severity": "high",
+    "category": "payments",
+    "summary": "3 underpaid TRON deposits from the same user within 10 minutes",
+    "relatedEntity": { "type": "User", "id": "usr_replace_me" },
+    "evidence": {
+      "paymentIds": ["pay_1", "pay_2", "pay_3"],
+      "expected6": "10000000",
+      "received6": "9000000"
+    },
+    "source": "agent:pattern-watcher"
+  }
+}
+
+docs {
+  Records an anomaly flag as an AuditLog row (actorType="agent",
+  action="anomaly.flagged") — purely additive, mutates no order/payment/stock
+  state. Flags surface in the admin panel's Audit log alongside human actions
+  (docs/AGENT_PLAN.md capability 4).
+
+  severity: one of "info" | "warning" | "high" | "critical".
+  relatedEntity: optional; defaults to entity="System".
+  evidence: optional JSON, at most 16 KB serialized — store a pointer to the
+  data (ids, hashes), not the data itself.
+  source: optional caller identity for the audit trail, defaults to
+  "internal-api".
+
+  Responds 201 with { id, severity, category, createdAt }.
+}

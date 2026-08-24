@@ -226,6 +226,13 @@ export const orderRedeliverSchema = z.object({
   orderId: z.string().min(1)
 })
 
+// trim() runs before min(1), so an all-whitespace "credential" is rejected
+// here as well as in core — the operator sees a form error, not a 500.
+export const orderManualDeliverSchema = z.object({
+  orderId: z.string().min(1),
+  payload: z.string().trim().min(1).max(10_000)
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Broadcast segments.
 //
@@ -299,5 +306,6 @@ export type UserSearchInput = z.infer<typeof userSearchSchema>
 export type OrderFilterInput = z.infer<typeof orderFilterSchema>
 export type OrderRefundInput = z.infer<typeof orderRefundSchema>
 export type OrderRedeliverInput = z.infer<typeof orderRedeliverSchema>
+export type OrderManualDeliverInput = z.infer<typeof orderManualDeliverSchema>
 export type BroadcastUpsertInput = z.infer<typeof broadcastUpsertSchema>
 export type BroadcastSendInput = z.infer<typeof broadcastSendSchema>

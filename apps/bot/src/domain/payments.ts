@@ -1,3 +1,4 @@
+import { Api } from 'grammy'
 import { prisma, PaymentProvider, PaymentStatus } from '@tgshop/db'
 import type { Payment } from '@tgshop/db'
 import { usdCentsToUsdt6 } from '@tgshop/core'
@@ -112,12 +113,40 @@ async function createCryptoBotPayment(input: CreateInvoiceInput): Promise<Invoic
   return { payment, payUrl: invoice.payUrl, tron: null, stars: null }
 }
 
+// A bare Api client (no update polling) is enough for createInvoiceLink; the
+// full Bot instance lives in index.ts and is not needed here.
+let starsApi: Api | null = null
+
+function getStarsApi(): Api {
+  if (!starsApi) starsApi = new Api(env.BOT_TOKEN)
+  return starsApi
+}
+
+/** Telegram caps invoice titles at 32 chars; description at 255. */
+function clampInvoiceText(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`
+}
+
 async function createStarsPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
   const stars = amountCentsToStars(input.amountCents)
 
-  // Stars invoices are sent through the Bot API in a chat, not via a web URL,
-  // so there is no payUrl: the Mini App shows its own "pay in chat" prompt and
-  // the bot's message:successful_payment handler settles the order.
+  // createInvoiceLink gives the Mini App a URL it can open with openInvoice(),
+  // so Stars work from the app, not only from the bot chat's sendInvoice flow.
+  // The payload is the same `reference` the rest of the pipeline uses (an
+  // Order.id or a `topup_*` ref), which is what the pre_checkout_query and
+  // successful_payment handlers validate and settle by.
+  const payUrl = await getStarsApi().createInvoiceLink(
+    clampInvoiceText(input.description, 32),
+    clampInvoiceText(input.description, 255),
+    input.reference,
+    '', // Stars require no provider token
+    'XTR',
+    [{ label: clampInvoiceText(input.description, 32), amount: stars }]
+  )
+
+  // amountCents is stored on the payload because Payment.amount holds STARS
+  // (asset XTR): a top-up settle must credit the exact USD cents the user
+  // asked for, not a stars->USD reconversion that can drift with the rate.
   const payment = await prisma.payment.create({
     data: {
       orderId: input.orderId ?? null,
@@ -126,18 +155,18 @@ async function createStarsPayment(input: CreateInvoiceInput): Promise<InvoiceRes
       amount: BigInt(stars),
       asset: 'XTR',
       status: PaymentStatus.PENDING,
-      rawPayload: { stars, reference: input.reference }
+      rawPayload: { stars, reference: input.reference, amountCents: input.amountCents, payUrl }
     }
   })
 
-  return { payment, payUrl: null, tron: null, stars }
+  return { payment, payUrl, tron: null, stars }
 }
 
 /**
  * Marks a Stars order's Payment row PAID and announces the money.
  *
  * Stars is the one rail with no reconciler behind it: CryptoBot has the
- * payments:poll fallback and TRON has chain:scan, but a Stars charge is only
+ * payments-poll fallback and TRON has chain-scan, but a Stars charge is only
  * ever reported once, in the successful_payment update. If this row is not
  * settled here it stays PENDING forever and the order reads as unpaid in every
  * admin payments view even though Telegram has taken the customer's Stars.

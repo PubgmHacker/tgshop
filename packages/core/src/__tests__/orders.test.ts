@@ -55,7 +55,12 @@ function makeOrderRow(overrides: Partial<FakeOrderRow> = {}): FakeOrderRow {
 
 function makeTx(rows: FakeOrderRow[] = []) {
   const orders = new Map(rows.map((row) => [row.id, { ...row }]))
-  const ledgerRows: Array<{ userId: string; amountCents: number; type: LedgerType }> = []
+  const ledgerRows: Array<{
+    userId: string
+    amountCents: number
+    type: LedgerType
+    orderId?: string | null
+  }> = []
   const idempotency = new Map<string, { scope: string; resultJson: unknown }>()
 
   const plan = {
@@ -123,13 +128,32 @@ function makeTx(rows: FakeOrderRow[] = []) {
       create: vi.fn(async () => ({ id: 'audit_1' }))
     },
     balanceTransaction: {
-      aggregate: vi.fn(async () => ({
-        _sum: { amountCents: ledgerRows.reduce((sum, row) => sum + row.amountCents, 0) }
-      })),
-      create: vi.fn(async (args: { data: { userId: string; amountCents: number; type: LedgerType } }) => {
-        ledgerRows.push(args.data)
-        return { id: `bt_${ledgerRows.length}`, ...args.data }
-      })
+      // Honours the where filter (userId / orderId / type) the way real Prisma
+      // does — getBalance() sums by userId, refundOrder()'s double-refund guard
+      // sums by (orderId, type=REFUND). A filter-blind mock would conflate the
+      // two and hide bugs in either.
+      aggregate: vi.fn(
+        async (args?: { where?: { userId?: string; orderId?: string; type?: LedgerType } }) => {
+          const where = args?.where ?? {}
+          const total = ledgerRows
+            .filter(
+              (row) =>
+                (where.userId === undefined || row.userId === where.userId) &&
+                (where.orderId === undefined || row.orderId === where.orderId) &&
+                (where.type === undefined || row.type === where.type)
+            )
+            .reduce((sum, row) => sum + row.amountCents, 0)
+          return { _sum: { amountCents: total } }
+        }
+      ),
+      create: vi.fn(
+        async (args: {
+          data: { userId: string; amountCents: number; type: LedgerType; orderId?: string | null }
+        }) => {
+          ledgerRows.push(args.data)
+          return { id: `bt_${ledgerRows.length}`, ...args.data }
+        }
+      )
     },
     idempotencyRecord: {
       findUnique: vi.fn(async (args: { where: { key: string } }) => {
@@ -317,7 +341,9 @@ describe('refundOrder', () => {
     expect(ledgerRows[0]).toMatchObject({
       userId: 'user_1',
       amountCents: 1299,
-      type: LedgerType.REFUND
+      type: LedgerType.REFUND,
+      // The credit MUST carry orderId — the double-refund guard filters on it.
+      orderId: 'order_1'
     })
   })
 
@@ -329,6 +355,26 @@ describe('refundOrder', () => {
 
     expect(order.status).toBe(OrderStatus.REFUNDED)
     expect(ledgerRows).toHaveLength(0)
+  })
+
+  it('does not double-credit an order that was already auto-refunded', async () => {
+    // A failed delivery auto-refunds the buyer under a DIFFERENT ledger key and
+    // leaves the order FAILED — a legal source state here. A manual/agent refund
+    // of that same order must still move it to REFUNDED but must NOT pay twice.
+    const { tx, ledgerRows } = makeTx([makeOrderRow({ status: OrderStatus.FAILED })])
+    ledgerRows.push({
+      userId: 'user_1',
+      amountCents: 1299,
+      type: LedgerType.REFUND,
+      orderId: 'order_1'
+    })
+
+    const order = await refundOrder(tx, 'order_1', 'agent retry after auto-refund')
+
+    expect(order.status).toBe(OrderStatus.REFUNDED)
+    // Still just the original auto-refund credit — no second payout.
+    expect(ledgerRows).toHaveLength(1)
+    expect(ledgerRows.filter((row) => row.type === LedgerType.REFUND)).toHaveLength(1)
   })
 })
 

@@ -19,7 +19,7 @@
     "open_miniapp": "🚀 Open Mini App"
   },
   "start": {
-    "welcome": "👋 Welcome to {shopName}!\n\nBuy digital goods quickly and securely. Pick a menu option to get started.",
+    "welcome": "👋 Welcome to {shopName}!\n\nNeural-net subscriptions: ChatGPT, Claude, Midjourney and more. Pick a menu option to get started.",
     "welcome_back": "Welcome back, {name}!",
     "referral_applied": "🎁 Referral code applied! Your friend will get a bonus after your first purchase.",
     "promo_applied": "🏷 Promo code \"{code}\" is ready to use at checkout."
@@ -44,6 +44,9 @@
     "pay_usdt": "💵 USDT (TRC-20)",
     "insufficient_balance": "Insufficient balance. Top up or choose another payment method.",
     "created": "✅ Order #{orderId} created. Waiting for payment…",
+    "enter_email": "📧 This product is delivered to your email. Send the address to issue the order to:",
+    "invalid_email": "That doesn't look like an email. Send an address like name@example.com:",
+    "email_accepted": "Email accepted: {email}",
     "cancelled": "❌ Checkout cancelled.",
     "paid_processing": "✅ Payment received! Preparing your delivery…",
     "delivery_caption": "🎉 Your order #{orderId} has been delivered!\n\nYour code/data below (tap to copy):",
@@ -58,7 +61,8 @@
     "prompt": "💰 Choose a top-up method:",
     "enter_amount": "Enter the top-up amount in USD (e.g. 10.00):",
     "invalid_amount": "Invalid amount. Enter a number between {min} and {max} USD.",
-    "created": "✅ Top-up invoice created for {amount}."
+    "created": "✅ Top-up invoice created for {amount}.",
+    "credited": "✅ Balance topped up by {amount}."
   },
   "profile": {
     "title": "👤 <b>Your profile</b>\n\nBalance: <b>{balance}</b>\nTotal spent: {totalSpent}\n\n📦 Active subscriptions:\n{subscriptions}\n\n🎁 Referral link:\n{refLink}\nReferral earnings: {refEarnings}",
@@ -109,7 +113,11 @@
       "promo_invalid": "This promo code cannot be applied.",
       "order_state": "This order can no longer be changed.",
       "delivery_failed": "We could not deliver your order. Our support team has been notified.",
-      "unknown_segment": "Unknown audience segment. Expected one of: {segments}."
+      "unknown_segment": "Unknown audience segment. Expected one of: {segments}.",
+      "reconcile_unsupported": "Provider {provider} has no external record to reconcile against. Supported: CRYPTOBOT, TRON_TRC20.",
+      "anomaly_evidence_too_large": "Anomaly evidence exceeds {maxBytes} bytes when serialized. Store a pointer to the data, not the data.",
+      "conflict": "Conflict: the value is already in use.",
+      "in_use": "Cannot delete: the object is referenced by orders or the catalog."
     }
   },
   "admin": {
@@ -126,6 +134,7 @@
     "usage_refund": "Usage: /refund <orderId>",
     "refund_done": "✅ Order {orderId} refunded.",
     "usage_grant": "Usage: /grant <userId> <amount>",
-    "grant_done": "✅ Granted {amount} to user {userId}."
+    "grant_done": "✅ Granted {amount} to user {userId}.",
+    "open_panel": "🛠 Open admin panel"
   }
 }

@@ -6,7 +6,7 @@ import { InitDataError, issueMiniAppJwt, validateTelegramInitData, JWT_TTL_SECON
 import { findOrCreateUser } from '../../../domain/users.js'
 import { env } from '../../../config/env.js'
 import { resolveLocale } from '../../../i18n/index.js'
-import { HttpError, sendError } from '../../../lib/httpErrors.js'
+import { HttpError, notFound, sendError } from '../../../lib/httpErrors.js'
 import { logger } from '../../../lib/logger.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,6 +48,46 @@ async function resolveReferrerTgId(startParam: string | null): Promise<bigint | 
 }
 
 export function registerAuthRoutes(app: FastifyInstance): void {
+  // Development-only: browser preview without Telegram WebApp initData.
+  // Disabled in production even if DEV_PREVIEW_TG_ID is present.
+  app.post('/api/auth/dev', async (req, reply) => {
+    const locale = resolveLocale(req.headers['accept-language'])
+    if (env.NODE_ENV !== 'development' || env.DEV_PREVIEW_TG_ID === undefined) {
+      await sendError(reply, notFound(), locale)
+      return
+    }
+
+    try {
+      const user = await findOrCreateUser({
+        tgId: env.DEV_PREVIEW_TG_ID,
+        username: 'preview',
+        firstName: 'Preview',
+        languageCode: 'ru',
+        referredByTgId: null
+      })
+
+      if (user.isBlocked) {
+        throw new HttpError(403, 'USER_BLOCKED', 'api.errors.blocked')
+      }
+
+      const accessToken = issueMiniAppJwt({ sub: user.id, tgId: user.tgId.toString() })
+      const balanceCents = await getBalance(prisma, user.id)
+
+      return {
+        accessToken,
+        expiresAt: new Date(Date.now() + JWT_TTL_SECONDS * 1000).toISOString(),
+        user: {
+          id: user.id,
+          languageCode: user.languageCode,
+          balanceCents
+        }
+      }
+    } catch (err) {
+      await sendError(reply, err, locale)
+      return
+    }
+  })
+
   app.post('/api/auth/telegram', async (req, reply) => {
     const locale = resolveLocale(req.headers['accept-language'])
 

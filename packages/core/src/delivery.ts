@@ -241,6 +241,19 @@ export function readCodeTemplate(externalConfig: unknown): string | null {
 }
 
 /**
+ * Whether checkout must collect a delivery email from the buyer, read from
+ * Product.externalConfig ({"requiresEmail": true}). Strictly boolean true —
+ * a string "true" or 1 left by a hand-edited config does not count, so a
+ * malformed config degrades to "no email asked" rather than a stuck checkout.
+ */
+export function readRequiresEmail(externalConfig: unknown): boolean {
+  if (typeof externalConfig !== 'object' || externalConfig === null || Array.isArray(externalConfig)) {
+    return false
+  }
+  return (externalConfig as { requiresEmail?: unknown }).requiresEmail === true
+}
+
+/**
  * Whether a product is served out of the StockItem pool — i.e. whether its
  * plans have a countable stock level. UNIQUE_CODE counts only when it has no
  * generator template, matching the dispatch in deliver().

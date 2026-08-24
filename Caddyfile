@@ -9,7 +9,8 @@
 #   api.{$DOMAIN}     -> bot        (Telegram webhook + Mini App API + /internal/*)
 #   miniapp.{$DOMAIN}  -> miniapp    (Next.js Mini App frontend)
 #   {$DOMAIN}          -> landing    (marketing landing page)
-#   admin.{$DOMAIN}    -> admin      (admin panel)
+#   admin.{$DOMAIN}    -> admin      (admin panel, desktop web)
+#   panel.{$DOMAIN}    -> admin-miniapp (admin Telegram Mini App)
 # ─────────────────────────────────────────────────────────────────────────────
 
 {
@@ -36,6 +37,15 @@ miniapp.{$DOMAIN} {
 
 admin.{$DOMAIN} {
 	reverse_proxy admin:3300
+	encode gzip zstd
+	log {
+		output stdout
+		format json
+	}
+}
+
+panel.{$DOMAIN} {
+	reverse_proxy admin-miniapp:3500
 	encode gzip zstd
 	log {
 		output stdout

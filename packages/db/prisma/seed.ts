@@ -1,4 +1,4 @@
-import { randomBytes, createCipheriv, createHash, hash } from 'node:crypto'
+import { randomBytes, createCipheriv, hash } from 'node:crypto'
 import { PrismaClient, DeliveryType, StockStatus, AdminRole } from '@prisma/client'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,76 +55,113 @@ const prisma = new PrismaClient()
 async function main(): Promise<void> {
   const key = loadEncryptionKey()
 
+  await prisma.plan.updateMany({
+    where: {
+      product: {
+        slug: {
+          in: [
+            'netflix-premium',
+            'spotify-premium',
+            'steam-wallet-code',
+            'pubg-mobile-uc',
+            'windows-11-pro-key',
+            'office-2021-key'
+          ]
+        }
+      }
+    },
+    data: { isActive: false }
+  })
+  await prisma.product.updateMany({
+    where: {
+      slug: {
+        in: [
+          'netflix-premium',
+          'spotify-premium',
+          'steam-wallet-code',
+          'pubg-mobile-uc',
+          'windows-11-pro-key',
+          'office-2021-key'
+        ]
+      }
+    },
+    data: { isActive: false }
+  })
+  await prisma.category.updateMany({
+    where: { slug: { in: ['streaming', 'gaming', 'software'] } },
+    data: { isActive: false }
+  })
+
   // ── Categories ──────────────────────────────────────────────────────────
   const categoriesData = [
-    { title: 'Streaming', slug: 'streaming', emoji: '🎬', sortOrder: 0 },
-    { title: 'Gaming', slug: 'gaming', emoji: '🎮', sortOrder: 1 },
-    { title: 'Software', slug: 'software', emoji: '💻', sortOrder: 2 }
+    { title: 'Чат', slug: 'chat', emoji: null, sortOrder: 0 },
+    { title: 'Картинки', slug: 'image', emoji: null, sortOrder: 1 },
+    { title: 'Код', slug: 'code', emoji: null, sortOrder: 2 }
   ]
 
   const categories = []
   for (const data of categoriesData) {
     const category = await prisma.category.upsert({
       where: { slug: data.slug },
-      update: data,
+      update: { ...data, isActive: true },
       create: { ...data, isActive: true }
     })
     categories.push(category)
   }
 
-  const [streaming, gaming, software] = categories
-  if (!streaming || !gaming || !software) {
+  const [chat, image, code] = categories
+  if (!chat || !image || !code) {
     throw new Error('failed to seed categories')
   }
 
   // ── Products (6) ────────────────────────────────────────────────────────
   const productsData = [
     {
-      categoryId: streaming.id,
-      title: 'Netflix Premium',
-      slug: 'netflix-premium',
-      description: 'Shared Netflix Premium 4K account access.',
+      categoryId: chat.id,
+      title: 'ChatGPT Plus',
+      slug: 'chatgpt-plus',
+      description: 'Подписка ChatGPT Plus: GPT-4o, приоритетный доступ, DALL·E.',
       deliveryType: DeliveryType.STOCK_POOL,
       sortOrder: 0
     },
     {
-      categoryId: streaming.id,
-      title: 'Spotify Premium',
-      slug: 'spotify-premium',
-      description: 'Spotify Premium individual account, ad-free music.',
+      categoryId: chat.id,
+      title: 'Claude Pro',
+      slug: 'claude-pro',
+      description: 'Anthropic Claude Pro: длинный контекст, Projects, приоритет.',
       deliveryType: DeliveryType.STOCK_POOL,
       sortOrder: 1
     },
     {
-      categoryId: gaming.id,
-      title: 'Steam Wallet Code',
-      slug: 'steam-wallet-code',
-      description: 'Steam Wallet top-up code, redeemable region-locked.',
+      categoryId: image.id,
+      title: 'Midjourney',
+      slug: 'midjourney',
+      description: 'Подписка Midjourney: генерация изображений в Discord.',
       deliveryType: DeliveryType.UNIQUE_CODE,
       sortOrder: 0
     },
     {
-      categoryId: gaming.id,
-      title: 'PUBG Mobile UC',
-      slug: 'pubg-mobile-uc',
-      description: 'PUBG Mobile UC currency top-up via external API.',
-      deliveryType: DeliveryType.EXTERNAL_API,
+      categoryId: image.id,
+      title: 'Flux Pro',
+      slug: 'flux-pro',
+      description: 'Доступ к Flux Pro для генерации изображений.',
+      deliveryType: DeliveryType.UNIQUE_CODE,
       sortOrder: 1
     },
     {
-      categoryId: software.id,
-      title: 'Windows 11 Pro Key',
-      slug: 'windows-11-pro-key',
-      description: 'Genuine retail Windows 11 Pro activation key.',
+      categoryId: code.id,
+      title: 'GitHub Copilot',
+      slug: 'github-copilot',
+      description: 'GitHub Copilot: автодополнение кода в IDE.',
       deliveryType: DeliveryType.UNIQUE_CODE,
       sortOrder: 0
     },
     {
-      categoryId: software.id,
-      title: 'Office 2021 Key',
-      slug: 'office-2021-key',
-      description: 'Microsoft Office 2021 Home & Business activation key.',
-      deliveryType: DeliveryType.MANUAL_FALLBACK,
+      categoryId: code.id,
+      title: 'Cursor Pro',
+      slug: 'cursor-pro',
+      description: 'Cursor Pro: агентный редактор с доступом к моделям.',
+      deliveryType: DeliveryType.STOCK_POOL,
       sortOrder: 1
     }
   ]
@@ -133,7 +170,7 @@ async function main(): Promise<void> {
   for (const data of productsData) {
     const product = await prisma.product.upsert({
       where: { slug: data.slug },
-      update: data,
+      update: { ...data, isActive: true },
       create: { ...data, isActive: true }
     })
     products.push(product)
@@ -177,25 +214,23 @@ async function main(): Promise<void> {
     plans.push(plan1, plan2)
   }
 
-  // ── Stock items (~20 demo, encrypted) ───────────────────────────────────
-  // Idempotent like everything above: re-seeding re-encrypts the same payloads
-  // rather than minting a second batch of rows. StockItem has no natural key,
-  // so the deterministic link is (planId, payloadEnc): a demo payload of the
-  // same plan is assumed to be this seed's row from an earlier run.
+  // ── Stock items (2 per active plan, encrypted) ──────────────────────────
+  // StockItem has no natural unique column, and payloadEnc cannot serve as one
+  // (a fresh IV per encrypt means the same plaintext yields different ciphertext
+  // each run). So the deterministic id is derived from (plan.id, index): keying
+  // on the plan — not on a payload-only hash — means that after a catalog change
+  // (e.g. swapping the old streaming/gaming products for these AI ones) a re-seed
+  // provisions fresh stock for the NEW plans instead of colliding on an id that
+  // still points at a now-inactive plan. update:{} stays empty so a re-seed never
+  // yanks a row back to AVAILABLE after a real order already consumed it.
   let stockCount = 0
   for (const plan of plans) {
-    if (stockCount >= 20) break
     const itemsForPlan = 2
-    for (let i = 0; i < itemsForPlan && stockCount < 20; i++) {
-      const demoPayload = `demo-login:user${stockCount}@example.com|password:Demo${stockCount}!Pass`
-      // Deterministic id derived from the payload: StockItem has no natural
-      // unique column, and payloadEnc cannot serve as one (a fresh IV per
-      // encrypt means the same plaintext yields different ciphertext each run).
-      const seedId = `seed-stock-${createHash('sha256').update(demoPayload).digest('hex').slice(0, 24)}`
+    for (let i = 0; i < itemsForPlan; i++) {
+      const demoPayload = `demo-login:${plan.id}-${i}@example.com|password:Demo${i}!Pass`
+      const seedId = `seed-stock-${plan.id}-${i}`
       await prisma.stockItem.upsert({
         where: { id: seedId },
-        // Empty, like every other upsert here: a re-seed must not yank a row
-        // back to AVAILABLE if a real order already consumed it.
         update: {},
         create: {
           id: seedId,
@@ -228,6 +263,11 @@ async function main(): Promise<void> {
     where: { key: 'referral_percent' },
     update: { value: 5 },
     create: { key: 'referral_percent', value: 5 }
+  })
+  await prisma.setting.upsert({
+    where: { key: 'refund_auto_approve_ceiling_cents' },
+    update: { value: 1000 },
+    create: { key: 'refund_auto_approve_ceiling_cents', value: 1000 }
   })
 
   // ── Default admin user ───────────────────────────────────────────────────

@@ -25,10 +25,15 @@ export type EventName =
   | 'order.paid'
   | 'order.delivered'
   | 'order.failed'
+  | 'order.refunded'
   | 'stock.low'
+  | 'stock.depleted'
   | 'payment.received'
   | 'payment.underpaid'
+  | 'payment.reconcile_mismatch'
   | 'user.registered'
+  | 'subscription.expiring_soon'
+  | 'broadcast.sent'
 
 export interface EventPayloads {
   'order.paid': {
@@ -50,11 +55,25 @@ export interface EventPayloads {
     reason: string
     refundedCents: number
   }
+  'order.refunded': {
+    orderId: string
+    userId: string
+    planId: string
+    /** What was credited back to the buyer's balance; 0 for a zero-amount order. */
+    refundedCents: number
+    reason: string
+    /** Who initiated it: "admin" (panel), "agent" (/internal), "system" (auto-refund). */
+    refundedBy: 'admin' | 'agent' | 'system'
+  }
   'stock.low': {
     planId: string
     productId: string
     available: number
     threshold: number
+  }
+  'stock.depleted': {
+    planId: string
+    productId: string
   }
   'payment.received': {
     paymentId: string
@@ -73,11 +92,44 @@ export interface EventPayloads {
     expected6: string
     received6: string
   }
+  'payment.reconcile_mismatch': {
+    provider: PaymentProvider
+    paymentId: string
+    orderId: string | null
+    /**
+     * Machine-readable disagreement class. Current values:
+     *   "paid_no_order"     provider says paid, but the payment row is linked
+     *                       to no order — money with no purchase to settle.
+     *   "paid_order_closed" provider says paid, but the order already reached
+     *                       a terminal state (EXPIRED/FAILED/REFUNDED) through
+     *                       another path — a late or contested payment.
+     * Consumers must tolerate unknown future values (flag, don't crash).
+     */
+    kind: string
+    /** Human-readable context for the admin audit trail. */
+    detail: string
+  }
   'user.registered': {
     userId: string
     /** Telegram id as a decimal string (BigInt-safe). */
     tgId: string
     referredById: string | null
+  }
+  'subscription.expiring_soon': {
+    subscriptionId: string
+    userId: string
+    planId: string
+    expiresAt: string
+    /** Whole days until expiry at emission time (3 or 1 for the current reminder windows). */
+    daysLeft: number
+  }
+  'broadcast.sent': {
+    postId: string
+    total: number
+    sent: number
+    blocked: number
+    failed: number
+    sentAt: string
   }
 }
 
@@ -89,10 +141,15 @@ const STREAM_BY_EVENT: Record<EventName, string> = {
   'order.paid': `${STREAM_PREFIX}orders`,
   'order.delivered': `${STREAM_PREFIX}orders`,
   'order.failed': `${STREAM_PREFIX}orders`,
+  'order.refunded': `${STREAM_PREFIX}orders`,
   'stock.low': `${STREAM_PREFIX}stock`,
+  'stock.depleted': `${STREAM_PREFIX}stock`,
   'payment.received': `${STREAM_PREFIX}payments`,
   'payment.underpaid': `${STREAM_PREFIX}payments`,
-  'user.registered': `${STREAM_PREFIX}users`
+  'payment.reconcile_mismatch': `${STREAM_PREFIX}payments`,
+  'user.registered': `${STREAM_PREFIX}users`,
+  'subscription.expiring_soon': `${STREAM_PREFIX}subs`,
+  'broadcast.sent': `${STREAM_PREFIX}broadcasts`
 }
 
 /** The stream an event is published to. Related events share a stream, one per domain. */

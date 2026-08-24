@@ -42,18 +42,29 @@ describe('QUEUE_CONFIG', () => {
     }
   })
 
-  // Serial by design: chain:scan and chain:sweep read and move real funds, so
+  // Serial by design: chain-scan and chain-sweep read and move real funds, so
   // two concurrent runs could double-spend a sweep or double-credit a deposit.
   it('keeps the chain queues strictly serial', () => {
     expect(QUEUE_CONFIG[QueueName.ChainScan].concurrency).toBe(1)
     expect(QUEUE_CONFIG[QueueName.ChainSweep].concurrency).toBe(1)
   })
+
+  // BullMQ's QueueBase throws "Queue name cannot contain :" — ':' is its Redis
+  // key separator. The original names (payments:poll, chain:scan, …) passed on
+  // older 5.x releases and crash on current ones, and the unit suite never
+  // constructed a real Queue, so nothing caught it before boot. This does.
+  it('uses only queue names BullMQ accepts (no colons), DLQs included', () => {
+    for (const name of ALL_QUEUES) {
+      expect(name, `queue name ${name} would crash BullMQ`).not.toContain(':')
+      expect(deadLetterQueueName(name)).not.toContain(':')
+    }
+  })
 })
 
 describe('deadLetterQueueName', () => {
   it('suffixes the queue name', () => {
-    expect(deadLetterQueueName('delivery')).toBe('delivery:dlq')
-    expect(deadLetterQueueName('chain:scan')).toBe('chain:scan:dlq')
+    expect(deadLetterQueueName('delivery')).toBe('delivery-dlq')
+    expect(deadLetterQueueName('chain-scan')).toBe('chain-scan-dlq')
   })
 
   // The DLQ must never collide with a real queue, or exhausted jobs would be

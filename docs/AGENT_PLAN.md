@@ -53,35 +53,32 @@ is a closed union, so an event not listed there cannot be published at all.
 | `tgshop:events:orders` | `order.failed` | delivery fails after retries exhausted | `orderId, reason` |
 | `tgshop:events:payments` | `payment.received` | a payment is confirmed on any rail | `paymentId, orderId, userId, provider, amount, asset` |
 | `tgshop:events:payments` | `payment.underpaid` | a `TRON_TRC20` deposit is short | `orderId, paymentId, expected6, received6` |
+| `tgshop:events:payments` | `payment.reconcile_mismatch` | reconciliation finds a provider/DB disagreement: a provider-paid invoice with no linked order (`kind="paid_no_order"`) or one whose order already closed EXPIRED/FAILED/REFUNDED (`kind="paid_order_closed"`) | `provider, paymentId, orderId, kind, detail` |
+| `tgshop:events:orders` | `order.refunded` | `refundOrder()` commits — from the admin panel, or from `POST /internal/orders/:id/refund` at/below the auto-approval ceiling | `orderId, userId, planId, refundedCents, reason, refundedBy` |
 | `tgshop:events:stock` | `stock.low` | a plan's `AVAILABLE` `StockItem` count drops to/below `lowStockThreshold` | `planId, productId, available, threshold` |
+| `tgshop:events:stock` | `stock.depleted` | a delivery draws a pool-backed plan to exactly zero `AVAILABLE` (fires alongside that delivery's `stock.low`) | `planId, productId` |
 | `tgshop:events:users` | `user.registered` | a new `User` row is created (first `/start` or first Mini App auth) | `userId, tgId, referredById` |
+| `tgshop:events:subs` | `subscription.expiring_soon` | the `subs-remind` sweep sends a 3-day or 1-day expiry reminder (deduped per window by `remindedAt`) | `subscriptionId, userId, planId, expiresAt, daysLeft` |
+| `tgshop:events:broadcasts` | `broadcast.sent` | a `BroadcastPost` fan-out finishes and the post reaches `SENT` (a `FAILED` fan-out emits nothing) | `postId, total, sent, blocked, failed, sentAt` |
 
 Every entry also carries `emittedAt` (ISO timestamp) and `schemaVersion`
 (`"1"` today) fields alongside `type`/`data`, so consumers can safely ignore
 unknown future event types on a stream rather than erroring.
 
-### Planned, not yet emitted
+### Adding a new event
 
-Listed so agent authors do not build against events that will never arrive.
-Adding one means extending the `EventName` union and `EventPayloads` in
-`packages/core/src/events.ts`, then publishing it from the owning edge.
-
-| Proposed event | Would fire when |
-| --- | --- |
-| `order.refunded` | `refundOrder()` completes |
-| `payment.reconcile_mismatch` | reconciliation finds a provider/DB disagreement |
-| `stock.depleted` | a plan hits zero `AVAILABLE` stock |
-| `subscription.expiring_soon` | a `Subscription` enters the reminder window |
-| `broadcast.sent` | a `BroadcastPost` finishes sending |
+Every event this plan originally proposed is emitted today (table above).
+Adding a future one means extending the `EventName` union, `EventPayloads`
+and the stream map in `packages/core/src/events.ts` (the union is closed, so
+an unlisted event cannot be published at all), then publishing it from the
+owning edge — after the transaction commits, never inside it. The mapping is
+pinned by `packages/core/src/__tests__/events.test.ts`.
 
 ## `/internal/*` endpoints available to the agent
 
 All require `Authorization: Bearer ${SERVICE_TOKEN}`. See
-`bruno/tgshop/internal-api/` for runnable examples. Endpoints marked
-*(planned)* do not exist yet — they are the surface this plan expects
-`apps/bot` to grow into as each capability below is built. Everything else in
-this table is live today; `apps/bot/src/server/routes/internal/` is the source
-of truth.
+`bruno/tgshop/internal-api/` for runnable examples. Every endpoint in this
+table is live; `apps/bot/src/server/routes/internal/` is the source of truth.
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
@@ -93,9 +90,9 @@ of truth.
 | `/internal/posts` | `POST` | Create a `BroadcastPost` (`source=AGENT`, defaults to `status=DRAFT`). |
 | `/internal/posts/:id/publish` | `POST` | Publish or schedule an existing post. |
 | `/internal/broadcasts` | `POST` | Enqueue a broadcast send to the worker's queue. |
-| `/internal/reconcile` | `POST` *(planned)* | Trigger an on-demand reconciliation pass for one provider (see `docs/PAYMENTS.md`). The agent would call this on a suspiciously stale `PENDING`/`CONFIRMING` `Payment` rather than diagnosing the provider API itself. Today reconciliation runs only as the worker's scheduled `payments:poll` job. |
-| `/internal/anomalies` | `POST` *(planned)* | Record an anomaly flag (see below) for the admin **Audit log**/dashboard to surface, without taking any mutating action itself. |
-| `/internal/orders/:id/refund` | `POST` *(planned, gated)* | Issue a refund for an order below a configured auto-approval `amountCents` ceiling; above the ceiling, this instead creates a pending-approval record for a human `ADMIN`. |
+| `/internal/reconcile` | `POST` | Trigger an on-demand reconciliation pass for one provider (see `docs/PAYMENTS.md`). Enqueues the worker's existing sweep — `payments-poll` for `CRYPTOBOT`, `chain-scan` for `TRON_TRC20` — rather than reconciling in the request; `BALANCE`/`STARS` are rejected (no external record to disagree with). The agent calls this on a suspiciously stale `PENDING`/`CONFIRMING` `Payment` rather than diagnosing the provider API itself. |
+| `/internal/anomalies` | `POST` | Record an anomaly flag (see below) as an `AuditLog` row (`actorType="agent"`, `action="anomaly.flagged"`) for the admin **Audit log**/dashboard to surface, without taking any mutating action itself. Evidence is capped at 16 KB serialized. |
+| `/internal/orders/:id/refund` | `POST` (gated) | Issue a refund for an order at/below the `refund_auto_approve_ceiling_cents` `Setting` (default 1000 = $10; 0 sends everything to a human). Above the ceiling it mutates nothing and records one pending-approval `AuditLog` row (`action="order.refund_requested"`) for a human `ADMIN`. Retry-safe: an already-`REFUNDED` order answers 200 with `alreadyRefunded=true`, and repeat above-ceiling requests do not duplicate the pending entry. |
 
 ## Capability 1: auto-generate channel promo posts
 
@@ -130,7 +127,7 @@ of truth.
    auditable).
 2. On `stock.depleted`, the agent should *not* silently disable the
    product/plan (that's a catalog edit with real revenue impact) — instead
-   it flags via `POST /internal/anomalies` (planned) with severity `high`,
+   it flags via `POST /internal/anomalies` with severity `high`,
    for a human to decide whether to disable, restock, or leave listed with
    an "out of stock, restocking soon" note.
 
@@ -154,7 +151,7 @@ entries the worker's own reconciliation job already emits.
    payments) via read-only `/internal/*`/`/api/*` calls and either: (a) if
    the numbers correctly imply a `PAID` order (e.g. a late-arriving webhook
    the reconciliation pass already found and fixed), does nothing further;
-   or (b) if genuinely ambiguous, calls `POST /internal/anomalies` (planned)
+   or (b) if genuinely ambiguous, calls `POST /internal/anomalies`
    rather than guessing, since a wrong auto-resolution here is a direct
    financial mistake.
 
@@ -165,7 +162,7 @@ entries the worker's own reconciliation job already emits.
 repeated `UNDERPAID` payments from one `userId`, refund volume spiking).
 
 **Flow**:
-1. `POST /internal/anomalies` (planned) with `{ severity, category,
+1. `POST /internal/anomalies` with `{ severity, category,
    summary, relatedEntity: { type, id }, evidence }` — purely additive,
    never mutates order/payment/stock state itself.
 2. Surfaces in the admin **Audit log** (per `docs/ADMIN.md`) alongside

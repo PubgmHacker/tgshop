@@ -1,16 +1,13 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { Inter } from 'next/font/google';
 import { LANDING_URL } from '../lib/env';
 import { getCopy } from '../lib/i18n';
 import { Analytics } from '../components/Analytics';
 import './globals.css';
 
-const inter = Inter({
-  subsets: ['latin', 'cyrillic'],
-  display: 'swap',
-  variable: '--font-sans',
-});
+// --font-sans is defined in globals.css as a system-first stack. next/font's
+// Google loader is deliberately NOT used: it downloads the font at build time,
+// which fails every build on a machine without internet access to Google.
 
 const copy = getCopy('ru');
 
@@ -52,7 +49,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="ru" className={inter.variable}>
+    <html lang="ru">
       <body className="font-sans antialiased">
         {children}
         <Analytics />

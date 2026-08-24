@@ -4,9 +4,9 @@ import { useParams } from 'next/navigation'
 import { useI18n } from '@/i18n/I18nProvider'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useCategoryData } from '@/hooks/useApi'
-import { ProductCard } from '@/components/ProductCard'
-import { ProductCardSkeleton } from '@/components/Skeletons'
+import { ServiceTile } from '@/components/ServiceTile'
 import { EmptyState, ErrorState } from '@/components/States'
+import { formatCents } from '@/lib/format'
 
 export default function CategoryPage(): JSX.Element {
   const params = useParams<{ slug: string }>()
@@ -17,22 +17,21 @@ export default function CategoryPage(): JSX.Element {
   useBackButton(true)
 
   return (
-    <div className="page-enter flex flex-1 flex-col gap-4 pt-4">
-      <header className="px-4">
+    <div className="page-enter flex flex-1 flex-col gap-4 px-4 pt-4">
+      <header>
         {isLoading ? (
           <div className="skeleton h-6 w-40 rounded" />
         ) : (
-          <h1 className="flex items-center gap-2 text-xl font-bold text-tg-text">
-            {data?.category.emoji ? <span>{data.category.emoji}</span> : null}
+          <h1 className="text-[22px] font-semibold tracking-[-0.04em] text-ink">
             {data?.category.title ?? t('category.notFound')}
           </h1>
         )}
       </header>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 gap-3 px-4">
+        <div className="grid grid-cols-2 gap-2.5">
           {Array.from({ length: 6 }).map((_, i) => (
-            <ProductCardSkeleton key={i} />
+            <div key={i} className="skeleton h-[68px] rounded-[20px]" />
           ))}
         </div>
       ) : isError ? (
@@ -40,9 +39,15 @@ export default function CategoryPage(): JSX.Element {
       ) : (data?.products.length ?? 0) === 0 ? (
         <EmptyState title={t('category.empty')} />
       ) : (
-        <div className="grid grid-cols-2 gap-3 px-4">
+        <div className="grid grid-cols-2 gap-2.5">
           {data?.products.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ServiceTile
+              key={product.id}
+              href={`/product/${product.slug}`}
+              slug={product.slug}
+              title={product.title}
+              meta={`${t('catalog.from')} ${formatCents(product.minPriceCents)}`}
+            />
           ))}
         </div>
       )}

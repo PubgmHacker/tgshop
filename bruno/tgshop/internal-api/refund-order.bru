@@ -1,0 +1,49 @@
+meta {
+  name: Refund order (gated)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{internal_base}}/internal/orders/{{order_id}}/refund
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{service_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "reason": "Support ticket #123: user paid twice for the same plan",
+    "source": "agent:support-triage"
+  }
+}
+
+docs {
+  The gated refund from docs/AGENT_PLAN.md:
+
+    order.amountCents <= refund_auto_approve_ceiling_cents (Setting, default
+    1000 = $10)  -> refunds immediately through core's refundOrder(): state
+    machine enforced, RESERVED stock released, promo use returned, balance
+    credited under the idempotent ledger key `refund:<orderId>`. Responds 200
+    { status: "REFUNDED", refundedCents } and publishes `order.refunded` to
+    tgshop:events:orders.
+
+    above the ceiling -> mutates nothing; records ONE pending-approval
+    AuditLog row (action="order.refund_requested") for a human ADMIN and
+    responds 202 { status: "PENDING_APPROVAL", amountCents, ceilingCents,
+    alreadyPending }.
+
+  Retry-safe end to end: an already-REFUNDED order answers 200 with
+  alreadyRefunded=true instead of an error, and repeat above-ceiling requests
+  do not duplicate the pending-approval entry.
+
+  404 for an unknown order id; 409 ORDER_STATE when the order's status has no
+  legal edge to REFUNDED (e.g. a PENDING order that was never paid).
+
+  Refunds always land on the internal balance — reversing the original rail
+  (Stars, chain transfer) stays a manual, provider-specific admin operation.
+}

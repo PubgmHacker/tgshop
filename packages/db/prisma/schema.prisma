@@ -208,6 +208,7 @@ model Order {
   externalId            String?
   idempotencyKey        String          @unique
   deliveredPayloadEnc   String?
+  customerEmail         String?
   promoId               String?
   createdAt             DateTime        @default(now())
   paidAt                DateTime?

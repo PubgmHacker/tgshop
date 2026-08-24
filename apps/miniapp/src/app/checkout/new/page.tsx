@@ -5,23 +5,28 @@ import { useState } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useMainButton } from '@/hooks/useMainButton'
-import { useCreateOrder } from '@/hooks/useApi'
-import { generateIdempotencyKey } from '@/lib/format'
-import { triggerNotificationHaptic } from '@/lib/TelegramProvider'
+import { useCreateOrder, useMeData } from '@/hooks/useApi'
+import { Icon, type IconName } from '@/components/Icons'
+import { formatCents, generateIdempotencyKey } from '@/lib/format'
+import { openPaymentUrl } from '@/lib/payments'
+import { ApiClientError } from '@/lib/apiClient'
+import { triggerHaptic, triggerNotificationHaptic } from '@/lib/TelegramProvider'
+import type { DictionaryKey } from '@/i18n/dictionaries'
 
 type ProviderChoice = 'BALANCE' | 'CRYPTOBOT' | 'STARS' | 'TRON_TRC20'
 
-const PROVIDERS: { value: ProviderChoice; labelKey: 'checkout.method.balance' | 'checkout.method.cryptobot' | 'checkout.method.stars' | 'checkout.method.tron'; icon: string }[] = [
-  { value: 'BALANCE', labelKey: 'checkout.method.balance', icon: '💰' },
-  { value: 'CRYPTOBOT', labelKey: 'checkout.method.cryptobot', icon: '🤖' },
-  { value: 'STARS', labelKey: 'checkout.method.stars', icon: '⭐' },
-  { value: 'TRON_TRC20', labelKey: 'checkout.method.tron', icon: '🪙' }
+const PROVIDERS: { value: ProviderChoice; labelKey: DictionaryKey; icon: IconName }[] = [
+  { value: 'BALANCE', labelKey: 'checkout.method.balance', icon: 'wallet' },
+  { value: 'CRYPTOBOT', labelKey: 'checkout.method.cryptobot', icon: 'card' },
+  { value: 'STARS', labelKey: 'checkout.method.stars', icon: 'star' },
+  { value: 'TRON_TRC20', labelKey: 'checkout.method.tron', icon: 'shield' }
 ]
 
 export default function NewCheckoutPage(): JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t } = useI18n()
+  const me = useMeData()
   const [provider, setProvider] = useState<ProviderChoice>('BALANCE')
   const [error, setError] = useState<string | null>(null)
   const createOrderMutation = useCreateOrder()
@@ -43,9 +48,18 @@ export default function NewCheckoutPage(): JSX.Element {
         idempotencyKey: generateIdempotencyKey()
       })
       triggerNotificationHaptic('success')
+      // CryptoBot / Stars hand back a payment URL — open it right away so the
+      // user lands on the payment sheet, then poll the order page behind it.
+      if (order.payUrl) {
+        openPaymentUrl(order.payUrl)
+      }
       router.replace(`/checkout/${order.orderId}`)
-    } catch {
-      setError(t('common.error.generic'))
+    } catch (err) {
+      setError(
+        err instanceof ApiClientError && err.code === 'INSUFFICIENT_BALANCE'
+          ? t('checkout.insufficientBalance')
+          : t('common.error.generic')
+      )
       triggerNotificationHaptic('error')
     }
   }
@@ -58,47 +72,56 @@ export default function NewCheckoutPage(): JSX.Element {
   })
 
   return (
-    <div className="page-enter flex flex-1 flex-col gap-4 pt-4">
-      <header className="px-4">
-        <h1 className="text-xl font-bold text-tg-text">{t('checkout.title')}</h1>
+    <div className="page-enter flex flex-1 flex-col gap-4 px-4 pt-3">
+      <header>
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink">{t('checkout.title')}</h1>
       </header>
 
-      <section className="flex flex-col gap-2 px-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-tg-section-header-text">
+      <section className="flex flex-col gap-2.5">
+        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-faint">
           {t('checkout.method')}
-        </h2>
-        <div className="flex flex-col gap-2">
-          {PROVIDERS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setProvider(option.value)}
-              className={`flex items-center gap-3 rounded-card border px-4 py-3 text-left ${
-                provider === option.value ? 'border-tg-accent-text bg-tg-section-bg' : 'border-transparent bg-tg-section-bg'
-              }`}
-            >
-              <span className="text-xl">{option.icon}</span>
-              <span className="text-sm font-medium text-tg-text">{t(option.labelKey)}</span>
-              {provider === option.value ? (
-                <span className="ml-auto text-tg-accent-text">✓</span>
-              ) : null}
-            </button>
-          ))}
+        </p>
+        <div className="grid grid-cols-2 gap-2.5">
+          {PROVIDERS.map((option) => {
+            const isActive = provider === option.value
+            const isBalance = option.value === 'BALANCE'
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light')
+                  setProvider(option.value)
+                }}
+                className={`flex flex-col items-center gap-2 rounded-tile border p-4 transition-colors ${
+                  isActive ? 'border-line-strong bg-card-strong' : 'border-line bg-card'
+                }`}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-card-strong text-muted">
+                  <Icon name={option.icon} size={17} />
+                </span>
+                <span className="text-xs font-semibold text-ink">{t(option.labelKey)}</span>
+                {isBalance ? (
+                  <span className="tnum text-[11px] text-faint">
+                    {me.data ? formatCents(me.data.balanceCents) : '\u00A0'}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
         </div>
       </section>
 
-      {error ? <p className="px-4 text-sm text-tg-destructive">{error}</p> : null}
+      {error ? <p className="text-center text-sm text-danger">{error}</p> : null}
 
-      <div className="px-4 pb-2">
-        <button
-          type="button"
-          onClick={() => void handlePay()}
-          disabled={createOrderMutation.isPending || !planId}
-          className="w-full rounded-full bg-tg-button py-3 text-center text-sm font-semibold text-tg-button-text disabled:opacity-50"
-        >
-          {t('checkout.pay')}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => void handlePay()}
+        disabled={createOrderMutation.isPending || !planId}
+        className="rounded-full bg-cta py-3.5 text-center text-sm font-semibold text-cta-ink transition-opacity disabled:opacity-40"
+      >
+        {t('checkout.pay')}
+      </button>
     </div>
   )
 }

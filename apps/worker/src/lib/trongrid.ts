@@ -2,7 +2,7 @@ import { tronAddressToHex } from '@tgshop/payments'
 import { loadEnv } from '../env.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Minimal TronGrid REST client for chain:scan / chain:sweep. Only the calls
+// Minimal TronGrid REST client for chain-scan / chain-sweep. Only the calls
 // the worker needs: TRC-20 transfer history for an address, TRC-20 and TRX
 // balances, and chain tip block number for confirmation math. Building and
 // signing sweep transactions is delegated to @tgshop/payments, which owns the
@@ -131,7 +131,7 @@ export class TronGridClient {
     return BigInt(`0x${word}`)
   }
 
-  /** Broadcasts an already-signed raw transaction (used by chain:sweep). Returns the resulting tx hash. */
+  /** Broadcasts an already-signed raw transaction (used by chain-sweep). Returns the resulting tx hash. */
   async broadcastTransaction(signedTx: unknown): Promise<{ result: boolean; txid?: string; message?: string }> {
     const url = new URL(`${this.baseUrl}/wallet/broadcasttransaction`)
     const res = await fetch(url.toString(), {

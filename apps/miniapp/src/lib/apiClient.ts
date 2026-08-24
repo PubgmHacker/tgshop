@@ -3,6 +3,7 @@
 import type { z } from 'zod'
 import { AuthResponseSchema } from '@/types/api'
 import { clearAuthSession, getAccessToken, setAuthSession } from './authStore'
+import { readInitDataFromLocation } from './launchParams'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
 
@@ -24,19 +25,44 @@ let initDataRef: string | null = null
 /** Called once at boot with the raw Telegram WebApp initData string. */
 export function setInitData(initData: string): void {
   initDataRef = initData
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.setItem('tgshop.initData', initData)
+  } catch {
+    // private mode / quota — ignore
+  }
+}
+
+function resolveInitData(): string | null {
+  if (initDataRef) return initDataRef
+  const fromLocation = readInitDataFromLocation()
+  if (fromLocation) {
+    initDataRef = fromLocation
+  }
+  return initDataRef
 }
 
 async function authenticate(): Promise<void> {
-  if (!initDataRef) {
+  const initData = resolveInitData()
+  const res = initData
+    ? await fetch(`${API_URL}/api/auth/telegram`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ initData })
+      })
+    : process.env.NODE_ENV === 'development'
+      ? await fetch(`${API_URL}/api/auth/dev`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}'
+        })
+      : null
+
+  if (!res) {
     throw new ApiClientError(401, 'NO_INIT_DATA', 'Telegram initData is not available')
   }
-  const res = await fetch(`${API_URL}/api/auth/telegram`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ initData: initDataRef })
-  })
   if (!res.ok) {
-    throw new ApiClientError(res.status, 'AUTH_FAILED', 'Telegram authentication failed')
+    throw new ApiClientError(res.status, 'AUTH_FAILED', 'Authentication failed')
   }
   const json = await res.json()
   const parsed = AuthResponseSchema.parse(json)

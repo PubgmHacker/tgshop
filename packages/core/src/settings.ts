@@ -30,7 +30,13 @@ export const SETTING_SCHEMAS = {
   /** How long a MANUAL_FALLBACK order may sit in DELIVERING before it is escalated. */
   manual_fallback_sla_minutes: z.number().int().min(1),
   /** Global broadcast send rate; Telegram tolerates ~30/s, we stay under it. */
-  broadcast_rate_per_sec: z.number().int().min(1).max(30)
+  broadcast_rate_per_sec: z.number().int().min(1).max(30),
+  /**
+   * Largest order (integer cents) POST /internal/orders/:id/refund may refund
+   * without a human. Above this it records a pending-approval audit entry
+   * instead (docs/AGENT_PLAN.md). 0 sends every agent refund to a human.
+   */
+  refund_auto_approve_ceiling_cents: z.number().int().min(0)
 } as const
 
 export type SettingKey = keyof typeof SETTING_SCHEMAS
@@ -45,7 +51,8 @@ const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   referral_percent: 5,
   price_override: {},
   manual_fallback_sla_minutes: 60,
-  broadcast_rate_per_sec: 25
+  broadcast_rate_per_sec: 25,
+  refund_auto_approve_ceiling_cents: 1000
 }
 
 const CACHE_PREFIX = 'tgshop:settings:'

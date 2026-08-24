@@ -9,7 +9,8 @@ name: tgshop
 #   bot:      single instance only (grammY long-poll or webhook, no horizontal
 #             scaling without a shared session store — not configured here).
 #   worker:   safe to scale horizontally (BullMQ workers are idempotent).
-#   miniapp/landing/admin: stateless Next.js, safe to scale horizontally.
+#   miniapp/landing/admin/admin-miniapp: stateless Next.js, safe to scale
+#             horizontally.
 #
 # All services read secrets/config from a single .env file at the repo root
 # (copy .env.example -> .env and fill in real values before starting).
@@ -139,6 +140,25 @@ services:
     expose:
       - "3300"
 
+  admin-miniapp:
+    build:
+      context: .
+      dockerfile: apps/admin-miniapp/Dockerfile
+      # Same build-arg rule as miniapp: NEXT_PUBLIC_* is inlined at build time.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tgshop
+    expose:
+      - "3500"
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -157,6 +177,7 @@ services:
       - miniapp
       - landing
       - admin
+      - admin-miniapp
     networks:
       - tgshop
 

@@ -4,6 +4,8 @@ import { registerStatsRoutes } from './stats.js'
 import { registerStockRoutes } from './stock.js'
 import { registerInternalOrderRoutes } from './orders.js'
 import { registerPostRoutes } from './posts.js'
+import { registerReconcileRoutes } from './reconcile.js'
+import { registerAnomalyRoutes } from './anomalies.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The Phase-2 agent seam: service-to-service endpoints for the worker, admin
@@ -20,4 +22,6 @@ export async function internalRoutes(app: FastifyInstance): Promise<void> {
   registerStockRoutes(app)
   registerInternalOrderRoutes(app)
   registerPostRoutes(app)
+  registerReconcileRoutes(app)
+  registerAnomalyRoutes(app)
 }

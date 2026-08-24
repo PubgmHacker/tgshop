@@ -66,9 +66,17 @@ const envSchema = z.object({
   MINIAPP_URL: z.string().url(),
   LANDING_URL: z.string().url(),
   ADMIN_URL: z.string().url(),
+  // Admin Mini App (Telegram WebApp for ADMIN_IDS). Optional: when unset the
+  // /api/admin routes still work, but CORS only trusts the URLs above and the
+  // bot's /admin command falls back to its text-only panel.
+  ADMIN_MINIAPP_URL: emptyAsUndefined(z.string().url().optional()),
   SENTRY_DSN: z.string().optional().default(''),
 
-  NEXT_PUBLIC_BOT_USERNAME: z.string().optional().default('')
+  NEXT_PUBLIC_BOT_USERNAME: z.string().optional().default(''),
+
+  // Local Mini App browser preview only. Ignored unless NODE_ENV=development.
+  // When set, POST /api/auth/dev mints a JWT for this Telegram id (no initData).
+  DEV_PREVIEW_TG_ID: emptyAsUndefined(z.coerce.bigint().optional())
 })
 
 export type BotEnv = z.infer<typeof envSchema>

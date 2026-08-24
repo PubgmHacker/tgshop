@@ -5,9 +5,17 @@ import type { Locale } from '../i18n/index.js'
 export interface SessionData {
   locale: Locale
   pendingPromoCode?: string
+  /**
+   * A checkout waiting on the buyer's email (requiresEmail products): the pay
+   * button parks its parameters here and the message:text handler resumes the
+   * purchase once a valid address arrives. Cleared on resume, on any menu
+   * button and on any command, so a stale prompt can never swallow messages.
+   */
   checkout?: {
     planId: string
     qty: number
+    provider: 'BALANCE' | 'CRYPTOBOT' | 'STARS' | 'TRON_TRC20'
+    awaitingEmail: boolean
   }
 }
 

@@ -1,9 +1,10 @@
 import type { Bot, NextFunction } from 'grammy'
+import { InlineKeyboard } from 'grammy'
 import { prisma, OrderStatus, LedgerType } from '@tgshop/db'
-import { credit } from '@tgshop/core'
+import { credit, refundOrder } from '@tgshop/core'
 import type { BotContext } from '../context.js'
 import { t } from '../../i18n/index.js'
-import { isAdminId } from '../../config/env.js'
+import { env, isAdminId } from '../../config/env.js'
 import { formatUsd } from '../../lib/format.js'
 import { getBalance } from '@tgshop/core'
 import { encryptStockPayload } from '../../domain/orders.js'
@@ -20,6 +21,17 @@ async function adminGuard(ctx: BotContext, next: NextFunction): Promise<void> {
 
 export function registerAdminHandlers(bot: Bot<BotContext>): void {
   bot.command('admin', adminGuard, async (ctx) => {
+    // With ADMIN_MINIAPP_URL configured, /admin opens the Admin Mini App; the
+    // web_app button only works over HTTPS, so a plain-HTTP dev URL falls back
+    // to the text panel like an unset one.
+    const adminAppUrl = env.ADMIN_MINIAPP_URL
+    if (adminAppUrl?.startsWith('https://')) {
+      await ctx.reply(t(ctx.session.locale, 'admin.panel'), {
+        parse_mode: 'HTML',
+        reply_markup: new InlineKeyboard().webApp(t(ctx.session.locale, 'admin.open_panel'), adminAppUrl)
+      })
+      return
+    }
     await ctx.reply(t(ctx.session.locale, 'admin.panel'), { parse_mode: 'HTML' })
   })
 
@@ -118,16 +130,13 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
       return
     }
     try {
-      await prisma.$transaction(async (tx) => {
-        await credit(tx, {
-          userId: order.userId,
-          amountCents: order.amountCents,
-          type: LedgerType.REFUND,
-          orderId: order.id,
-          idempotencyKey: `refund:${order.id}`
-        })
-        await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.REFUNDED } })
-      })
+      // Route through core so the refund gets the state-machine check, stock and
+      // promo release, and the shared "return the money at most once" guard. The
+      // hand-rolled credit+update this replaced skipped all three: it double-paid
+      // an already auto-refunded FAILED order and would even refund an unpaid one.
+      await prisma.$transaction((tx) =>
+        refundOrder(tx, order.id, `admin /refund by tg:${ctx.from?.id ?? 'unknown'}`)
+      )
       await ctx.reply(t(locale, 'admin.refund_done', { orderId }))
     } catch (err) {
       logger.error({ err, orderId }, 'refund failed')

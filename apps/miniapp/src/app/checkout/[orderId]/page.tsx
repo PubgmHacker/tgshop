@@ -9,7 +9,9 @@ import { useOrderDetail } from '@/hooks/useApi'
 import { CopyButton } from '@/components/CopyButton'
 import { QrCode } from '@/components/QrCode'
 import { ErrorState } from '@/components/States'
-import { formatDate } from '@/lib/format'
+import { formatCents, formatDate } from '@/lib/format'
+import { openPaymentUrl } from '@/lib/payments'
+import { triggerHaptic } from '@/lib/TelegramProvider'
 import type { DictionaryKey } from '@/i18n/dictionaries'
 import type { OrderStatusSchema } from '@/types/api'
 import type { z } from 'zod'
@@ -47,14 +49,14 @@ export default function CheckoutOrderPage(): JSX.Element {
   useMainButton({
     text: t('common.continue'),
     isVisible: isTerminal,
-    onClick: () => router.push('/profile')
+    onClick: () => router.push('/orders')
   })
 
   if (isLoading) {
     return (
-      <div className="page-enter flex flex-1 flex-col gap-4 pt-4">
-        <div className="mx-4 skeleton h-24 rounded-card" />
-        <div className="mx-4 skeleton h-48 rounded-card" />
+      <div className="page-enter flex flex-1 flex-col gap-4 px-4 pt-3">
+        <div className="skeleton h-24 rounded-card" />
+        <div className="skeleton h-48 rounded-card" />
       </div>
     )
   }
@@ -66,63 +68,77 @@ export default function CheckoutOrderPage(): JSX.Element {
   }
 
   return (
-    <div className="page-enter flex flex-1 flex-col gap-4 pt-4">
-      <header className="px-4">
-        <h1 className="text-xl font-bold text-tg-text">{t('checkout.title')}</h1>
+    <div className="page-enter flex flex-1 flex-col gap-4 px-4 pb-4 pt-3">
+      <header>
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink">{t('checkout.title')}</h1>
       </header>
 
-      <section className="mx-4 flex flex-col gap-2 rounded-card bg-tg-section-bg p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-tg-hint">{data.productTitle}</p>
+      <section className="flex flex-col gap-2 rounded-card border border-line bg-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-sm font-semibold text-ink">{data.productTitle}</p>
           <StatusPill status={data.status} label={t(STATUS_KEY[data.status])} />
         </div>
-        <p className="text-sm font-medium text-tg-text">{data.planTitle}</p>
-        <p className="text-xs text-tg-hint">{formatDate(data.createdAt, locale)}</p>
+        <p className="text-xs text-muted">{data.planTitle}</p>
+        <div className="flex items-center justify-between border-t border-line pt-2.5">
+          <p className="text-xs text-faint">{formatDate(data.createdAt, locale)}</p>
+          <p className="tnum text-sm font-bold text-ink">{formatCents(data.amountCents)}</p>
+        </div>
       </section>
 
+      {data.payUrl && data.status === 'PENDING' ? (
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('medium')
+            openPaymentUrl(data.payUrl as string)
+          }}
+          className="rounded-full bg-cta py-3.5 text-center text-sm font-semibold text-cta-ink"
+        >
+          {t('checkout.pay')}
+        </button>
+      ) : null}
+
       {data.tron && data.status === 'PENDING' ? (
-        <section className="mx-4 flex flex-col items-center gap-3 rounded-card bg-tg-section-bg p-4">
-          <p className="text-sm font-semibold text-tg-text">{t('checkout.tron.network')}</p>
+        <section className="flex flex-col items-center gap-3 rounded-card border border-line bg-card p-4">
+          <p className="text-sm font-semibold text-ink">{t('checkout.tron.network')}</p>
           <QrCode value={`tron:${data.tron.address}?amount=${data.tron.amountUsdt6}`} />
-          <div className="flex w-full items-center justify-between gap-2 rounded-lg bg-tg-secondary-bg px-3 py-2">
-            <p className="truncate text-xs text-tg-text">{data.tron.address}</p>
+          <div className="flex w-full items-center justify-between gap-2 rounded-xl bg-card-strong px-3 py-2.5">
+            <p className="truncate text-xs text-ink">{data.tron.address}</p>
             <CopyButton value={data.tron.address} label={t('checkout.tron.copyAddress')} />
           </div>
           <div className="flex w-full items-center justify-between">
-            <p className="text-sm text-tg-hint">{t('checkout.tron.amount')}</p>
-            <p className="text-sm font-semibold text-tg-text">{data.tron.amountUsdt6} USDT</p>
+            <p className="text-sm text-muted">{t('checkout.tron.amount')}</p>
+            <p className="tnum text-sm font-semibold text-ink">{data.tron.amountUsdt6} USDT</p>
           </div>
-          <p className="animate-pulse text-xs text-tg-hint">{t('checkout.tron.waiting')}</p>
+          <p className="animate-pulse text-xs text-faint">{t('checkout.tron.waiting')}</p>
         </section>
       ) : null}
 
       {data.paymentStatus === 'CONFIRMING' ? (
-        <p className="px-4 text-center text-sm text-tg-hint">{t('checkout.tron.confirming')}</p>
+        <p className="text-center text-sm text-muted">{t('checkout.tron.confirming')}</p>
       ) : null}
       {data.paymentStatus === 'UNDERPAID' ? (
-        <p className="px-4 text-center text-sm text-tg-destructive">{t('checkout.tron.underpaid')}</p>
+        <p className="text-center text-sm text-danger">{t('checkout.tron.underpaid')}</p>
       ) : null}
 
       {data.deliveredPayload ? (
-        <section className="mx-4 flex flex-col gap-2 rounded-card bg-tg-section-bg p-4">
-          <p className="text-sm font-semibold text-tg-text">{t('checkout.deliveredPayload')}</p>
-          <div className="flex items-center justify-between gap-2 rounded-lg bg-tg-secondary-bg px-3 py-2">
-            <p className="truncate text-xs text-tg-text">{data.deliveredPayload}</p>
+        <section className="flex flex-col gap-2 rounded-card border border-line bg-card p-4">
+          <p className="text-sm font-semibold text-ink">{t('checkout.deliveredPayload')}</p>
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-card-strong px-3 py-2.5">
+            <p className="truncate text-xs text-ink">{data.deliveredPayload}</p>
             <CopyButton value={data.deliveredPayload} label={t('checkout.copyPayload')} />
           </div>
         </section>
       ) : null}
 
       {isTerminal ? (
-        <div className="px-4 pb-2">
-          <button
-            type="button"
-            onClick={() => router.push('/profile')}
-            className="w-full rounded-full bg-tg-button py-3 text-center text-sm font-semibold text-tg-button-text"
-          >
-            {t('common.continue')}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => router.push('/orders')}
+          className="rounded-lg border border-line-strong py-3.5 text-center text-sm font-semibold text-ink"
+        >
+          {t('common.continue')}
+        </button>
       ) : null}
     </div>
   )
@@ -131,10 +147,12 @@ export default function CheckoutOrderPage(): JSX.Element {
 function StatusPill({ status, label }: { status: OrderStatus; label: string }): JSX.Element {
   const tone =
     status === 'DELIVERED' || status === 'PAID'
-      ? 'bg-emerald-500/15 text-emerald-400'
+      ? 'bg-success/15 text-success'
       : status === 'FAILED' || status === 'EXPIRED'
-        ? 'bg-red-500/15 text-red-400'
-        : 'bg-amber-500/15 text-amber-400'
+        ? 'bg-danger/15 text-danger'
+        : status === 'REFUNDED'
+          ? 'bg-line text-muted'
+          : 'bg-warning/15 text-warning'
 
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${tone}`}>{label}</span>
+  return <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${tone}`}>{label}</span>
 }

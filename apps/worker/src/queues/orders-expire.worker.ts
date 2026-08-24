@@ -7,7 +7,7 @@ import { sendTelegramMessage } from '../telegram.js'
 import { resolveLocale, t } from '../i18n.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// orders:expire — repeatable job that cancels PENDING orders past their
+// orders-expire — repeatable job that cancels PENDING orders past their
 // expiresAt, returns any RESERVED stock item to the pool, and hands back the
 // promo use the order claimed when it was created.
 //
@@ -55,7 +55,7 @@ async function processOrdersExpire(job: Job<Record<string, never>>): Promise<voi
     }
   }
 
-  log.info({ expired: expiredCount, scanned: expired.length }, 'orders:expire sweep complete')
+  log.info({ expired: expiredCount, scanned: expired.length }, 'orders-expire sweep complete')
 }
 
 export function startOrdersExpireWorker() {

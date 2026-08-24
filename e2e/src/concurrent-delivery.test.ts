@@ -22,7 +22,7 @@ import {
 //
 // deliver() claims a stock item with `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1`
 // inside a transaction. The claim is the only thing standing between the shop
-// and selling one Netflix password to two customers, and it is exactly the kind
+// and selling one ChatGPT login to two customers, and it is exactly the kind
 // of guarantee unit tests with a mocked Prisma cannot prove — a mock will
 // happily "lock" nothing at all.
 //

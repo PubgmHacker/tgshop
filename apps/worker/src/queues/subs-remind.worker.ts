@@ -3,12 +3,13 @@ import { prisma, SubStatus } from '@tgshop/db'
 import { renewFromBalance, type RenewFailureReason } from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
+import { emitEvent } from '../events.js'
 import { sendTelegramMessage } from '../telegram.js'
 import { resolveLocale, t } from '../i18n.js'
 import { loadEnv } from '../env.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// subs:remind — repeatable job. For each ACTIVE subscription:
+// subs-remind — repeatable job. For each ACTIVE subscription:
 //   - expiring in ~3 days and not yet reminded at the 3-day mark: send a
 //     reminder with a one-tap renew button.
 //   - expiring in ~1 day: send an urgent reminder.
@@ -67,13 +68,22 @@ async function processSubsRemind(job: Job<Record<string, never>>): Promise<void>
         await sendReminder(sub, daysUntilExpiry === 1 ? 'urgent' : 'normal')
         await prisma.subscription.update({ where: { id: sub.id }, data: { remindedAt: now } })
         remindedCount += 1
+        // The remindedAt guard above already dedupes this per window, so an
+        // agent consuming the stream sees one entry per reminder actually sent.
+        await emitEvent('subscription.expiring_soon', {
+          subscriptionId: sub.id,
+          userId: sub.userId,
+          planId: sub.planId,
+          expiresAt: sub.expiresAt.toISOString(),
+          daysLeft: daysUntilExpiry
+        })
       }
     } catch (err) {
-      log.error({ err, subscriptionId: sub.id }, 'subs:remind failed to process subscription')
+      log.error({ err, subscriptionId: sub.id }, 'subs-remind failed to process subscription')
     }
   }
 
-  log.info({ remindedCount, expiredCount, renewedCount }, 'subs:remind sweep complete')
+  log.info({ remindedCount, expiredCount, renewedCount }, 'subs-remind sweep complete')
 }
 
 async function sendReminder(

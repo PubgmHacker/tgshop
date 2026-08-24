@@ -1,14 +1,16 @@
 'use client'
 
-import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useMainButton } from '@/hooks/useMainButton'
 import { useProductData } from '@/hooks/useApi'
+import { Icon } from '@/components/Icons'
 import { ErrorState } from '@/components/States'
+import { BrandMark } from '@/components/BrandMark'
 import { formatCents } from '@/lib/format'
+import { triggerHaptic } from '@/lib/TelegramProvider'
 import type { Plan } from '@/types/api'
 import { BuySheet } from './BuySheet'
 
@@ -37,10 +39,11 @@ export default function ProductPage(): JSX.Element {
 
   if (isLoading) {
     return (
-      <div className="page-enter flex flex-1 flex-col gap-4 pt-4">
-        <div className="skeleton mx-4 aspect-square rounded-card" />
-        <div className="mx-4 skeleton h-6 w-3/4 rounded" />
-        <div className="mx-4 skeleton h-4 w-1/2 rounded" />
+      <div className="page-enter flex flex-1 flex-col gap-4 px-4 pt-3">
+        <div className="skeleton h-20 rounded-tile" />
+        <div className="skeleton h-16 rounded-card" />
+        <div className="skeleton h-16 rounded-card" />
+        <div className="skeleton h-28 rounded-card" />
       </div>
     )
   }
@@ -56,53 +59,53 @@ export default function ProductPage(): JSX.Element {
   }
 
   return (
-    <div className="page-enter flex flex-1 flex-col gap-4 pb-6 pt-4">
-      <div className="relative mx-4 aspect-square overflow-hidden rounded-card bg-tg-secondary-bg">
-        {data.imageUrl ? (
-          <Image src={data.imageUrl} alt={data.title} fill sizes="480px" className="object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-5xl">🛍️</div>
-        )}
-      </div>
+    <div className="page-enter flex flex-1 flex-col gap-4 px-4 pb-4 pt-3">
+      <header className="glass glass-live flex items-center gap-3.5 overflow-hidden rounded-[24px] px-4 py-4 [--sheen-radius:24px]">
+        <span className="glass-sheen" aria-hidden />
+        <span className="mark-plate relative flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px]">
+          <BrandMark slug={data.slug} size={42} />
+        </span>
+        <span className="relative min-w-0">
+          <p className="text-[13px] font-semibold text-muted">{data.categoryTitle}</p>
+          <h1 className="text-[24px] font-bold leading-tight tracking-[-0.03em] text-ink">{data.title}</h1>
+        </span>
+      </header>
 
-      <div className="flex flex-col gap-1 px-4">
-        <p className="text-xs font-medium text-tg-hint">{data.categoryTitle}</p>
-        <h1 className="text-xl font-bold text-tg-text">{data.title}</h1>
-      </div>
-
-      <section className="flex flex-col gap-2 px-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-tg-section-header-text">
-          {t('product.plans')}
-        </h2>
+      <section className="flex flex-col gap-2.5">
+        <p className="text-[13px] font-medium text-muted">{t('product.plans')}</p>
         <div className="flex flex-col gap-2">
           {data.plans.map((plan) => (
             <PlanRow
               key={plan.id}
               plan={plan}
               isSelected={plan.id === selectedPlan?.id}
-              onSelect={() => setSelectedPlanId(plan.id)}
+              onSelect={() => {
+                triggerHaptic('light')
+                setSelectedPlanId(plan.id)
+              }}
             />
           ))}
         </div>
       </section>
 
-      <section className="flex flex-col gap-2 px-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-tg-section-header-text">
-          {t('product.description')}
-        </h2>
-        <p className="whitespace-pre-line text-sm text-tg-text/90">{data.description}</p>
-      </section>
+      {data.description ? (
+        <section className="flex flex-col gap-2.5">
+          <p className="text-[13px] font-medium text-muted">{t('product.description')}</p>
+          <div className="tile rounded-card p-4">
+            <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{data.description}</p>
+          </div>
+        </section>
+      ) : null}
 
-      <div className="px-4 pb-2">
-        <button
-          type="button"
-          disabled={!selectedPlan?.inStock}
-          onClick={() => setIsSheetOpen(true)}
-          className="w-full rounded-full bg-tg-button py-3 text-center text-sm font-semibold text-tg-button-text disabled:opacity-40"
-        >
-          {t('product.buyNow')}
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={!selectedPlan?.inStock}
+        onClick={() => setIsSheetOpen(true)}
+        className="flex items-center justify-center gap-2 rounded-full bg-cta py-3.5 text-center text-sm font-semibold text-cta-ink transition-opacity disabled:opacity-40"
+      >
+        <Icon name="bag" size={16} />
+        {t('product.buyNow')}
+      </button>
 
       {selectedPlan ? (
         <BuySheet
@@ -137,27 +140,27 @@ function PlanRow({
       type="button"
       onClick={onSelect}
       disabled={!plan.inStock}
-      className={`flex items-center justify-between rounded-card border px-4 py-3 text-left transition-colors disabled:opacity-40 ${
-        isSelected ? 'border-tg-accent-text bg-tg-section-bg' : 'border-transparent bg-tg-section-bg'
+      className={`tile flex items-center justify-between rounded-card px-4 py-3.5 text-left transition-colors disabled:cursor-not-allowed ${
+        isSelected ? 'ring-1 ring-line-strong' : ''
       }`}
     >
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium text-tg-text">{plan.title}</p>
-        <p className="text-xs text-tg-hint">
+        <p className={`text-[15px] font-bold ${plan.inStock ? 'text-ink' : 'text-muted'}`}>{plan.title}</p>
+        <p className="text-[13px] font-medium text-muted">
           {plan.durationDays ? t('product.duration.days', { days: plan.durationDays }) : t('product.duration.lifetime')}
         </p>
         {!plan.inStock ? (
-          <p className="text-xs text-tg-destructive">{t('product.outOfStock')}</p>
+          <p className="text-xs font-medium text-danger">{t('product.outOfStock')}</p>
         ) : plan.lowStock ? (
-          <p className="text-xs text-tg-destructive">{t('product.lowStock')}</p>
+          <p className="text-xs font-medium text-warning">{t('product.lowStock')}</p>
         ) : (
-          <p className="text-xs text-tg-hint">{t('product.inStock')}</p>
+          <p className="text-xs text-success">{t('product.inStock')}</p>
         )}
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <p className="text-sm font-semibold text-tg-text">{formatCents(plan.priceCents)}</p>
+        <p className="tnum text-[17px] font-bold text-ink">{formatCents(plan.priceCents)}</p>
         {plan.discountPercent > 0 ? (
-          <p className="text-xs text-tg-accent-text">{t('product.discount', { percent: plan.discountPercent })}</p>
+          <p className="text-xs font-medium text-success">{t('product.discount', { percent: plan.discountPercent })}</p>
         ) : null}
       </div>
     </button>

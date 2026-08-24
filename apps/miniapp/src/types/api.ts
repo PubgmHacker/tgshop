@@ -115,7 +115,19 @@ export type PricingBreakdown = z.infer<typeof PricingBreakdownSchema>
 export const CreateOrderResponseSchema = z.object({
   orderId: z.string(),
   status: OrderStatusSchema,
-  pricing: PricingBreakdownSchema
+  pricing: PricingBreakdownSchema,
+  /** Off-site payment page (CryptoBot) or Stars invoice link. Absent for BALANCE. */
+  payUrl: z.string().nullish(),
+  /** Whole Stars to charge, STARS provider only. */
+  stars: z.number().int().nullish(),
+  tron: z
+    .object({
+      address: z.string(),
+      network: z.literal('TRC20'),
+      amountUsdt6: z.string(),
+      expiresAt: z.string()
+    })
+    .nullish()
 })
 export type CreateOrderResponse = z.infer<typeof CreateOrderResponseSchema>
 
@@ -141,6 +153,7 @@ export const OrderDetailSchema = z.object({
   expiresAt: z.string().nullable(),
   deliveredPayload: z.string().nullable(),
   paymentStatus: PaymentStatusSchema.nullable(),
+  payUrl: z.string().nullable(),
   tron: TronPaymentDetailsSchema.nullable()
 })
 export type OrderDetail = z.infer<typeof OrderDetailSchema>
@@ -178,6 +191,42 @@ export const ProfileResponseSchema = z.object({
   subscriptions: z.array(SubscriptionItemSchema)
 })
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>
+
+export const MeResponseSchema = z.object({
+  user: z.object({
+    id: z.string(),
+    tgId: z.string(),
+    username: z.string().nullable(),
+    firstName: z.string().nullable(),
+    languageCode: z.string().nullable(),
+    isBlocked: z.boolean(),
+    createdAt: z.string()
+  }),
+  balanceCents: z.number().int(),
+  totalSpentCents: z.number().int(),
+  referral: z.object({
+    code: z.string(),
+    link: z.string(),
+    count: z.number().int(),
+    earningsCents: z.number().int()
+  })
+})
+export type MeResponse = z.infer<typeof MeResponseSchema>
+
+export const ConfigResponseSchema = z.object({
+  botUsername: z.string(),
+  supportUrl: z.string()
+})
+export type ConfigResponse = z.infer<typeof ConfigResponseSchema>
+
+export const CatalogResponseSchema = z.object({
+  categories: z.array(
+    CategorySchema.extend({
+      products: z.array(ProductDetailSchema)
+    })
+  )
+})
+export type CatalogResponse = z.infer<typeof CatalogResponseSchema>
 
 export const TopupMethodSchema = z.enum(['CRYPTOBOT', 'STARS', 'TRON_TRC20'])
 export type TopupMethod = z.infer<typeof TopupMethodSchema>

@@ -2,7 +2,11 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { redeliverOrderAction, refundOrderAction } from '../../../../lib/actions/orders'
+import {
+  deliverOrderManuallyAction,
+  redeliverOrderAction,
+  refundOrderAction
+} from '../../../../lib/actions/orders'
 import { Button } from '../../../../components/ui/button'
 import { Input } from '../../../../components/ui/input'
 import { Label } from '../../../../components/ui/label'
@@ -12,15 +16,20 @@ export function OrderActions({
   orderId,
   canAct,
   canRedeliver,
-  canRefund
+  canRefund,
+  canManualDeliver,
+  customerEmail
 }: {
   orderId: string
   canAct: boolean
   canRedeliver: boolean
   canRefund: boolean
+  canManualDeliver: boolean
+  customerEmail: string | null
 }) {
   const router = useRouter()
   const [reason, setReason] = useState('')
+  const [payload, setPayload] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -37,6 +46,31 @@ export function OrderActions({
     try {
       await redeliverOrderAction({ orderId })
       setMessage('Order re-delivered')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function onManualDeliver() {
+    if (!payload.trim()) {
+      setError('The delivery payload is required')
+      return
+    }
+    if (!window.confirm('Deliver this payload to the buyer? The order becomes DELIVERED.')) return
+    setPending(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const result = await deliverOrderManuallyAction({ orderId, payload })
+      setMessage(
+        result.buyerNotified
+          ? 'Order delivered; the buyer was notified in Telegram'
+          : 'Order delivered; Telegram push not sent (no BOT_TOKEN or send failed) — the buyer can open it from their purchases'
+      )
+      setPayload('')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -70,6 +104,32 @@ export function OrderActions({
 
   return (
     <div className="flex flex-col gap-3">
+      {canManualDeliver && (
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/40 p-3">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="manualPayload">{t('orders.manualDeliver.label')}</Label>
+            <textarea
+              id="manualPayload"
+              value={payload}
+              onChange={(e) => setPayload(e.target.value)}
+              rows={3}
+              maxLength={10_000}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          {customerEmail && (
+            <p className="text-xs text-muted-foreground">
+              {t('orders.manualDeliver.customerEmail')}:{' '}
+              <code className="font-mono text-foreground">{customerEmail}</code>
+            </p>
+          )}
+          <div>
+            <Button type="button" onClick={onManualDeliver} disabled={pending || !payload.trim()}>
+              {t('orders.manualDeliver')}
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <Button type="button" variant="outline" onClick={onRedeliver} disabled={pending || !canRedeliver}>
           {t('orders.redeliver')}

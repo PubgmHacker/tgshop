@@ -50,7 +50,8 @@ const fulfillOptions = {
   emit: {
     orderDelivered: (e) => emitEvent('order.delivered', e),
     orderFailed: (e) => emitEvent('order.failed', e),
-    stockLow: (e) => emitEvent('stock.low', e)
+    stockLow: (e) => emitEvent('stock.low', e),
+    stockDepleted: (e) => emitEvent('stock.depleted', e)
   } satisfies FulfillmentEmitter
 }
 

@@ -54,3 +54,16 @@ export function canRedeliverOrder(order: RedeliverySource): boolean {
 export function canRefundOrder(status: OrderStatus): boolean {
   return ALLOWED_TRANSITIONS[status].includes(OrderStatus.REFUNDED)
 }
+
+/**
+ * True when an order needs an operator to type the payload in by hand: it is
+ * paid-and-undelivered (PAID, or the DELIVERING state deliver() parks
+ * MANUAL_FALLBACK orders in) and owns NO payload from any source — exactly the
+ * complement of canRedeliverOrder() over the live statuses. The moment a
+ * payload exists, re-delivery is the right tool and this returns false, so the
+ * two buttons can never both apply to one order.
+ */
+export function canManualDeliverOrder(order: RedeliverySource): boolean {
+  if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.DELIVERING) return false
+  return order.deliveredPayloadEnc === null && order.stockItem?.payloadEnc == null
+}

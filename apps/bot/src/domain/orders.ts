@@ -68,7 +68,8 @@ const fulfillOptions = {
   emit: {
     orderDelivered: (e) => emitEvent('order.delivered', e),
     orderFailed: (e) => emitEvent('order.failed', e),
-    stockLow: (e) => emitEvent('stock.low', e)
+    stockLow: (e) => emitEvent('stock.low', e),
+    stockDepleted: (e) => emitEvent('stock.depleted', e)
   } satisfies FulfillmentEmitter,
   onWarning: (message: string, context: Record<string, unknown>): void => {
     logger.error(context, message)
@@ -82,6 +83,8 @@ export interface CreateOrderInput {
   provider: PaymentProvider
   promoCode?: string | null
   idempotencyKey: string
+  /** Delivery address for requiresEmail products; null for everything else. */
+  customerEmail?: string | null
 }
 
 export interface CreateOrderResult {
@@ -108,7 +111,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       qty: input.qty,
       provider: input.provider,
       promoCode: input.promoCode ?? undefined,
-      idempotencyKey: input.idempotencyKey
+      idempotencyKey: input.idempotencyKey,
+      customerEmail: input.customerEmail ?? null
     })
   )
 

@@ -2,7 +2,7 @@ import { loadEnv } from '../env.js'
 import { logger } from '../logger.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Minimal CryptoBot (@CryptoBot Pay API) client used by payments:poll to
+// Minimal CryptoBot (@CryptoBot Pay API) client used by payments-poll to
 // fall back onto polling `getInvoices` for orders whose webhook may have
 // been missed.
 // ─────────────────────────────────────────────────────────────────────────────

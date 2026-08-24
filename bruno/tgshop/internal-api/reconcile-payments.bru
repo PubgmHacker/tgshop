@@ -1,5 +1,5 @@
 meta {
-  name: Reconcile payments (PLANNED - not implemented)
+  name: Reconcile payments
   type: http
   seq: 9
 }
@@ -23,14 +23,25 @@ body:json {
 }
 
 docs {
-  ⚠️ THIS ENDPOINT DOES NOT EXIST YET — sending this request returns 404.
+  Triggers one on-demand reconciliation pass by enqueueing the worker's
+  existing sweep — the request itself never talks to a provider API:
 
-  It is kept as the agreed shape for an on-demand reconciliation trigger, as
-  described in docs/AGENT_PLAN.md. Today reconciliation runs ONLY as the
-  worker's scheduled `payments:poll` job, which re-checks CryptoBot invoices
-  for orders still PENDING; there is no HTTP entry point to force a pass.
+    CRYPTOBOT   -> the "payments-poll" queue (re-checks PENDING/CONFIRMING
+                   invoices against getInvoices)
+    TRON_TRC20  -> the "chain-scan" queue (re-scans deposit addresses on
+                   TronGrid)
 
-  To implement: add the route under apps/bot/src/server/routes/internal/,
-  behind the existing SERVICE_TOKEN guard, and have it enqueue the worker's
-  reconciliation job rather than doing the work in the request.
+  Responds 202 with { enqueued, provider, queue, jobId }. Requests within the
+  same second collapse into one job (deterministic jobId), so an agent retry
+  after a timeout is safe.
+
+  `sinceMinutes` is accepted and carried on the job but ADVISORY today: both
+  sweeps re-check every pending row regardless of the window.
+
+  BALANCE and STARS are rejected with 400 — the balance is our own ledger and
+  Stars settle synchronously inside Telegram, so neither has an external
+  record to disagree with.
+
+  Mismatches the sweep finds are published to the tgshop:events:payments
+  stream as `payment.reconcile_mismatch` (see docs/AGENT_PLAN.md capability 3).
 }

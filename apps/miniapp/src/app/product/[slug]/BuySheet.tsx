@@ -52,26 +52,26 @@ export function BuySheet({ isOpen, onClose, plan, onProceedToCheckout }: BuyShee
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title={t('buySheet.title')}>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-tg-text">{plan.title}</p>
-          <p className="text-sm font-semibold text-tg-text">{formatCents(plan.priceCents)}</p>
+        <div className="flex items-center justify-between rounded-card border border-line bg-card-strong px-4 py-3">
+          <p className="text-sm font-medium text-ink">{plan.title}</p>
+          <p className="tnum text-sm font-bold text-ink">{formatCents(plan.priceCents)}</p>
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-tg-hint">{t('buySheet.qty')}</p>
+          <p className="text-sm text-muted">{t('buySheet.qty')}</p>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => adjustQty(-1)}
-              className="h-8 w-8 rounded-full bg-tg-secondary-bg text-tg-text"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
             >
               −
             </button>
-            <span className="w-6 text-center text-sm font-medium text-tg-text">{qty}</span>
+            <span className="tnum w-6 text-center text-sm font-semibold text-ink">{qty}</span>
             <button
               type="button"
               onClick={() => adjustQty(1)}
-              className="h-8 w-8 rounded-full bg-tg-secondary-bg text-tg-text"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
             >
               +
             </button>
@@ -79,39 +79,39 @@ export function BuySheet({ isOpen, onClose, plan, onProceedToCheckout }: BuyShee
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <p className="text-sm text-tg-hint">{t('buySheet.promo')}</p>
+          <p className="text-sm text-muted">{t('buySheet.promo')}</p>
           <div className="flex gap-2">
             <input
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
               placeholder="PROMO2026"
-              className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text outline-none placeholder:text-tg-hint"
+              className="min-w-0 flex-1 rounded-xl border border-line bg-card-strong px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-faint"
             />
             <button
               type="button"
               onClick={() => void handleApplyPromo()}
               disabled={previewMutation.isPending}
-              className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm font-medium text-tg-text disabled:opacity-50"
+              className="shrink-0 rounded-xl border border-line-strong px-3.5 py-2.5 text-sm font-semibold text-ink disabled:opacity-50"
             >
               {t('buySheet.promoApply')}
             </button>
           </div>
-          {promoError ? <p className="text-xs text-tg-destructive">{promoError}</p> : null}
+          {promoError ? <p className="text-xs text-danger">{promoError}</p> : null}
           {breakdown?.promoCode ? (
-            <p className="text-xs text-tg-accent-text">{t('buySheet.promoApplied')}</p>
+            <p className="text-xs font-medium text-success">{t('buySheet.promoApplied')}</p>
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between border-t border-white/5 pt-3">
-          <p className="text-sm font-semibold text-tg-text">{t('buySheet.total')}</p>
-          <p className="text-base font-bold text-tg-text">{formatCents(totalCents)}</p>
+        <div className="flex items-center justify-between border-t border-line pt-3.5">
+          <p className="text-sm font-semibold text-ink">{t('buySheet.total')}</p>
+          <p className="tnum text-lg font-bold text-ink">{formatCents(totalCents)}</p>
         </div>
 
         <button
           type="button"
           onClick={handleCheckout}
           disabled={previewMutation.isPending}
-          className="w-full rounded-full bg-tg-button py-3 text-center text-sm font-semibold text-tg-button-text disabled:opacity-50"
+          className="rounded-full bg-cta py-3.5 text-center text-sm font-semibold text-cta-ink disabled:opacity-50"
         >
           {t('buySheet.checkout')}
         </button>

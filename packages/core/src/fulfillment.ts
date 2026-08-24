@@ -68,6 +68,10 @@ export interface FulfillmentEmitter {
     available: number
     threshold: number
   }): Promise<void>
+  stockDepleted(e: {
+    planId: string
+    productId: string
+  }): Promise<void>
 }
 
 export interface FulfillOptions extends DeliveryDeps {
@@ -137,7 +141,7 @@ export async function fulfillOrder(
         planId: delivered.planId,
         deliveredAt: (delivered.deliveredAt ?? new Date()).toISOString()
       })
-      await emitStockLow(prisma, delivered.planId, opts)
+      await emitStockLevels(prisma, delivered.planId, opts)
     }
   } catch (err) {
     opts.onWarning?.('post-delivery bookkeeping failed; order is delivered', {
@@ -223,18 +227,23 @@ async function settleFailedDelivery(
 
 /**
  * Announces stock.low when a delivery has drawn a pool down to (or below) the
- * plan's own threshold.
+ * plan's own threshold, and stock.depleted when it has drawn it to zero.
  *
  * Only pool-backed plans have a finite level. An EXTERNAL_API plan — or a
  * UNIQUE_CODE plan that mints codes from a template — would otherwise report
  * zero available forever and fire this alert on every single sale.
+ *
+ * At zero BOTH events fire: stock.low keeps its "at or below threshold"
+ * contract for consumers that only watch it, and stock.depleted is the
+ * distinct, sharper signal docs/AGENT_PLAN.md routes to a human decision
+ * (disable? restock?) rather than a promo post.
  */
-async function emitStockLow(
+async function emitStockLevels(
   prisma: PrismaClient,
   planId: string,
   opts: FulfillOptions
 ): Promise<void> {
-  if (!opts.emit?.stockLow) return
+  if (!opts.emit?.stockLow && !opts.emit?.stockDepleted) return
 
   const plan = await prisma.plan.findUnique({
     where: { id: planId },
@@ -251,12 +260,19 @@ async function emitStockLow(
   const available = await countAvailable(prisma, plan.id)
   if (available > plan.lowStockThreshold) return
 
-  await opts.emit.stockLow({
+  await opts.emit?.stockLow?.({
     planId: plan.id,
     productId: plan.productId,
     available,
     threshold: plan.lowStockThreshold
   })
+
+  if (available === 0) {
+    await opts.emit?.stockDepleted?.({
+      planId: plan.id,
+      productId: plan.productId
+    })
+  }
 }
 
 /** Total already credited back for an order, whoever issued it. */

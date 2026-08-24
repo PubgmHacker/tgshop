@@ -42,7 +42,7 @@ export function registerStartHandler(bot: Bot<BotContext>): void {
 
     const locale = ctx.session.locale
 
-    await ctx.reply(t(locale, 'start.welcome', { shopName: 'TG Shop' }), {
+    await ctx.reply(t(locale, 'start.welcome', { shopName: 'AI Access Rage' }), {
       reply_markup: mainMenuKeyboard(locale),
       parse_mode: 'HTML'
     })

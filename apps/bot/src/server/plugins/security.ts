@@ -14,6 +14,7 @@ export async function registerSecurityPlugins(app: FastifyInstance): Promise<voi
   await app.register(helmet, { global: true })
 
   const allowedOrigins = new Set([env.MINIAPP_URL, env.ADMIN_URL, env.LANDING_URL])
+  if (env.ADMIN_MINIAPP_URL) allowedOrigins.add(env.ADMIN_MINIAPP_URL)
   await app.register(cors, {
     origin(origin, callback) {
       if (!origin || allowedOrigins.has(origin)) {

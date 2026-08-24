@@ -175,8 +175,8 @@ frontend-only development.
 2. **Product**: insert a `Product` row under that category — `title`, unique
    `slug`, `description`, optional `imageUrl`, and crucially `deliveryType`:
    - `STOCK_POOL` — pre-provisioned codes/accounts consumed one at a time
-     from `StockItem` rows (`status=AVAILABLE`). Most common case (VPN
-     configs, gift cards, license keys).
+     from `StockItem` rows (`status=AVAILABLE`). Most common case (ChatGPT
+     logins, Midjourney codes, Copilot seats).
    - `UNIQUE_CODE` — the code is generated at delivery time from a template
      in `Product.externalConfig.codeTemplate`, supporting the placeholders
      `{RANDOM8}`, `{NANOID}` and `{ORDER}` (e.g. `"SHOP-{RANDOM8}"`). If no
@@ -242,7 +242,7 @@ frontend-only development.
 | `node scripts/verify-api.mjs` | Smoke-tests the bot's `/api` + `/internal` auth surface against a booted Fastify instance |
 | `node scripts/verify-seed.mjs` | Checks the seeded catalog counts and decrypts a `StockItem` payload end-to-end |
 | `node scripts/verify-broadcast.mjs` | Drives the broadcast lifecycle (arm → cancel → re-arm → sweep) against real Postgres + Redis |
-| `node scripts/fake-trongrid.mjs` | Stub TronGrid server for exercising `chain:scan` without touching a real chain |
+| `node scripts/fake-trongrid.mjs` | Stub TronGrid server for exercising `chain-scan` without touching a real chain |
 
 The three `verify-*` scripts and `create-admin.mjs` need a live Postgres/Redis
 and the environment loaded first (`set -a; source .env; set +a`), and they

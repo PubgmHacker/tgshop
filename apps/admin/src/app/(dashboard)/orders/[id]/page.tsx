@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AdminRole } from '@tgshop/db'
 import { getOrderDetailAction } from '../../../../lib/actions/orders'
-import { canRedeliverOrder, canRefundOrder } from '../../../../lib/orders-policy'
+import { canManualDeliverOrder, canRedeliverOrder, canRefundOrder } from '../../../../lib/orders-policy'
 import { hasRole, requireSession } from '../../../../lib/rbac'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../../components/ui/card'
 import { Badge } from '../../../../components/ui/badge'
@@ -24,6 +24,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
   // enabled exactly when the action behind it would succeed.
   const canRedeliver = canRedeliverOrder(order)
   const canRefund = canRefundOrder(order.status)
+  const canManualDeliver = canManualDeliverOrder(order)
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,6 +61,8 @@ export default async function OrderDetailPage({ params }: { params: { id: string
               <dd>{order.promo ? order.promo.code : '—'}</dd>
               <dt className="text-muted-foreground">Stock item</dt>
               <dd className="font-mono text-xs">{order.stockItem ? order.stockItem.id : '—'}</dd>
+              <dt className="text-muted-foreground">Customer email</dt>
+              <dd className="font-mono text-xs">{order.customerEmail ?? '—'}</dd>
             </dl>
           </CardContent>
         </Card>
@@ -97,6 +100,8 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             canAct={canAct}
             canRedeliver={canRedeliver}
             canRefund={canRefund}
+            canManualDeliver={canManualDeliver}
+            customerEmail={order.customerEmail}
           />
         </CardContent>
       </Card>

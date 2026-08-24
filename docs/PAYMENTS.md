@@ -204,13 +204,13 @@ the order.
 **Risk**: the webhook HTTP request never arrives (network partition, DNS
 issue, CryptoBot-side outage) even though the invoice was actually paid.
 
-**Mitigation**: the worker's reconciliation job
-(`POST /internal/reconcile`, also run on a schedule) periodically re-queries
-CryptoBot's `getInvoices` for any `Payment` still `PENDING`/`CONFIRMING`
-past a threshold age, and applies the same idempotent PAID transition if the
-provider's own state disagrees with ours. This is the same mechanism that
-would catch a webhook-signature verification bug silently dropping
-legitimate callbacks.
+**Mitigation**: the worker's reconciliation job (scheduled every 30s, and
+triggerable on demand via `POST /internal/reconcile`) re-queries CryptoBot's
+`getInvoices` for every `Payment` still `PENDING`/`CONFIRMING` and applies
+the same idempotent settlement the webhook would have: order payments settle
+and deliver, `topup_*` payments credit the balance under the webhook's own
+`topup:<paymentId>` ledger key. This is the same mechanism that would catch
+a webhook-signature verification bug silently dropping legitimate callbacks.
 
 ### Underpayment (TRON)
 
@@ -233,13 +233,20 @@ after fees.
 invoices and TRON deposit windows both have a configured TTL reflected in
 `Order.expiresAt`).
 
-**Mitigation**: the reconciliation/polling job still detects the payment
-arriving, but instead of marking the `Order` `PAID` it credits the
-equivalent amount to the user's `BalanceTransaction` ledger
-(`LedgerType.TOPUP`) and marks the `Order` `EXPIRED` — the user doesn't lose
-funds, but the original order isn't silently resurrected days later with
-stale pricing/stock assumptions. A support agent (or the user themselves, via
-the Mini App) can then place a fresh order paid from that balance.
+**Mitigation**: the order is never silently resurrected days later with
+stale pricing/stock assumptions. Per rail:
+
+- **TRON**: `chain-scan` detects the deposit against the expired order,
+  credits the full received amount to the user's `BalanceTransaction`
+  ledger instead of delivering, and notifies the user — funds are not lost,
+  and a fresh order can be placed from balance.
+- **CryptoBot**: `payments-poll` finds the provider-paid invoice attached to
+  the closed order, marks the `Payment` `PAID` (the provider's truth), and
+  flags a reconcile mismatch (`kind="paid_order_closed"`) — an `AuditLog`
+  anomaly row plus a `payment.reconcile_mismatch` event — for a human to
+  decide between crediting balance and refunding through CryptoBot. The
+  money sits with CryptoBot either way, so deliberately nothing is credited
+  automatically.
 
 ### Refund
 

@@ -125,15 +125,15 @@ export interface LandingCopy {
 
 const ruCopy: LandingCopy = {
   meta: {
-    title: 'Souldawn Store — цифровые товары в Telegram мгновенно',
+    title: 'AI Access Rage — подписки на нейросети в Telegram',
     description:
-      'Покупайте подписки и цифровые товары прямо в Telegram: оплата картой, USDT TRC-20 или Stars, доставка за секунды, 24/7 без выходных.',
-    ogTitle: 'Souldawn Store — мгновенная доставка цифровых товаров',
+      'ChatGPT, Claude, Midjourney и другие модели: оплата картой, USDT TRC-20 или Stars, выдача за секунды, 24/7.',
+    ogTitle: 'AI Access Rage — подписки на нейросети',
     ogDescription:
-      'Выбирайте товар, оплачивайте любым удобным способом и получайте доступ мгновенно. Работает прямо в Telegram.',
+      'Выбирайте модель, оплачивайте любым способом и получайте доступ мгновенно. Работает прямо в Telegram.',
   },
   nav: {
-    brand: 'Souldawn',
+    brand: 'AI Access Rage',
     links: [
       { label: 'Как это работает', href: '#how-it-works' },
       { label: 'Каталог', href: '#showcase' },
@@ -144,11 +144,11 @@ const ruCopy: LandingCopy = {
     cta: 'Открыть в Telegram',
   },
   hero: {
-    eyebrow: 'Магазин цифровых товаров в Telegram',
+    eyebrow: 'Подписки на нейросети в Telegram',
     headline: 'Покупки за 30 секунд,',
-    headlineAccent: 'доставка мгновенно',
+    headlineAccent: 'доступ сразу',
     subheadline:
-      'Подписки, ключи и цифровые товары — оплата CryptoBot, Telegram Stars или USDT TRC-20. Никаких сайтов и паролей, всё в чате бота.',
+      'ChatGPT, Claude, Midjourney — оплата CryptoBot, Telegram Stars или USDT TRC-20. Никаких сайтов, всё в чате бота.',
     ctaPrimary: 'Открыть в Telegram',
     ctaSecondary: 'Смотреть каталог',
     stat1Value: '24/7',
@@ -183,7 +183,7 @@ const ruCopy: LandingCopy = {
   },
   showcase: {
     eyebrow: 'Каталог',
-    title: 'Популярные подписки и товары',
+    title: 'Популярные модели',
     subtitle: 'Актуальные цены подтягиваются из магазина в реальном времени.',
     fallbackNotice: 'Показаны демонстрационные цены — актуальный каталог смотрите в боте.',
     priceFrom: 'от',
@@ -265,7 +265,7 @@ const ruCopy: LandingCopy = {
       },
       {
         question: 'Можно ли оформить подписку на несколько месяцев сразу?',
-        answer: 'Да, при выборе тарифа доступны разные периоды — от одного месяца до безлимитного доступа.',
+        answer: 'Да, у каждой модели есть тарифы на 1 и 3 месяца.',
       },
     ],
   },
@@ -275,7 +275,7 @@ const ruCopy: LandingCopy = {
     cta: 'Открыть в Telegram',
   },
   footer: {
-    tagline: 'Цифровые товары и подписки с мгновенной доставкой прямо в Telegram.',
+    tagline: 'Подписки на нейросети с мгновенной выдачей прямо в Telegram.',
     columns: [
       {
         title: 'Продукт',
@@ -302,33 +302,33 @@ const ruCopy: LandingCopy = {
   },
   demoProducts: [
     {
-      id: 'demo-streaming',
-      title: 'Стриминг Premium',
-      description: 'Подписка на популярный стриминговый сервис без рекламы и в HD.',
-      categoryTitle: 'Стриминг',
+      id: 'demo-chatgpt',
+      title: 'ChatGPT Plus',
+      description: 'GPT-4o, приоритетный доступ, DALL·E.',
+      categoryTitle: 'Чат',
       plans: [
         { id: 'p1', title: '1 месяц', priceCents: 49900, durationDays: 30 },
         { id: 'p2', title: '3 месяца', priceCents: 129900, durationDays: 90, badge: 'Хит' },
       ],
     },
     {
-      id: 'demo-ai',
-      title: 'AI-ассистент Pro',
-      description: 'Доступ к нейросетевому ассистенту с расширенным лимитом запросов.',
-      categoryTitle: 'Нейросети',
+      id: 'demo-midjourney',
+      title: 'Midjourney',
+      description: 'Генерация изображений в Discord.',
+      categoryTitle: 'Картинки',
       plans: [
         { id: 'p3', title: '1 месяц', priceCents: 79900, durationDays: 30 },
-        { id: 'p4', title: '12 месяцев', priceCents: 699900, durationDays: 365, badge: 'Выгодно' },
+        { id: 'p4', title: '3 месяца', priceCents: 199900, durationDays: 90, badge: 'Выгодно' },
       ],
     },
     {
-      id: 'demo-vpn',
-      title: 'VPN Unlimited',
-      description: 'Быстрый и стабильный VPN без ограничений трафика на всех устройствах.',
-      categoryTitle: 'VPN',
+      id: 'demo-cursor',
+      title: 'Cursor Pro',
+      description: 'Агентный редактор с доступом к моделям.',
+      categoryTitle: 'Код',
       plans: [
-        { id: 'p5', title: '1 месяц', priceCents: 39900, durationDays: 30 },
-        { id: 'p6', title: 'Навсегда', priceCents: 999900, durationDays: null, badge: 'Топ' },
+        { id: 'p5', title: '1 месяц', priceCents: 79900, durationDays: 30 },
+        { id: 'p6', title: '3 месяца', priceCents: 199900, durationDays: 90, badge: 'Топ' },
       ],
     },
   ],
@@ -336,14 +336,14 @@ const ruCopy: LandingCopy = {
 
 const enCopy: LandingCopy = {
   meta: {
-    title: 'Souldawn Store — instant digital goods in Telegram',
+    title: 'AI Access Rage — neural-net subscriptions in Telegram',
     description:
-      'Buy subscriptions and digital goods right inside Telegram: pay with card, USDT TRC-20 or Stars, get instant delivery, 24/7 with no days off.',
-    ogTitle: 'Souldawn Store — instant digital goods delivery',
-    ogDescription: 'Pick a product, pay with any method, get access instantly. Works entirely inside Telegram.',
+      'ChatGPT, Claude, Midjourney and other models: pay with card, USDT TRC-20 or Stars, delivered in seconds, 24/7.',
+    ogTitle: 'AI Access Rage — neural-net subscriptions',
+    ogDescription: 'Pick a model, pay any way you like, get access instantly. Works entirely inside Telegram.',
   },
   nav: {
-    brand: 'Souldawn',
+    brand: 'AI Access Rage',
     links: [
       { label: 'How it works', href: '#how-it-works' },
       { label: 'Catalog', href: '#showcase' },
@@ -354,11 +354,11 @@ const enCopy: LandingCopy = {
     cta: 'Open in Telegram',
   },
   hero: {
-    eyebrow: 'Digital goods store in Telegram',
+    eyebrow: 'Neural-net subscriptions in Telegram',
     headline: 'Checkout in 30 seconds,',
-    headlineAccent: 'delivered instantly',
+    headlineAccent: 'access instantly',
     subheadline:
-      'Subscriptions, keys and digital goods — pay with CryptoBot, Telegram Stars or USDT TRC-20. No websites, no passwords, everything inside the bot chat.',
+      'ChatGPT, Claude, Midjourney — pay with CryptoBot, Telegram Stars or USDT TRC-20. No websites, everything inside the bot chat.',
     ctaPrimary: 'Open in Telegram',
     ctaSecondary: 'Browse catalog',
     stat1Value: '24/7',
@@ -393,7 +393,7 @@ const enCopy: LandingCopy = {
   },
   showcase: {
     eyebrow: 'Catalog',
-    title: 'Popular subscriptions and products',
+    title: 'Popular models',
     subtitle: 'Live prices are pulled straight from the store.',
     fallbackNotice: 'Showing demo pricing — see the live catalog inside the bot.',
     priceFrom: 'from',
@@ -475,7 +475,7 @@ const enCopy: LandingCopy = {
       },
       {
         question: 'Can I subscribe for several months at once?',
-        answer: 'Yes, plans offer different durations — from a single month up to lifetime access.',
+        answer: 'Yes — each model has 1-month and 3-month plans.',
       },
     ],
   },
@@ -485,7 +485,7 @@ const enCopy: LandingCopy = {
     cta: 'Open in Telegram',
   },
   footer: {
-    tagline: 'Digital goods and subscriptions with instant delivery, right inside Telegram.',
+    tagline: 'Neural-net subscriptions with instant delivery, right inside Telegram.',
     columns: [
       {
         title: 'Product',
@@ -512,33 +512,33 @@ const enCopy: LandingCopy = {
   },
   demoProducts: [
     {
-      id: 'demo-streaming',
-      title: 'Streaming Premium',
-      description: 'A popular streaming service subscription, ad-free and in HD.',
-      categoryTitle: 'Streaming',
+      id: 'demo-chatgpt',
+      title: 'ChatGPT Plus',
+      description: 'GPT-4o, priority access, DALL·E.',
+      categoryTitle: 'Chat',
       plans: [
         { id: 'p1', title: '1 month', priceCents: 999, durationDays: 30 },
         { id: 'p2', title: '3 months', priceCents: 2699, durationDays: 90, badge: 'Popular' },
       ],
     },
     {
-      id: 'demo-ai',
-      title: 'AI Assistant Pro',
-      description: 'Access to an AI assistant with an extended request limit.',
-      categoryTitle: 'AI tools',
+      id: 'demo-midjourney',
+      title: 'Midjourney',
+      description: 'Image generation in Discord.',
+      categoryTitle: 'Images',
       plans: [
         { id: 'p3', title: '1 month', priceCents: 1599, durationDays: 30 },
-        { id: 'p4', title: '12 months', priceCents: 13999, durationDays: 365, badge: 'Best value' },
+        { id: 'p4', title: '3 months', priceCents: 3999, durationDays: 90, badge: 'Best value' },
       ],
     },
     {
-      id: 'demo-vpn',
-      title: 'VPN Unlimited',
-      description: 'Fast, stable VPN with no traffic limits across all your devices.',
-      categoryTitle: 'VPN',
+      id: 'demo-cursor',
+      title: 'Cursor Pro',
+      description: 'Agentic editor with model access.',
+      categoryTitle: 'Code',
       plans: [
-        { id: 'p5', title: '1 month', priceCents: 799, durationDays: 30 },
-        { id: 'p6', title: 'Lifetime', priceCents: 19999, durationDays: null, badge: 'Top pick' },
+        { id: 'p5', title: '1 month', priceCents: 1599, durationDays: 30 },
+        { id: 'p6', title: '3 months', priceCents: 3999, durationDays: 90, badge: 'Top pick' },
       ],
     },
   ],

@@ -3,6 +3,7 @@ import { prisma, PostStatus } from '@tgshop/db'
 import { parseSegment, resolveSegmentRecipients, type SegmentRecipient } from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, getQueue, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
+import { emitEvent } from '../events.js'
 import { sendTelegramMessage, TelegramBlockedError, TelegramRateLimitError } from '../telegram.js'
 import {
   enqueueBroadcast,
@@ -224,14 +225,28 @@ async function sendPost(postId: string, log: ReturnType<typeof jobLogger>): Prom
 
   stats.finishedAt = new Date().toISOString()
 
+  const finalStatus = stats.sent > 0 || stats.total === 0 ? PostStatus.SENT : PostStatus.FAILED
   await prisma.broadcastPost.update({
     where: { id: postId },
     data: {
-      status: stats.sent > 0 || stats.total === 0 ? PostStatus.SENT : PostStatus.FAILED,
+      status: finalStatus,
       sentAt: new Date(),
       statsJson: stats as unknown as object
     }
   })
+
+  // Announced only for a post that actually reached SENT — a FAILED fan-out is
+  // not a send, and emitting it as one would corrupt any consumer's send stats.
+  if (finalStatus === PostStatus.SENT) {
+    await emitEvent('broadcast.sent', {
+      postId,
+      total: stats.total,
+      sent: stats.sent,
+      blocked: stats.blocked,
+      failed: stats.failed,
+      sentAt: stats.finishedAt
+    })
+  }
 
   log.info({ postId, stats }, 'broadcast complete')
 }

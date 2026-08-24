@@ -6,6 +6,7 @@ import {
   OrderNotFoundError,
   OrderStateError,
   PromoInvalidError,
+  SettingsValidationError,
   StockUnavailableError
 } from '@tgshop/core'
 import { t, type Locale } from '../i18n/index.js'
@@ -53,6 +54,8 @@ export const notFound = (key = 'api.errors.not_found'): HttpError => new HttpErr
 
 export const forbidden = (key = 'api.errors.forbidden'): HttpError => new HttpError(403, 'FORBIDDEN', key)
 
+export const conflict = (key = 'api.errors.conflict'): HttpError => new HttpError(409, 'CONFLICT', key)
+
 /** Builds the wire body for an error, localized for the caller. */
 export function toApiErrorBody(code: string, locale: Locale, messageKey: string, vars: Record<string, string | number> = {}): ApiErrorBody {
   return { error: { code, message: t(locale, messageKey, vars) } }
@@ -70,6 +73,12 @@ export function describeError(err: unknown, locale: Locale): { status: number; b
   }
 
   if (err instanceof ZodError) {
+    return { status: 400, body: toApiErrorBody('VALIDATION_ERROR', locale, 'api.errors.validation') }
+  }
+
+  // core's setSetting throws this for a value that fails the key's schema; it is
+  // the caller's bad input, not an outage, so it must surface as a 400.
+  if (err instanceof SettingsValidationError) {
     return { status: 400, body: toApiErrorBody('VALIDATION_ERROR', locale, 'api.errors.validation') }
   }
 

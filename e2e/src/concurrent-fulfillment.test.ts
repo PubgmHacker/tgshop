@@ -49,6 +49,7 @@ interface CapturedEvents {
   delivered: string[]
   failed: { orderId: string; refundedCents: number }[]
   stockLow: string[]
+  stockDepleted: string[]
 }
 
 /**
@@ -59,7 +60,7 @@ interface CapturedEvents {
  * bus would have seen.
  */
 function captureEmitter(): { events: CapturedEvents; emit: FulfillmentEmitter } {
-  const events: CapturedEvents = { delivered: [], failed: [], stockLow: [] }
+  const events: CapturedEvents = { delivered: [], failed: [], stockLow: [], stockDepleted: [] }
   return {
     events,
     emit: {
@@ -71,6 +72,9 @@ function captureEmitter(): { events: CapturedEvents; emit: FulfillmentEmitter } 
       },
       async stockLow(e) {
         events.stockLow.push(e.planId)
+      },
+      async stockDepleted(e) {
+        events.stockDepleted.push(e.planId)
       }
     }
   }
@@ -178,6 +182,15 @@ describe('fulfillOrder() — the worker delivery path — under concurrency', ()
   it('warns that the pool ran down', () => {
     expect(events.stockLow.length).toBeGreaterThan(0)
     expect(new Set(events.stockLow)).toEqual(new Set([fixture.plan.id]))
+  })
+
+  // The pool is drawn to exactly zero above, so the sharper stock.depleted
+  // signal (docs/AGENT_PLAN.md capability 2) must also fire, and only for this
+  // plan. Which racer observes the zero is timing-dependent; that at least one
+  // does is not.
+  it('announces that the pool is empty', () => {
+    expect(events.stockDepleted.length).toBeGreaterThan(0)
+    expect(new Set(events.stockDepleted)).toEqual(new Set([fixture.plan.id]))
   })
 
   it('fails a sold-out order once, refunds it once, and announces it once', async () => {

@@ -1,81 +1,45 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
 import { useBackButton } from '@/hooks/useBackButton'
-import { useHomeData } from '@/hooks/useApi'
-import { CategoryChipRow } from '@/components/CategoryChip'
-import { ProductCard } from '@/components/ProductCard'
-import { CategoryChipSkeleton, ProductCardSkeleton } from '@/components/Skeletons'
-import { EmptyState, ErrorState } from '@/components/States'
-import { BRAND_NAME } from '@/lib/tokens'
+import { useHomeData, useMeData } from '@/hooks/useApi'
+import { CollectionGrid } from '@/components/CollectionGrid'
+import { HomeHero } from '@/components/HomeHero'
+import { ModelRail } from '@/components/ModelRail'
+import { ErrorState } from '@/components/States'
 
 export default function HomePage(): JSX.Element {
   const { t } = useI18n()
-  const { data, isLoading, isError, refetch } = useHomeData()
+  const me = useMeData()
+  const home = useHomeData()
 
   useBackButton(false)
 
+  const categories = home.data?.categories ?? []
+  const counts = useMemo(() => {
+    const next: Record<string, number> = {}
+    for (const product of home.data?.bestsellers ?? []) {
+      next[product.categorySlug] = (next[product.categorySlug] ?? 0) + 1
+    }
+    return next
+  }, [home.data?.bestsellers])
+
   return (
-    <div className="page-enter flex flex-1 flex-col gap-5 pt-4">
-      <header className="px-4">
-        <h1 className="text-xl font-bold text-tg-text">{BRAND_NAME}</h1>
-      </header>
+    <div className="page-enter flex min-w-0 flex-1 flex-col gap-5 overflow-x-hidden px-4 pt-2">
+      {me.isError ? (
+        <ErrorState
+          title={t('common.error.network')}
+          onRetry={() => void me.refetch()}
+          retryLabel={t('common.retry')}
+        />
+      ) : (
+        <HomeHero balanceCents={me.data?.balanceCents ?? null} isLoading={me.isLoading} />
+      )}
 
-      {data?.banners && data.banners.length > 0 ? (
-        <div className="no-scrollbar flex gap-3 overflow-x-auto px-4">
-          {data.banners.map((banner) => (
-            <div
-              key={banner.id}
-              className="relative aspect-[16/7] w-[85%] shrink-0 overflow-hidden rounded-card bg-brand-gradient"
-            >
-              {banner.title ? (
-                <p className="absolute bottom-3 left-3 text-sm font-semibold text-white drop-shadow">
-                  {banner.title}
-                </p>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <ModelRail products={home.data?.bestsellers ?? []} isLoading={home.isLoading} />
 
-      <section className="flex flex-col gap-2">
-        <h2 className="px-4 text-sm font-semibold uppercase tracking-wide text-tg-section-header-text">
-          {t('home.categories')}
-        </h2>
-        {isLoading ? (
-          <div className="flex gap-2 px-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <CategoryChipSkeleton key={i} />
-            ))}
-          </div>
-        ) : isError ? null : (
-          <CategoryChipRow categories={data?.categories ?? []} />
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="px-4 text-sm font-semibold uppercase tracking-wide text-tg-section-header-text">
-          {t('home.bestsellers')}
-        </h2>
-
-        {isLoading ? (
-          <div className="grid grid-cols-2 gap-3 px-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <ProductCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : isError ? (
-          <ErrorState title={t('common.error.network')} onRetry={() => void refetch()} retryLabel={t('common.retry')} />
-        ) : (data?.bestsellers.length ?? 0) === 0 ? (
-          <EmptyState title={t('home.empty.bestsellers')} />
-        ) : (
-          <div className="grid grid-cols-2 gap-3 px-4">
-            {data?.bestsellers.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        )}
-      </section>
+      <CollectionGrid categories={categories} counts={counts} isLoading={home.isLoading} />
     </div>
   )
 }

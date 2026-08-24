@@ -137,10 +137,10 @@ export function registerCryptoBotWebhookRoute(app: FastifyInstance): void {
           }
         } else if (orderOrTopupRef) {
           // Settle the Payment row before touching the order. Money has arrived
-          // whatever delivery does next, and nothing else would ever settle this
-          // row: payments:poll only reconsiders payments whose order is still
-          // PENDING, so a row left PENDING here stays PENDING forever and the
-          // order reads as unpaid in every admin payments view.
+          // whatever delivery does next. payments-poll would eventually settle a
+          // row left PENDING here, but 30s later and only because the sweep now
+          // re-checks every pending payment — the webhook is the primary path
+          // and must not lean on its own fallback.
           await settleOrderPayment(invoiceId, orderOrTopupRef, req.body as object)
 
           try {

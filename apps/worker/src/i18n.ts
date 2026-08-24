@@ -90,5 +90,5 @@ export const adminStrings = {
   manualFallbackSla: (orderId: string, ageMinutes: number) =>
     `🐢 MANUAL FALLBACK SLA: order ${orderId} has been pending manual delivery for ${ageMinutes} min.`,
   sweepFailed: (address: string, reason: string) => `🧹 SWEEP FAILED for ${address}: ${reason}`,
-  chainScanError: (reason: string) => `🔴 chain:scan job errored: ${reason}`
+  chainScanError: (reason: string) => `🔴 chain-scan job errored: ${reason}`
 }

@@ -75,6 +75,8 @@ export interface OrderDetailDto {
   expiresAt: string | null
   deliveredPayload: string | null
   paymentStatus: string | null
+  /** Re-openable payment page/invoice link while the payment is still due. */
+  payUrl: string | null
   tron: TronPaymentDetails | null
 }
 
@@ -174,6 +176,17 @@ export function toOrderListItemDto(order: OrderWithPlan): OrderListItemDto {
  * never sent to the client. A decryption failure degrades to `null` rather than
  * failing the whole request, so the user still sees their order status.
  */
+/** payUrl stamped on the payment row at invoice creation (CryptoBot page / Stars invoice link). */
+function payUrlOf(payment: Payment | null): string | null {
+  if (!payment) return null
+  const raw = payment.rawPayload
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const url = (raw as Record<string, unknown>)['payUrl']
+    if (typeof url === 'string' && url.startsWith('https://')) return url
+  }
+  return null
+}
+
 export function toOrderDetailDto(order: OrderWithPlan, payment: Payment | null): OrderDetailDto {
   let deliveredPayload: string | null = null
   if (order.deliveredPayloadEnc) {
@@ -198,6 +211,9 @@ export function toOrderDetailDto(order: OrderWithPlan, payment: Payment | null):
     expiresAt: order.expiresAt ? order.expiresAt.toISOString() : null,
     deliveredPayload,
     paymentStatus: payment ? payment.status : null,
+    // Only while the order can still be paid — a paid/closed order must not
+    // dangle a live-looking invoice link.
+    payUrl: order.status === 'PENDING' ? payUrlOf(payment) : null,
     tron: payment ? tronDetailsFromPayment(payment) : null
   }
 }

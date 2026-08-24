@@ -8,13 +8,18 @@ import { nanoid } from 'nanoid'
 // policy, per-queue concurrency, and a uniform dead-letter queue mechanism.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Hyphens, never colons: BullMQ (since v5.x, enforced in QueueBase) throws
+// "Queue name cannot contain :" because ':' is its Redis key separator. The
+// worker booted fine on older resolutions of ^5.34 and would crash on today's;
+// these identifiers are the load-bearing contract with every producer
+// (apps/bot/src/domain/{content,reconcile}.ts, apps/admin/src/lib/queue.ts).
 export const QueueName = {
-  PaymentsPoll: 'payments:poll',
-  ChainScan: 'chain:scan',
-  ChainSweep: 'chain:sweep',
+  PaymentsPoll: 'payments-poll',
+  ChainScan: 'chain-scan',
+  ChainSweep: 'chain-sweep',
   Delivery: 'delivery',
-  OrdersExpire: 'orders:expire',
-  SubsRemind: 'subs:remind',
+  OrdersExpire: 'orders-expire',
+  SubsRemind: 'subs-remind',
   Broadcast: 'broadcast',
   Notify: 'notify'
 } as const
@@ -22,7 +27,7 @@ export const QueueName = {
 export type QueueNameValue = (typeof QueueName)[keyof typeof QueueName]
 
 export function deadLetterQueueName(queueName: string): string {
-  return `${queueName}:dlq`
+  return `${queueName}-dlq`
 }
 
 export interface QueueConfig {

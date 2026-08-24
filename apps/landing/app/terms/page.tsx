@@ -28,7 +28,7 @@ export default function TermsPage() {
         <h1 className="text-3xl font-bold text-white sm:text-4xl">Условия использования</h1>
         <div className="mt-8 space-y-6 text-sm leading-relaxed text-muted">
           <p>
-            Используя бота и мини-приложение Souldawn Store («Сервис»), вы соглашаетесь с настоящими условиями.
+            Используя бота и мини-приложение AI Access Rage («Сервис»), вы соглашаетесь с настоящими условиями.
             Сервис предоставляет доступ к цифровым товарам и подпискам, оплата и доставка которых происходят
             автоматически внутри Telegram.
           </p>

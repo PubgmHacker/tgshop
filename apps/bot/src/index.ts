@@ -7,6 +7,7 @@ import { createBot } from './bot/index.js'
 import type { BotContext } from './bot/context.js'
 import { buildServer } from './server/app.js'
 import { closeBroadcastQueue } from './domain/content.js'
+import { closeReconcileQueues } from './domain/reconcile.js'
 import { logger } from './lib/logger.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,6 +142,7 @@ async function gracefulShutdown(runtime: Runtime, signal: string, exitCode = 0):
 
     // 3. Close outbound connections, worst-case independently of each other.
     await closeBroadcastQueue()
+    await closeReconcileQueues()
 
     const results = await Promise.allSettled([prisma.$disconnect(), redis.quit()])
     for (const result of results) {
