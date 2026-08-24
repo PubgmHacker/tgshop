@@ -2,7 +2,7 @@
 
 # ─── Stage 1: install workspace deps + build all referenced packages ─────────
 FROM node:20-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /repo
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -24,7 +24,7 @@ RUN pnpm --filter @tgshop/db... --filter @tgshop/worker run build
 
 # ─── Stage 2: production runtime, only prod deps + built dist ────────────────
 FROM node:20-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /repo
 ENV NODE_ENV=production
 
@@ -38,7 +38,10 @@ RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /repo/packages/db/dist packages/db/dist
 COPY --from=builder /repo/packages/db/prisma packages/db/prisma
-COPY --from=builder /repo/node_modules/.prisma node_modules/.prisma
+# pnpm keeps the generated client inside its virtual store, not at
+# node_modules/.prisma — that path only exists under npm's hoisted layout, so
+# regenerate the client in this tree instead of copying it across stages.
+RUN cd packages/db && ./node_modules/.bin/prisma generate
 COPY --from=builder /repo/packages/core/dist packages/core/dist
 COPY --from=builder /repo/packages/payments/dist packages/payments/dist
 COPY --from=builder /repo/apps/worker/dist apps/worker/dist

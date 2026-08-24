@@ -11,10 +11,10 @@ COPY packages/ui/package.json packages/ui/package.json
 RUN pnpm install --frozen-lockfile --filter @tgshop/landing...
 
 # --- build ---
-FROM node:20-alpine AS builder
-WORKDIR /app
-RUN corepack enable
-COPY --from=deps /app/node_modules ./node_modules
+# FROM deps, not a fresh image: pnpm links every package's own node_modules
+# (apps/landing/node_modules/.bin/next included) into the virtual store, and a
+# lone COPY of the root node_modules drops those links — `next: not found`.
+FROM deps AS builder
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter @tgshop/landing build

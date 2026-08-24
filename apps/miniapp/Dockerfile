@@ -1,7 +1,9 @@
 # --- deps ---
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN corepack enable
+# openssl keeps prisma's engine-target detection consistent for the generate
+# that runs during the dependency builds (@tgshop/db is here via @tgshop/core).
+RUN apk add --no-cache openssl && corepack enable
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY apps/miniapp/package.json apps/miniapp/package.json
 COPY packages/db/package.json packages/db/package.json
@@ -11,10 +13,10 @@ COPY packages/ui/package.json packages/ui/package.json
 RUN pnpm install --frozen-lockfile --filter @tgshop/miniapp...
 
 # --- build ---
-FROM node:20-alpine AS builder
-WORKDIR /app
-RUN corepack enable
-COPY --from=deps /app/node_modules ./node_modules
+# FROM deps, not a fresh image: pnpm links every package's own node_modules
+# (apps/miniapp/node_modules/.bin/next included) into the virtual store, and a
+# lone COPY of the root node_modules drops those links — `next: not found`.
+FROM deps AS builder
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 # NEXT_PUBLIC_* are inlined into the client bundle at build time, so they must
@@ -24,7 +26,9 @@ ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_BOT_USERNAME
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_BOT_USERNAME=$NEXT_PUBLIC_BOT_USERNAME
-RUN pnpm --filter @tgshop/miniapp build
+# The ellipsis builds @tgshop/core (and @tgshop/db beneath it) first —
+# .dockerignore strips their dist from the build context.
+RUN pnpm --filter @tgshop/miniapp... build
 
 # --- runtime ---
 FROM node:20-alpine AS runner
@@ -33,6 +37,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
+COPY --from=builder --chown=nextjs:nodejs /app/apps/miniapp/public ./apps/miniapp/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/miniapp/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/miniapp/.next/static ./apps/miniapp/.next/static
 

@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM node:20-alpine AS base
-RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+# openssl: without it prisma cannot detect the libssl version and falls back to
+# the openssl-1.1.x engine target — a different binary name than the engines
+# actually fetched at install time, so the runtime would try to re-download.
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /repo
 
 # ---- deps: install full workspace deps with lockfile ----
@@ -33,10 +36,19 @@ COPY packages/payments/package.json packages/payments/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY apps/bot/package.json apps/bot/package.json
 RUN pnpm install --frozen-lockfile --prod --filter @tgshop/bot... || pnpm install --prod --filter @tgshop/bot...
+# The runtime copies THIS node_modules tree, but postinstall here saw no schema,
+# so @prisma/client is still the throwing stub — generate the real client in
+# place. `migrate diff` then forces the schema-engine download while we are
+# still root: `migrate deploy` at boot runs as an unprivileged user and must
+# never need to write into node_modules.
+COPY packages/db/prisma packages/db/prisma
+RUN cd packages/db \
+ && ./node_modules/.bin/prisma generate \
+ && ./node_modules/.bin/prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > /dev/null
 
 FROM node:20-alpine AS runtime
 ENV NODE_ENV=production
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init openssl
 WORKDIR /repo
 COPY --from=deps-prod /repo/node_modules ./node_modules
 COPY --from=deps-prod /repo/packages ./packages
