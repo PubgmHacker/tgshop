@@ -1,6 +1,6 @@
 import type { Bot } from 'grammy'
 import type { BotContext } from '../context.js'
-import { mainMenuKeyboard } from '../keyboards/menu.js'
+import { mainMenuKeyboard, openShopKeyboard } from '../keyboards/menu.js'
 import { t } from '../../i18n/index.js'
 import { findOrCreateUser } from '../../domain/users.js'
 
@@ -45,6 +45,13 @@ export function registerStartHandler(bot: Bot<BotContext>): void {
     await ctx.reply(t(locale, 'start.welcome', { shopName: 'AI Access Rage' }), {
       reply_markup: mainMenuKeyboard(locale),
       parse_mode: 'HTML'
+    })
+
+    // Separate message because one message carries one reply_markup, and the
+    // welcome already installs the reply keyboard. Inline web_app buttons are
+    // the launch path that receives initData.
+    await ctx.reply(t(locale, 'start.open_shop'), {
+      reply_markup: openShopKeyboard(locale)
     })
 
     if (intent.referrerTgId) {

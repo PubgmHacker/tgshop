@@ -72,7 +72,7 @@ const MAX_EMAIL_LENGTH = 254
 
 /** Reply-keyboard captions in every locale; the email prompt must never swallow them. */
 const MENU_CAPTIONS: ReadonlySet<string> = new Set(
-  (['catalog', 'profile', 'topup', 'purchases', 'referrals', 'faq', 'open_miniapp'] as const).flatMap(
+  (['catalog', 'profile', 'topup', 'purchases', 'referrals', 'faq'] as const).flatMap(
     (key) => [t('ru', `menu.${key}`), t('en', `menu.${key}`)]
   )
 )

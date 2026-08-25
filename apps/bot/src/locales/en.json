@@ -20,6 +20,7 @@
   },
   "start": {
     "welcome": "👋 Welcome to {shopName}!\n\nNeural-net subscriptions: ChatGPT, Claude, Midjourney and more. Pick a menu option to get started.",
+    "open_shop": "🛍 Browse and pay in a couple of taps — in the Mini App:",
     "welcome_back": "Welcome back, {name}!",
     "referral_applied": "🎁 Referral code applied! Your friend will get a bonus after your first purchase.",
     "promo_applied": "🏷 Promo code \"{code}\" is ready to use at checkout."
