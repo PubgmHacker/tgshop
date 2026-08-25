@@ -37,9 +37,19 @@ export default function HomePage(): JSX.Element {
         <HomeHero balanceCents={me.data?.balanceCents ?? null} isLoading={me.isLoading} />
       )}
 
-      <ModelRail products={home.data?.bestsellers ?? []} isLoading={home.isLoading} />
+      {home.isError ? (
+        <ErrorState
+          title={t('common.error.generic')}
+          onRetry={() => void home.refetch()}
+          retryLabel={t('common.retry')}
+        />
+      ) : (
+        <>
+          <ModelRail products={home.data?.bestsellers ?? []} isLoading={home.isLoading} />
 
-      <CollectionGrid categories={categories} counts={counts} isLoading={home.isLoading} />
+          <CollectionGrid categories={categories} counts={counts} isLoading={home.isLoading} />
+        </>
+      )}
     </div>
   )
 }

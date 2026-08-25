@@ -58,6 +58,8 @@ export const dictionaries = {
     'home.hero.orders': 'Мои заказы',
     'home.collections': 'Коллекции',
     'home.collections.all': 'Все модели',
+    'home.collections.soon': 'Скоро пополнение',
+    'home.collections.soon.sub': 'Новые модели уже в пути',
     'home.models': 'Модели',
 
     'catalog.title': 'Каталог',
@@ -228,6 +230,8 @@ export const dictionaries = {
     'home.hero.orders': 'My orders',
     'home.collections': 'Collections',
     'home.collections.all': 'All models',
+    'home.collections.soon': 'Restock soon',
+    'home.collections.soon.sub': 'New models are on the way',
     'home.models': 'Models',
 
     'catalog.title': 'Catalog',

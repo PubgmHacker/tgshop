@@ -20,7 +20,7 @@ export function CollectionGrid({
   categories: Category[]
   counts: Record<string, number>
   isLoading?: boolean
-}): JSX.Element | null {
+}): JSX.Element {
   const { t } = useI18n()
 
   if (isLoading) {
@@ -32,8 +32,6 @@ export function CollectionGrid({
       </div>
     )
   }
-
-  if (categories.length === 0) return null
 
   return (
     <section className="flex flex-col gap-3">
@@ -52,6 +50,21 @@ export function CollectionGrid({
             <span className="mt-0.5 block text-[13px] font-medium text-muted">{t('catalog.title')}</span>
           </span>
         </Link>
+        {categories.length === 0 ? (
+          <div className="tile relative flex h-[120px] flex-col justify-between overflow-hidden rounded-[24px] p-4">
+            <span className="mark-plate relative flex h-10 w-10 items-center justify-center rounded-[11px]">
+              <Icon name="box" size={20} className="text-black" />
+            </span>
+            <span className="relative">
+              <span className="block text-[16px] font-bold tracking-[-0.02em] text-ink">
+                {t('home.collections.soon')}
+              </span>
+              <span className="mt-0.5 block text-[13px] font-medium text-muted">
+                {t('home.collections.soon.sub')}
+              </span>
+            </span>
+          </div>
+        ) : null}
         {categories.map((category) => {
           return (
             <Link

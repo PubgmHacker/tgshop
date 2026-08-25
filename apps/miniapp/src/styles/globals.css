@@ -223,10 +223,10 @@ html::before {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 32%);
 }
 
-.glass-live {
-  --sheen-radius: 28px;
-}
-
+/* No mix-blend-mode / clip-path / contain here: combined with the parent's
+   backdrop-filter they force iOS WKWebView to re-rasterize the layer
+   mid-flight (banding, flicker, jagged edges). Plain alpha white clipped by
+   rounded overflow reads the same and composites cleanly. */
 .glass-sheen {
   pointer-events: none;
   position: absolute;
@@ -235,11 +235,6 @@ html::before {
   overflow: hidden;
   overflow: clip;
   border-radius: inherit;
-  isolation: isolate;
-  contain: paint;
-  clip-path: inset(0 round var(--sheen-radius, 28px));
-  -webkit-clip-path: inset(0 round var(--sheen-radius, 28px));
-  mix-blend-mode: screen;
   transform: translateZ(0);
 }
 
@@ -247,9 +242,10 @@ html::before {
   content: '';
   position: absolute;
   top: -55%;
-  left: -12%;
+  left: 0;
   width: 46%;
   height: 210%;
+  will-change: transform;
   background: linear-gradient(
     125deg,
     transparent 0%,
@@ -262,27 +258,23 @@ html::before {
     transparent 66%,
     transparent 100%
   );
-  animation: sheen-sweep 3.8s linear infinite;
+  animation: sheen-sweep 4.4s linear infinite;
 }
 
+/* Constant opacity: both keyframe ends sit fully outside the clipped surface
+   (percentages are of the stripe's own 46% width), so the streak enters and
+   leaves through the banner edges instead of dissolving mid-surface, and the
+   loop restart is invisible. The 62%→100% hold is the pause between sweeps. */
 @keyframes sheen-sweep {
   0% {
-    transform: translate3d(-88%, -26%, 0);
-    opacity: 0;
+    transform: translate3d(-130%, 0, 0);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1);
   }
-  10% {
-    opacity: 1;
-  }
-  78% {
-    opacity: 1;
-  }
-  90% {
-    transform: translate3d(198%, 34%, 0);
-    opacity: 0;
+  62% {
+    transform: translate3d(260%, 0, 0);
   }
   100% {
-    transform: translate3d(198%, 34%, 0);
-    opacity: 0;
+    transform: translate3d(260%, 0, 0);
   }
 }
 
@@ -326,10 +318,6 @@ html::before {
 
 :root[data-theme='light'] .btn-primary::before {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, transparent 40%);
-}
-
-:root[data-theme='light'] .glass-sheen {
-  mix-blend-mode: overlay;
 }
 
 :root[data-theme='light'] .glass-sheen::after {
@@ -429,7 +417,7 @@ html::before {
 @media (prefers-reduced-motion: reduce) {
   .glass-sheen::after {
     animation: none;
-    transform: translate3d(22%, 6%, 0);
+    transform: translate3d(60%, 0, 0);
     opacity: 0.55;
   }
 }
