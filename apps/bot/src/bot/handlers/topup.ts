@@ -21,7 +21,11 @@ export async function topupConversation(
   conversation: Conversation<BotContext, BotContext>,
   ctx: BotContext
 ): Promise<void> {
-  const locale = ctx.session.locale
+  // Session lives only on OUTSIDE context objects: the conversations replay
+  // engine rebuilds inner contexts without running outer middleware, so
+  // `ctx.session` here is undefined at runtime (the types cannot show that).
+  // external() hands its callback the outside context — the one with session.
+  const locale = await conversation.external((outerCtx) => outerCtx.session.locale)
 
   await ctx.reply(t(locale, 'topup.enter_amount'))
   const amountCtx = await conversation.waitFor('message:text')
