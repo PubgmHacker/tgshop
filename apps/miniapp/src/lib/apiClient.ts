@@ -5,7 +5,9 @@ import { AuthResponseSchema } from '@/types/api'
 import { clearAuthSession, getAccessToken, setAuthSession } from './authStore'
 import { readInitDataFromLocation } from './launchParams'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
+// Production is same-origin: next.config.js rewrites relay /api/* to the bot
+// server-side, so the WebView never has to reach a second host.
+const API_URL = process.env.NODE_ENV === 'production' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? '')
 
 export class ApiClientError extends Error {
   public readonly status: number
