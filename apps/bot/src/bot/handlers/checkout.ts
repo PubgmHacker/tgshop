@@ -327,12 +327,10 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
     await ctx.answerCallbackQuery({
       text: t(ctx.session.locale, 'order.report_received', { orderId: reportedOrderId })
     })
-    const locale = ctx.session.locale
     for (const adminId of env.ADMIN_IDS) {
       await ctx.api
         .sendMessage(Number(adminId), `⚠️ Problem report for order ${reportedOrderId} from user ${ctx.from?.id}`)
         .catch(() => undefined)
     }
-    void locale
   })
 }
