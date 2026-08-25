@@ -1,6 +1,8 @@
 import type { Bot } from 'grammy'
 import type { BotContext } from './context.js'
 import { logger } from '../lib/logger.js'
+import { env } from '../config/env.js'
+import { versionedWebAppUrl } from './webAppUrls.js'
 
 interface CommandSpec {
   command: string
@@ -45,6 +47,20 @@ export async function registerBotCommands(
     await bot.api.setMyCommands(PUBLIC_COMMANDS.ru, { language_code: 'ru' })
   } catch (err) {
     logger.warn({ err }, 'failed to set public bot commands')
+  }
+
+  // The chat's ≡ menu button opens the Mini App with the release-stamped URL
+  // (see webAppUrls.ts) so phones stop reviving cached bundles from previous
+  // deploys. Reply keyboards sent earlier keep their old URL until the next
+  // /start; the menu button is bot-level and updates for everyone at boot.
+  try {
+    const current = await bot.api.getChatMenuButton()
+    const text = current.type === 'web_app' && current.text ? current.text : 'Магазин'
+    await bot.api.setChatMenuButton({
+      menu_button: { type: 'web_app', text, web_app: { url: versionedWebAppUrl(env.MINIAPP_URL) } }
+    })
+  } catch (err) {
+    logger.warn({ err }, 'failed to set chat menu button')
   }
 
   for (const adminId of adminIds) {

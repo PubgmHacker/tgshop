@@ -13,11 +13,22 @@ const { mockLogger } = vi.hoisted(() => ({
 vi.mock('../lib/logger.js', () => ({ logger: mockLogger }))
 
 import { registerBotCommands, PUBLIC_COMMANDS, ADMIN_COMMANDS } from '../bot/commands.js'
+import { env } from '../config/env.js'
 import type { Bot } from 'grammy'
 import type { BotContext } from '../bot/context.js'
 
 function makeBot() {
-  return { api: { setMyCommands: vi.fn(async () => true) } }
+  return {
+    api: {
+      setMyCommands: vi.fn(async () => true),
+      getChatMenuButton: vi.fn(
+        async (): Promise<{ type: string; text?: string; web_app?: { url: string } }> => ({
+          type: 'default'
+        })
+      ),
+      setChatMenuButton: vi.fn(async () => true)
+    }
+  }
 }
 
 beforeEach(() => {
@@ -40,6 +51,40 @@ describe('registerBotCommands', () => {
     })
     expect(bot.api.setMyCommands).toHaveBeenCalledTimes(4)
     expect(mockLogger.warn).not.toHaveBeenCalled()
+  })
+
+  it('points the chat menu button at the miniapp (default label when none was set)', async () => {
+    const bot = makeBot()
+
+    await registerBotCommands(bot as unknown as Bot<BotContext>, [])
+
+    expect(bot.api.setChatMenuButton).toHaveBeenCalledWith({
+      menu_button: { type: 'web_app', text: 'Магазин', web_app: { url: env.MINIAPP_URL } }
+    })
+  })
+
+  it('keeps the existing menu button label when one is already configured', async () => {
+    const bot = makeBot()
+    bot.api.getChatMenuButton.mockResolvedValueOnce({
+      type: 'web_app',
+      text: 'Shop',
+      web_app: { url: 'https://old.example' }
+    })
+
+    await registerBotCommands(bot as unknown as Bot<BotContext>, [])
+
+    expect(bot.api.setChatMenuButton).toHaveBeenCalledWith({
+      menu_button: { type: 'web_app', text: 'Shop', web_app: { url: env.MINIAPP_URL } }
+    })
+  })
+
+  it('logs and continues when the menu button cannot be set', async () => {
+    const bot = makeBot()
+    bot.api.setChatMenuButton.mockRejectedValueOnce(new Error('network down'))
+
+    await expect(registerBotCommands(bot as unknown as Bot<BotContext>, [])).resolves.toBeUndefined()
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.anything(), 'failed to set chat menu button')
   })
 
   it('keeps going when one admin chat is unknown to Telegram', async () => {

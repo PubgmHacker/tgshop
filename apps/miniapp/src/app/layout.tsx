@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   description: `${BRAND_NAME} — подписки на нейросети`
 }
 
+// The storefront HTML is the document Telegram's WebView keeps in its cache,
+// and a cached copy carries the previous release's bundle. force-dynamic makes
+// Next serve every document request fresh with a no-store Cache-Control.
+export const dynamic = 'force-dynamic'
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -34,6 +39,9 @@ export default function RootLayout({ children }: { children: ReactNode }): JSX.E
           </div>
           <BottomTabBar />
         </Providers>
+        <div className="pointer-events-none fixed bottom-1 right-2 z-50 text-[9px] text-white/25">
+          {`v.${(process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7)}`}
+        </div>
       </body>
     </html>
   )

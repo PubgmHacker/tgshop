@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   description: `${BRAND_NAME} — панель управления магазином`
 }
 
+// Same reasoning as the customer miniapp: the WebView must never revive a
+// cached document from a previous release.
+export const dynamic = 'force-dynamic'
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,

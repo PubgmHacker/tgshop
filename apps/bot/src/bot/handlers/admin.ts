@@ -9,6 +9,7 @@ import { formatUsd } from '../../lib/format.js'
 import { getBalance } from '@tgshop/core'
 import { encryptStockPayload } from '../../domain/orders.js'
 import { logger } from '../../lib/logger.js'
+import { versionedWebAppUrl } from '../webAppUrls.js'
 
 async function adminGuard(ctx: BotContext, next: NextFunction): Promise<void> {
   const tgId = ctx.from?.id
@@ -28,7 +29,10 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
     if (adminAppUrl?.startsWith('https://')) {
       await ctx.reply(t(ctx.session.locale, 'admin.panel'), {
         parse_mode: 'HTML',
-        reply_markup: new InlineKeyboard().webApp(t(ctx.session.locale, 'admin.open_panel'), adminAppUrl)
+        reply_markup: new InlineKeyboard().webApp(
+          t(ctx.session.locale, 'admin.open_panel'),
+          versionedWebAppUrl(adminAppUrl)
+        )
       })
       return
     }
