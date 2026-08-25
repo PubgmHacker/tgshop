@@ -8,13 +8,23 @@ import { markOrderPaidAndDeliver } from '../../domain/orders.js'
 import { emitEvent } from '../../domain/events.js'
 import { logger } from '../../lib/logger.js'
 
-const cryptoBotWebhookSchema = z.object({
+/**
+ * The invoice_paid update body, matching what Crypto Pay actually sends.
+ *
+ * The shop creates FIAT invoices (currency_type: 'fiat'), and for those the
+ * Invoice object carries NO `asset` field — the crypto actually used arrives
+ * as `paid_asset` instead. Requiring `asset` here rejected every real payment
+ * webhook with 400, so CryptoBot kept redelivering and settlement silently
+ * fell through to the payments-poll worker. `amount` on a fiat invoice is the
+ * fiat amount, which is exactly what the top-up credit math below expects.
+ */
+export const cryptoBotWebhookSchema = z.object({
   update_type: z.string(),
   payload: z.object({
     invoice_id: z.number(),
     status: z.string(),
     amount: z.string(),
-    asset: z.string(),
+    asset: z.string().optional(),
     payload: z.string().optional()
   })
 })
