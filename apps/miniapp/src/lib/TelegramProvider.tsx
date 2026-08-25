@@ -10,7 +10,7 @@ import {
 } from '@telegram-apps/sdk-react'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { setInitData } from './apiClient'
-import { readInitDataFromLocation } from './launchParams'
+import { probeInitData, readInitDataFromLocation } from './launchParams'
 
 interface TelegramContextValue {
   isReady: boolean
@@ -35,6 +35,37 @@ function bootstrapInitData(): void {
   }
 }
 
+/** Key names and value lengths only — never the values themselves. */
+function describeParams(raw: string): string {
+  if (!raw) return '-'
+  const trimmed = raw.startsWith('#') || raw.startsWith('?') ? raw.slice(1) : raw
+  try {
+    const parts: string[] = []
+    new URLSearchParams(trimmed).forEach((value, key) => {
+      parts.push(`${key}:${value.length}`)
+    })
+    return parts.length > 0 ? parts.join(',') : '-'
+  } catch {
+    return 'unparsable'
+  }
+}
+
+/**
+ * One fire-and-forget GET per boot. The middleware logs the query string, so
+ * a phone that renders «нет соединения» still tells the server logs exactly
+ * what launch state it saw — which is how this incident gets diagnosed
+ * without physical access to the device.
+ */
+function sendBootBeacon(fields: Record<string, string>): void {
+  try {
+    void fetch(`/client-log?${new URLSearchParams(fields).toString()}`, { keepalive: true }).catch(
+      () => {}
+    )
+  } catch {
+    // diagnostics must never break the app
+  }
+}
+
 export function TelegramProvider({ children }: { children: ReactNode }): JSX.Element {
   const [isReady, setIsReady] = useState(false)
   const [isTelegramEnvironment, setIsTelegramEnvironment] = useState(false)
@@ -56,10 +87,23 @@ export function TelegramProvider({ children }: { children: ReactNode }): JSX.Ele
     // Hash/query fallback for local browser verification and tdesktop launch URLs.
     bootstrapInitData()
 
+    // Launch state before the SDK touches (and possibly strips) the URL.
+    const entryHash = window.location.hash
+    const entrySearch = window.location.search
+    let navigationUrl = ''
+    try {
+      navigationUrl = performance.getEntriesByType('navigation')[0]?.name ?? ''
+    } catch {
+      navigationUrl = ''
+    }
+    let platform = '-'
+    let sdkError = ''
+
     try {
       initSdk()
 
       const launchParams = retrieveLaunchParams()
+      platform = `${launchParams.platform ?? '-'}@${launchParams.version ?? '-'}`
       const rawInitData = launchParams.initDataRaw
       if (rawInitData) {
         setInitData(rawInitData)
@@ -84,13 +128,26 @@ export function TelegramProvider({ children }: { children: ReactNode }): JSX.Ele
       if (mainButton.mount.isAvailable()) {
         mainButton.mount()
       }
-    } catch {
-      // Not running inside Telegram (e.g. local dev in a plain browser).
+    } catch (err) {
+      // Not running inside Telegram (e.g. local dev in a plain browser) — or a
+      // strict SDK parser rejecting launch params a newer client sent.
       // Keep any initData captured from the launch hash so API auth still works.
+      sdkError = err instanceof Error ? err.message : String(err)
       bootstrapInitData()
       setIsTelegramEnvironment(false)
     } finally {
       setIsReady(true)
+      const finalProbe = probeInitData()
+      sendBootBeacon({
+        got: finalProbe.initData ? '1' : '0',
+        src: finalProbe.source,
+        hash: describeParams(entryHash),
+        search: describeParams(entrySearch),
+        nav: navigationUrl.includes('#') ? describeParams(navigationUrl.slice(navigationUrl.indexOf('#'))) : '-',
+        tgobj: (window as { Telegram?: { WebApp?: unknown } }).Telegram?.WebApp ? '1' : '0',
+        plat: platform,
+        sdk: sdkError.slice(0, 120)
+      })
     }
   }, [])
 
