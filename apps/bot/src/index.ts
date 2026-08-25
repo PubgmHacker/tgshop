@@ -4,6 +4,7 @@ import type { Bot } from 'grammy'
 import { env } from './config/env.js'
 import { redis } from './config/redis.js'
 import { createBot } from './bot/index.js'
+import { registerBotCommands } from './bot/commands.js'
 import type { BotContext } from './bot/context.js'
 import { buildServer } from './server/app.js'
 import { closeBroadcastQueue } from './domain/content.js'
@@ -75,6 +76,10 @@ async function main(): Promise<void> {
   logger.info({ port: env.PORT }, 'HTTP server listening')
 
   const usingWebhook = await startBotTransport(bot)
+
+  // Telegram renders these behind the "/" and ≡ buttons; without them users
+  // see an empty command menu. Failures are logged inside, never fatal.
+  await registerBotCommands(bot, env.ADMIN_IDS)
 
   installShutdownHandlers({ app, bot, usingWebhook })
 }
