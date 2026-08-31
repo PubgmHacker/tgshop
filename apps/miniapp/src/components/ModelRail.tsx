@@ -15,7 +15,8 @@ const SHOWCASE = [
   { slug: 'midjourney', title: 'Midjourney' },
   { slug: 'flux-pro', title: 'Flux' },
   { slug: 'github-copilot', title: 'Copilot' },
-  { slug: 'cursor-pro', title: 'Cursor' }
+  { slug: 'cursor-pro', title: 'Cursor' },
+  { slug: 'mirasim', title: 'Mirasim' }
 ] as const
 
 export function ModelRail({

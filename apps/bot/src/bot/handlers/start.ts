@@ -51,7 +51,7 @@ export function registerStartHandler(bot: Bot<BotContext>): void {
     // welcome already installs the reply keyboard. Inline web_app buttons are
     // the launch path that receives initData.
     await ctx.reply(t(locale, 'start.open_shop'), {
-      reply_markup: openShopKeyboard(locale)
+      reply_markup: openShopKeyboard(locale, intent.productSlug)
     })
 
     if (intent.referrerTgId) {
@@ -61,11 +61,6 @@ export function registerStartHandler(bot: Bot<BotContext>): void {
       ctx.session.pendingPromoCode = intent.promoCode
       await ctx.reply(t(locale, 'start.promo_applied', { code: intent.promoCode }))
     }
-    if (intent.productSlug) {
-      // Route straight into the product view via a synthetic callback-like flow.
-      await ctx.api.sendChatAction(tgUser.id, 'typing')
-    }
-
     void user
   })
 }

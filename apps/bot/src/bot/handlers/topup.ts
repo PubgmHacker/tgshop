@@ -10,9 +10,8 @@ import { getUserByTgId, findOrCreateUser } from '../../domain/users.js'
 import { createInvoice } from '../../domain/payments.js'
 import { newTopupReference } from '../../domain/topup.js'
 import { logger } from '../../lib/logger.js'
-
-const MIN_TOPUP_CENTS = 100 // $1.00
-const MAX_TOPUP_CENTS = 500_000 // $5,000
+import { getTopupLimits } from '../../domain/topup-policy.js'
+import { getPaymentAvailability } from '../../domain/payment-availability.js'
 
 // Both type arguments are required: Conversation's second parameter (the inner
 // context) defaults to plain Context, which would not match createConversation's
@@ -26,6 +25,17 @@ export async function topupConversation(
   // `ctx.session` here is undefined at runtime (the types cannot show that).
   // external() hands its callback the outside context — the one with session.
   const locale = await conversation.external((outerCtx) => outerCtx.session.locale)
+  const limits = await conversation.external(() => getTopupLimits())
+
+  const topupProviders = getPaymentAvailability().topupProviders
+  if (topupProviders.length === 0) {
+    await ctx.reply(t(locale, 'common.error_generic'))
+    return
+  }
+  // CryptoBot remains the preferred chat rail when configured, but Stars is a
+  // fully supported fallback. A missing/rotated CryptoBot token must not turn
+  // the bot's Top up button into a dead end while Telegram Stars still works.
+  const provider = topupProviders.includes('CRYPTOBOT') ? PaymentProvider.CRYPTOBOT : PaymentProvider.STARS
 
   await ctx.reply(t(locale, 'topup.enter_amount'))
   const amountCtx = await conversation.waitFor('message:text')
@@ -37,11 +47,11 @@ export async function topupConversation(
     }
   })
 
-  if (cents === null || cents < MIN_TOPUP_CENTS || cents > MAX_TOPUP_CENTS) {
+  if (cents === null || cents < limits.minCents || cents > limits.maxCents) {
     await ctx.reply(
       t(locale, 'topup.invalid_amount', {
-        min: formatUsd(MIN_TOPUP_CENTS),
-        max: formatUsd(MAX_TOPUP_CENTS)
+        min: formatUsd(limits.minCents),
+        max: formatUsd(limits.maxCents)
       })
     )
     return
@@ -63,9 +73,10 @@ export async function topupConversation(
       createInvoice({
         userId: user.id,
         amountCents: cents,
-        provider: PaymentProvider.CRYPTOBOT,
+        provider,
         description: 'Balance top-up',
-        reference
+        reference,
+        idempotencyKey: `bot-topup:${user.id}:${reference}`
       })
     )
 
@@ -75,7 +86,7 @@ export async function topupConversation(
     }
 
     await ctx.reply(t(locale, 'topup.created', { amount: formatUsd(cents) }), {
-      reply_markup: new InlineKeyboard().url('💳 Pay', invoice.payUrl)
+      reply_markup: new InlineKeyboard().url(provider === PaymentProvider.STARS ? '⭐ Pay with Stars' : '💳 Pay', invoice.payUrl)
     })
   } catch (err) {
     await conversation.external(() => logger.error({ err }, 'top-up invoice creation failed'))

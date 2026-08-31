@@ -22,6 +22,7 @@ function labelFor(key: string, t: (key: DictionaryKey) => string): string {
 /** Row preview of the current value, per editor kind. */
 function renderValue(kind: SettingKind, value: unknown): string {
   if (value === null || value === undefined) return '—'
+  if (kind === 'boolean') return value === true ? 'ON' : 'OFF'
   if (kind === 'cents' && typeof value === 'number') return formatCents(value)
   if (kind === 'percent') return `${String(value)}%`
   if (kind === 'json') {
@@ -89,13 +90,28 @@ export default function SettingsPage(): JSX.Element {
       }
     } else if (editing.kind === 'url') {
       value = raw
+    } else if (editing.kind === 'boolean') {
+      if (raw !== 'true' && raw !== 'false') {
+        setFormError(t('common.error.generic'))
+        return
+      }
+      value = raw === 'true'
+    } else if (editing.kind === 'decimal') {
+      // Keep decimal settings as strings end-to-end. Converting through Number
+      // can silently change a rate's digits and reintroduce floating-point
+      // rounding into a money configuration.
+      if (raw === '') {
+        setFormError(t('common.error.generic'))
+        return
+      }
+      value = raw
     } else {
       const num = Number(raw)
       if (raw === '' || Number.isNaN(num)) {
         setFormError(t('common.error.generic'))
         return
       }
-      value = editing.kind === 'decimal' ? num : Math.trunc(num)
+      value = Math.trunc(num)
     }
     saveMutation.mutate({ key: editing.key, value })
   }
@@ -158,6 +174,15 @@ export default function SettingsPage(): JSX.Element {
                         rows={7}
                         className="tile w-full resize-none rounded-tile px-3.5 py-3 font-mono text-[13px] text-ink outline-none"
                       />
+                    ) : editing.kind === 'boolean' ? (
+                      <select
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        className="tile w-full appearance-none rounded-tile px-3.5 py-3 text-sm text-ink outline-none"
+                      >
+                        <option value="false">OFF</option>
+                        <option value="true">ON</option>
+                      </select>
                     ) : (
                       <input
                         value={draft}

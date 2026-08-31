@@ -12,10 +12,12 @@ import { getPlanById } from '../../../domain/catalog.js'
 import { countAvailableForPlan, isPoolBacked } from '../../../domain/stock.js'
 import { createInvoice, getLatestPaymentForOrder } from '../../../domain/payments.js'
 import { getUserBalance } from '../../../domain/users.js'
-import { HttpError, badRequest, forbidden, notFound, sendError } from '../../../lib/httpErrors.js'
+import { HttpError, badRequest, conflict, forbidden, notFound, sendError, unavailable } from '../../../lib/httpErrors.js'
 import { logger } from '../../../lib/logger.js'
 import { requestLocale, requireUserId } from './context.js'
 import { toOrderDetailDto } from './presenters.js'
+import { planPriceToStars } from '../../../payments/stars.js'
+import { isPaymentProviderAvailable } from '../../../domain/payment-availability.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Order creation, payment kickoff, and status polling.
@@ -79,21 +81,33 @@ export function registerOrderRoutes(app: FastifyInstance): void {
     try {
       const body = createOrderBodySchema.parse(req.body)
       const userId = requireUserId(req)
+      const provider = PaymentProvider[body.provider]
+      const idempotencyKey = `order:${userId}:${body.idempotencyKey}`
 
-      const plan = await getPlanById(body.planId)
-      if (!plan || !plan.isActive || !plan.product.isActive) throw notFound('api.errors.plan_not_found')
+      // Check the namespaced key before stock/config validation. A retry must
+      // return the original order even if the last stock item has since gone or
+      // an operator temporarily disabled that payment rail.
+      const existingOrder = await prisma.order.findUnique({ where: { idempotencyKey } })
+      if (!existingOrder && !isPaymentProviderAvailable(provider)) {
+        throw unavailable()
+      }
+
+      const plan = await getPlanById(existingOrder?.planId ?? body.planId)
+      if (!plan) throw notFound('api.errors.plan_not_found')
+
+      if (!existingOrder && (!plan.isActive || !plan.product.isActive)) {
+        throw notFound('api.errors.plan_not_found')
+      }
 
       // Reject before taking money when the pool is already empty. externalConfig
       // is passed so a UNIQUE_CODE product that mints codes from a template is
       // not mistaken for a finite pool and refused as "sold out".
-      if (isPoolBacked(plan.product.deliveryType, plan.product.externalConfig)) {
+      if (!existingOrder && isPoolBacked(plan.product.deliveryType, plan.product.externalConfig)) {
         const available = await countAvailableForPlan(plan.id)
         if (available < body.qty) {
           throw new HttpError(409, 'STOCK_UNAVAILABLE', 'api.errors.stock_unavailable')
         }
       }
-
-      const provider = PaymentProvider[body.provider]
 
       const { order, pricing } = await createOrder({
         userId,
@@ -103,12 +117,24 @@ export function registerOrderRoutes(app: FastifyInstance): void {
         promoCode: body.promoCode ?? null,
         // Namespaced by user so one client cannot collide with (or replay)
         // another user's key on the globally-unique Order.idempotencyKey.
-        idempotencyKey: `order:${userId}:${body.idempotencyKey}`
+        idempotencyKey
       })
 
       // A replayed idempotencyKey returns the original order; make sure it is
       // still this caller's order before echoing any of it back.
       if (order.userId !== userId) throw forbidden()
+      if (order.planId !== body.planId || order.qty !== body.qty) {
+        throw conflict('api.errors.idempotency_conflict')
+      }
+      // A client retry must never create a second invoice after the original
+      // order has already settled. Also reject a reused key with a different
+      // payment rail instead of attaching a new provider payment to history.
+      if (order.provider !== provider) throw conflict('api.errors.idempotency_conflict')
+      if (order.status !== 'PENDING') {
+        return { orderId: order.id, status: order.status, pricing }
+      }
+
+      if (!isPaymentProviderAvailable(provider)) throw unavailable()
 
       if (provider === PaymentProvider.BALANCE) {
         const balance = await getUserBalance(userId)
@@ -130,7 +156,8 @@ export function registerOrderRoutes(app: FastifyInstance): void {
         provider,
         description: `${plan.product.title} — ${plan.title}`,
         reference: order.id,
-        orderId: order.id
+        orderId: order.id,
+        priceStars: planPriceToStars(plan.priceStars, plan.priceCents, body.qty, pricing.totalCents)
       })
 
       return {

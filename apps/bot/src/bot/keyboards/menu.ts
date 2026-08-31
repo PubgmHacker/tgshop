@@ -22,9 +22,13 @@ export function mainMenuKeyboard(locale: Locale) {
     .resized()
 }
 
-export function openShopKeyboard(locale: Locale) {
-  return new InlineKeyboard().webApp(
-    t(locale, 'menu.open_miniapp'),
-    versionedWebAppUrl(env.MINIAPP_URL)
-  )
+export function openShopKeyboard(locale: Locale, productSlug?: string) {
+  const target = productSlug
+    ? (() => {
+        const url = new URL(env.MINIAPP_URL)
+        url.pathname = `${url.pathname.replace(/\/$/, '')}/product/${encodeURIComponent(productSlug)}`
+        return url.toString()
+      })()
+    : env.MINIAPP_URL
+  return new InlineKeyboard().webApp(t(locale, 'menu.open_miniapp'), versionedWebAppUrl(target))
 }

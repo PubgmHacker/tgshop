@@ -1,6 +1,8 @@
 import type { Job } from 'bullmq'
 import { prisma, OrderStatus } from '@tgshop/db'
+import { getSetting } from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, upsertRepeatable } from '../queue.js'
+import { getRedisConnection } from '../redis.js'
 import { jobLogger } from '../logger.js'
 import { notifyAdmins } from '../telegram.js'
 import { adminStrings } from '../i18n.js'
@@ -12,11 +14,11 @@ import type { NotifyJobData } from './notify.js'
 // stuck in DELIVERING beyond the SLA window and raises an alert for each.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MANUAL_FALLBACK_SLA_MINUTES = 30
-
-// Sweep twice as often as the SLA window, so an order can overshoot the SLA by
-// at most half of it before an admin is alerted.
-const SLA_SWEEP_INTERVAL_MS = (MANUAL_FALLBACK_SLA_MINUTES / 2) * 60 * 1000
+// The SLA itself is a live shop setting. A short fixed sweep interval keeps
+// alert latency bounded even when an owner changes the SLA from the admin
+// panel; the previous implementation baked in 30 minutes and ignored the
+// configurable value entirely.
+const SLA_SWEEP_INTERVAL_MS = 5 * 60 * 1000
 
 /** Registers the repeatable manual-fallback SLA sweep. Idempotent — safe on every boot. */
 export async function registerNotifyRepeatables(): Promise<void> {
@@ -60,7 +62,8 @@ async function processNotify(job: Job<NotifyJobPayload>): Promise<void> {
 }
 
 async function runManualFallbackSlaSweep(log: ReturnType<typeof jobLogger>): Promise<void> {
-  const cutoff = new Date(Date.now() - MANUAL_FALLBACK_SLA_MINUTES * 60 * 1000)
+  const slaMinutes = await getSetting(prisma, 'manual_fallback_sla_minutes', getRedisConnection())
+  const cutoff = new Date(Date.now() - slaMinutes * 60 * 1000)
   const stuck = await prisma.order.findMany({
     where: {
       status: OrderStatus.DELIVERING,

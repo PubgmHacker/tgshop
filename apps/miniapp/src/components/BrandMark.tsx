@@ -1,5 +1,8 @@
 'use client'
 
+import Image from 'next/image'
+import { useTheme } from '@/lib/ThemeProvider'
+
 const TINTS: Record<string, string> = {
   'chatgpt-plus': '#10A37F',
   'claude-pro': '#D97757',
@@ -7,19 +10,21 @@ const TINTS: Record<string, string> = {
   'flux-pro': '#E0B060',
   'github-copilot': '#58A6FF',
   'cursor-pro': '#7EB8D4',
+  mirasim: '#FFFFFF',
   chat: '#10A37F',
   image: '#5B8DEF',
   code: '#7EB8D4',
   all: '#F0C8A0'
 }
 
-const MARKS: Record<string, string> = {
+const MARKS: Record<string, string | { dark: string; light: string }> = {
   'chatgpt-plus': '/brands/chatgpt.svg',
   'claude-pro': '/brands/claude.svg',
   midjourney: '/brands/midjourney.svg',
   'flux-pro': '/brands/flux.svg',
   'github-copilot': '/brands/copilot.svg',
-  'cursor-pro': '/brands/cursor.svg'
+  'cursor-pro': '/brands/cursor.svg',
+  mirasim: { dark: '/brands/mirasim.png', light: '/brands/mirasim-black.png' }
 }
 
 export function tintFor(slug: string): string {
@@ -39,24 +44,24 @@ function AllMark(): JSX.Element {
 }
 
 function FallbackMark({ slug }: { slug: string }): JSX.Element {
-  const label = slug.replace(/[^a-z0-9]+/gi, '').slice(0, 2).toUpperCase() || '•'
+  const label =
+    slug
+      .replace(/[^a-z0-9]+/gi, '')
+      .slice(0, 2)
+      .toUpperCase() || '•'
   return <span className="text-[11px] font-bold tracking-tight text-black">{label}</span>
 }
 
-export function BrandMark({
-  slug,
-  size = 32
-}: {
-  slug: string
-  size?: number
-}): JSX.Element {
+export function BrandMark({ slug, size = 32 }: { slug: string; size?: number }): JSX.Element {
+  const { theme } = useTheme()
   if (slug === 'all') return <AllMark />
 
-  const src = MARKS[slug]
+  const mark = MARKS[slug]
+  const src = typeof mark === 'string' ? mark : mark?.[theme]
   if (!src) return <FallbackMark slug={slug} />
 
   return (
-    <img
+    <Image
       src={src}
       alt=""
       width={size}

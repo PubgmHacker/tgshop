@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { API_URL } from './env';
-import { type DemoProduct, type LandingCopy } from './i18n';
+import { z } from 'zod'
+import { API_URL } from './env'
+import { type DemoProduct, type LandingCopy } from './i18n'
 
 const planSchema = z.object({
   id: z.string(),
@@ -10,24 +10,26 @@ const planSchema = z.object({
   // Normalise the missing case to `null` here, at the parse boundary, so the
   // rest of the app only ever deals with `number | null` (see `DemoPlan`).
   durationDays: z.number().int().nullable().default(null),
-  badge: z.string().optional(),
-});
+  badge: z.string().optional()
+})
 
 const productSchema = z.object({
   id: z.string(),
+  slug: z.string().optional(),
   title: z.string(),
   description: z.string(),
   categoryTitle: z.string(),
-  plans: z.array(planSchema).min(1),
-});
+  imageUrl: z.string().url().nullable().optional(),
+  plans: z.array(planSchema).min(1)
+})
 
 const catalogSchema = z.object({
-  products: z.array(productSchema),
-});
+  products: z.array(productSchema)
+})
 
 export interface CatalogResult {
-  products: DemoProduct[];
-  isFallback: boolean;
+  products: DemoProduct[]
+  isFallback: boolean
 }
 
 /**
@@ -39,28 +41,28 @@ export interface CatalogResult {
  */
 export async function getCatalog(copy: LandingCopy): Promise<CatalogResult> {
   if (!API_URL) {
-    return { products: copy.demoProducts, isFallback: true };
+    return { products: copy.demoProducts, isFallback: true }
   }
 
   try {
-    const res = await fetch(`${API_URL}/public/catalog`, {
+    const res = await fetch(`${API_URL}/api/public/catalog`, {
       next: { revalidate: 300 },
-      headers: { accept: 'application/json' },
-    });
+      headers: { accept: 'application/json' }
+    })
 
     if (!res.ok) {
-      return { products: copy.demoProducts, isFallback: true };
+      return { products: copy.demoProducts, isFallback: true }
     }
 
-    const json = await res.json();
-    const parsed = catalogSchema.safeParse(json);
+    const json = await res.json()
+    const parsed = catalogSchema.safeParse(json)
 
     if (!parsed.success || parsed.data.products.length === 0) {
-      return { products: copy.demoProducts, isFallback: true };
+      return { products: copy.demoProducts, isFallback: true }
     }
 
-    return { products: parsed.data.products, isFallback: false };
+    return { products: parsed.data.products, isFallback: false }
   } catch {
-    return { products: copy.demoProducts, isFallback: true };
+    return { products: copy.demoProducts, isFallback: true }
   }
 }

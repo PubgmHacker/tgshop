@@ -9,14 +9,12 @@ export function ServiceTile({
   href,
   slug,
   title,
-  meta,
-  featured = false
+  meta
 }: {
   href: string
   slug: string
   title: string
   meta: string
-  featured?: boolean
 }): JSX.Element {
   return (
     <Link

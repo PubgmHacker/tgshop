@@ -18,6 +18,7 @@ const { mocks } = vi.hoisted(() => ({
     findOrCreateUser: vi.fn(),
     createInvoice: vi.fn(),
     newTopupReference: vi.fn(() => 'topup_ref_1'),
+    getTopupLimits: vi.fn(async () => ({ minCents: 500, maxCents: 1_000_000 })),
     logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }
   }
 }))
@@ -28,6 +29,13 @@ vi.mock('../domain/users.js', () => ({
 }))
 vi.mock('../domain/payments.js', () => ({ createInvoice: mocks.createInvoice }))
 vi.mock('../domain/topup.js', () => ({ newTopupReference: mocks.newTopupReference }))
+vi.mock('../domain/topup-policy.js', () => ({ getTopupLimits: mocks.getTopupLimits }))
+vi.mock('../domain/payment-availability.js', () => ({
+  getPaymentAvailability: () => ({
+    orderProviders: ['BALANCE', 'CRYPTOBOT', 'STARS'],
+    topupProviders: ['CRYPTOBOT', 'STARS']
+  })
+}))
 vi.mock('../lib/logger.js', () => ({ logger: mocks.logger }))
 // Keep the real enums (transitive imports read OrderStatus etc.); the Prisma
 // client is lazy and never connects because every domain call is mocked above.
@@ -101,7 +109,7 @@ describe('topupConversation', () => {
     )
 
     expect(innerCtx.reply).toHaveBeenLastCalledWith(
-      t('ru', 'topup.invalid_amount', { min: '$1.00', max: '$5000.00' })
+      t('ru', 'topup.invalid_amount', { min: '$5.00', max: '$10000.00' })
     )
     expect(mocks.createInvoice).not.toHaveBeenCalled()
   })

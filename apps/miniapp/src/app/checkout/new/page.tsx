@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useMainButton } from '@/hooks/useMainButton'
-import { useCreateOrder, useMeData } from '@/hooks/useApi'
+import { useConfigData, useCreateOrder, useMeData } from '@/hooks/useApi'
 import { Icon, type IconName } from '@/components/Icons'
 import { formatCents, generateIdempotencyKey } from '@/lib/format'
 import { openPaymentUrl } from '@/lib/payments'
@@ -27,6 +27,7 @@ export default function NewCheckoutPage(): JSX.Element {
   const searchParams = useSearchParams()
   const { t } = useI18n()
   const me = useMeData()
+  const config = useConfigData()
   const [provider, setProvider] = useState<ProviderChoice>('BALANCE')
   const [error, setError] = useState<string | null>(null)
   const createOrderMutation = useCreateOrder()
@@ -36,6 +37,13 @@ export default function NewCheckoutPage(): JSX.Element {
   const planId = searchParams.get('planId') ?? ''
   const qty = Number(searchParams.get('qty') ?? '1')
   const promoCode = searchParams.get('promo') ?? undefined
+  // Balance and Stars are guaranteed by the bot's boot contract. Optional
+  // rails only appear after /api/config confirms their credentials exist.
+  const configuredProviders: ProviderChoice[] = config.data?.paymentMethods ?? ['BALANCE', 'STARS']
+  const availableProviders = PROVIDERS.filter((option) => configuredProviders.includes(option.value))
+  const selectedProvider = configuredProviders.includes(provider)
+    ? provider
+    : (configuredProviders[0] ?? 'STARS')
 
   async function handlePay(): Promise<void> {
     setError(null)
@@ -44,7 +52,7 @@ export default function NewCheckoutPage(): JSX.Element {
         planId,
         qty,
         promoCode,
-        provider,
+        provider: selectedProvider,
         idempotencyKey: generateIdempotencyKey()
       })
       triggerNotificationHaptic('success')
@@ -58,7 +66,9 @@ export default function NewCheckoutPage(): JSX.Element {
       setError(
         err instanceof ApiClientError && err.code === 'INSUFFICIENT_BALANCE'
           ? t('checkout.insufficientBalance')
-          : t('common.error.generic')
+          : err instanceof ApiClientError && err.code === 'PAYMENT_METHOD_UNAVAILABLE'
+            ? t('checkout.methodUnavailable')
+            : t('common.error.generic')
       )
       triggerNotificationHaptic('error')
     }
@@ -67,7 +77,7 @@ export default function NewCheckoutPage(): JSX.Element {
   useMainButton({
     text: t('checkout.pay'),
     isLoading: createOrderMutation.isPending,
-    isEnabled: Boolean(planId),
+    isEnabled: Boolean(planId && availableProviders.length > 0),
     onClick: () => void handlePay()
   })
 
@@ -82,8 +92,8 @@ export default function NewCheckoutPage(): JSX.Element {
           {t('checkout.method')}
         </p>
         <div className="grid grid-cols-2 gap-2.5">
-          {PROVIDERS.map((option) => {
-            const isActive = provider === option.value
+          {availableProviders.map((option) => {
+            const isActive = selectedProvider === option.value
             const isBalance = option.value === 'BALANCE'
             return (
               <button
@@ -93,6 +103,7 @@ export default function NewCheckoutPage(): JSX.Element {
                   triggerHaptic('light')
                   setProvider(option.value)
                 }}
+                aria-pressed={isActive}
                 className={`flex flex-col items-center gap-2 rounded-tile border p-4 transition-colors ${
                   isActive ? 'border-line-strong bg-card-strong' : 'border-line bg-card'
                 }`}
@@ -117,7 +128,7 @@ export default function NewCheckoutPage(): JSX.Element {
       <button
         type="button"
         onClick={() => void handlePay()}
-        disabled={createOrderMutation.isPending || !planId}
+        disabled={createOrderMutation.isPending || !planId || availableProviders.length === 0}
         className="rounded-full bg-cta py-3.5 text-center text-sm font-semibold text-cta-ink transition-opacity disabled:opacity-40"
       >
         {t('checkout.pay')}

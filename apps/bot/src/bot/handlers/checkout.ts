@@ -1,6 +1,6 @@
 import type { Bot } from 'grammy'
 import { InlineKeyboard } from 'grammy'
-import { PaymentProvider } from '@tgshop/db'
+import { prisma, PaymentProvider } from '@tgshop/db'
 import type { BotContext } from '../context.js'
 import { t } from '../../i18n/index.js'
 import { formatUsd } from '../../lib/format.js'
@@ -19,11 +19,11 @@ import { readRequiresEmail } from '@tgshop/core'
 import { createInvoice, settleStarsPayment } from '../../domain/payments.js'
 import { findStarsTopupPayment, settleStarsTopup } from '../../domain/topup.js'
 import { emitEvent } from '../../domain/events.js'
-import { amountCentsToStars } from '../../payments/stars.js'
-import { allocateDepositAddress } from '../../payments/tron.js'
+import { planPriceToStars } from '../../payments/stars.js'
 import { logger } from '../../lib/logger.js'
 import { reportProblemKeyboard } from '../keyboards/catalog.js'
 import { env } from '../../config/env.js'
+import { isPaymentProviderAvailable } from '../../domain/payment-availability.js'
 
 async function requireUser(ctx: BotContext) {
   if (!ctx.from) throw new Error('no ctx.from')
@@ -93,8 +93,13 @@ async function launchCheckout(ctx: BotContext, params: CheckoutParams): Promise<
   const locale = ctx.session.locale
 
   const plan = await getPlanById(params.planId)
-  if (!plan) {
+  if (!plan || !plan.isActive || !plan.product.isActive) {
     await ctx.reply(t(locale, 'common.not_found'))
+    return
+  }
+
+  if (!isPaymentProviderAvailable(params.provider)) {
+    await ctx.reply(t(locale, 'common.error_generic'))
     return
   }
 
@@ -110,6 +115,13 @@ async function launchCheckout(ctx: BotContext, params: CheckoutParams): Promise<
     idempotencyKey,
     customerEmail: params.customerEmail
   })
+
+  // Re-entering a Telegram checkout must not mint a second invoice for an
+  // order that is already paid/delivered. Show the existing outcome instead.
+  if (order.status !== 'PENDING') {
+    await deliverAndNotify(ctx, order.id)
+    return
+  }
 
   switch (params.provider) {
     case PaymentProvider.BALANCE: {
@@ -152,16 +164,52 @@ async function launchCheckout(ctx: BotContext, params: CheckoutParams): Promise<
     }
 
     case PaymentProvider.STARS: {
-      const stars = amountCentsToStars(pricing.totalCents)
-      await ctx.api.sendInvoice(ctx.chat?.id ?? ctx.from?.id ?? 0, `${plan.product.title} — ${plan.title}`, plan.product.description, order.id, 'XTR', [
-        { label: plan.title, amount: stars }
-      ])
+      try {
+        // Create the Payment row before sending the chat invoice. Without this
+        // the successful_payment update could charge the user but have no row
+        // for settleStarsPayment() to mark as paid.
+        const invoice = await createInvoice({
+          userId: user.id,
+          amountCents: pricing.totalCents,
+          provider: PaymentProvider.STARS,
+          description: `${plan.product.title} — ${plan.title}`,
+          reference: order.id,
+          orderId: order.id,
+          priceStars: planPriceToStars(plan.priceStars, plan.priceCents, params.qty, pricing.totalCents)
+        })
+        const stars = invoice.stars
+        if (!stars) throw new Error('Stars invoice returned no amount')
+        // createInvoice() already creates the Telegram invoice link and the
+        // Payment row that successful_payment will settle. Sending a second
+        // native invoice here used to leave an orphan link/payment pair and
+        // made retries ambiguous. One link, one Payment, one settlement path.
+        if (!invoice.payUrl) throw new Error('Stars invoice returned no payUrl')
+        await ctx.reply(t(locale, 'order.created', { orderId: order.id }), {
+          reply_markup: new InlineKeyboard().url('⭐ Pay with Stars', invoice.payUrl)
+        })
+      } catch (err) {
+        logger.error({ err, orderId: order.id }, 'Stars invoice creation failed')
+        await ctx.reply(t(locale, 'common.error_generic'))
+      }
       return
     }
 
     case PaymentProvider.TRON_TRC20: {
       try {
-        const address = await allocateDepositAddress(user.id, order.id)
+        // Route through the shared invoice creator so the deposit address and
+        // Payment row are persisted together. A chat checkout that only handed
+        // out an address was invisible to the chain scanner and could never be
+        // reconciled automatically.
+        const invoice = await createInvoice({
+          userId: user.id,
+          amountCents: pricing.totalCents,
+          provider: PaymentProvider.TRON_TRC20,
+          description: `${plan.product.title} — ${plan.title}`,
+          reference: order.id,
+          orderId: order.id
+        })
+        const address = invoice.tron?.address
+        if (!address) throw new Error('TRON invoice returned no deposit address')
         await ctx.reply(
           t(locale, 'order.created', { orderId: order.id }) +
             `\n\nSend ${formatUsd(pricing.totalCents)} worth of USDT (TRC-20) to:\n<code>${address}</code>`,
@@ -249,10 +297,20 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
   bot.on('pre_checkout_query', async (ctx) => {
     // Must be answered within 10s per Telegram's API contract.
     const payload = ctx.preCheckoutQuery.invoice_payload
+    const payer = ctx.from ? await getUserByTgId(BigInt(ctx.from.id)) : null
+    const totalStars = ctx.preCheckoutQuery.total_amount
 
     if (payload.startsWith('topup_')) {
       const topup = await findStarsTopupPayment(payload)
-      if (!topup || topup.status === 'PAID') {
+      if (
+        !topup ||
+        topup.status === 'PAID' ||
+        !payer ||
+        payer.id !== topup.userId ||
+        !Number.isSafeInteger(totalStars) ||
+        totalStars <= 0 ||
+        topup.amount !== BigInt(totalStars)
+      ) {
         await ctx.answerPreCheckoutQuery(false, 'This top-up invoice is no longer valid.')
         return
       }
@@ -261,7 +319,22 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
     }
 
     const order = await getOrderById(payload)
-    if (!order || order.status !== 'PENDING') {
+    const payment = order
+      ? await prisma.payment.findFirst({
+          where: { orderId: order.id, provider: PaymentProvider.STARS, status: 'PENDING' },
+          orderBy: { createdAt: 'desc' }
+        })
+      : null
+    if (
+      !order ||
+      order.status !== 'PENDING' ||
+      !payer ||
+      payer.id !== order.userId ||
+      !payment ||
+      !Number.isSafeInteger(totalStars) ||
+      totalStars <= 0 ||
+      payment.amount !== BigInt(totalStars)
+    ) {
       await ctx.answerPreCheckoutQuery(false, 'Order is no longer valid.')
       return
     }
@@ -277,10 +350,19 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
       // (guarded claim + idempotent ledger key), so a redelivered update
       // cannot double-credit.
       try {
+        const payer = ctx.from ? await getUserByTgId(BigInt(ctx.from.id)) : null
+        if (!payer) {
+          logger.error({ reference: payload }, 'Stars top-up update has no known payer')
+          return
+        }
         const settled = await settleStarsTopup(
           payload,
           payment.telegram_payment_charge_id,
-          payment as unknown as object
+          payment as unknown as object,
+          {
+            userId: payer.id,
+            totalStars: payment.total_amount
+          }
         )
         if (settled) {
           await emitEvent('payment.received', {
@@ -308,9 +390,22 @@ export function registerCheckoutHandlers(bot: Bot<BotContext>): void {
     // on delivery succeeding. Nothing else would ever settle this row — Stars
     // has no reconciler sweep behind it the way CryptoBot and TRON do.
     try {
-      await settleStarsPayment(orderId, payment.telegram_payment_charge_id, payment as unknown as object)
+      const payer = ctx.from ? await getUserByTgId(BigInt(ctx.from.id)) : null
+      if (!payer) {
+        logger.error({ orderId }, 'Stars payment update has no known payer')
+        return
+      }
+      const settled = await settleStarsPayment(orderId, payment.telegram_payment_charge_id, payment as unknown as object, {
+        userId: payer.id,
+        totalStars: payment.total_amount
+      })
+      if (!settled) {
+        logger.error({ orderId }, 'rejected Stars payment settlement because payer or amount did not match')
+        return
+      }
     } catch (err) {
       logger.error({ err, orderId }, 'failed to settle Stars payment row')
+      return
     }
 
     try {

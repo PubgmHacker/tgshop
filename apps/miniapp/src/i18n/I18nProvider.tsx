@@ -21,12 +21,26 @@ function interpolate(template: string, vars?: Record<string, string | number>): 
 
 function detectInitialLocale(): Locale {
   if (typeof window === 'undefined') return DEFAULT_LOCALE
+  try {
+    const stored = window.localStorage.getItem('tgshop.locale')
+    if (stored === 'ru' || stored === 'en') return stored
+  } catch {
+    // Private mode / blocked storage: use the browser language below.
+  }
   const nav = window.navigator.language?.toLowerCase() ?? ''
   return nav.startsWith('ru') ? 'ru' : 'en'
 }
 
 export function I18nProvider({ children }: { children: ReactNode }): JSX.Element {
   const [locale, setLocale] = useState<Locale>(() => detectInitialLocale())
+  const changeLocale = useCallback((next: Locale) => {
+    setLocale(next)
+    try {
+      window.localStorage.setItem('tgshop.locale', next)
+    } catch {
+      // The selection still applies for the current session.
+    }
+  }, [])
 
   const t = useCallback(
     (key: DictionaryKey, vars?: Record<string, string | number>) => {
@@ -37,7 +51,10 @@ export function I18nProvider({ children }: { children: ReactNode }): JSX.Element
     [locale]
   )
 
-  const value = useMemo<I18nContextValue>(() => ({ locale, setLocale, t }), [locale, t])
+  const value = useMemo<I18nContextValue>(
+    () => ({ locale, setLocale: changeLocale, t }),
+    [locale, changeLocale, t]
+  )
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }

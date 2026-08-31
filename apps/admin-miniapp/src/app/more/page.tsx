@@ -9,12 +9,13 @@ import type { Locale } from '@/i18n/dictionaries'
 interface MoreLink {
   href: string
   icon: IconName
-  titleKey: 'more.promos' | 'more.settings' | 'more.audit'
-  hintKey: 'more.promos.hint' | 'more.settings.hint' | 'more.audit.hint'
+  titleKey: 'more.promos' | 'more.broadcasts' | 'more.settings' | 'more.audit'
+  hintKey: 'more.promos.hint' | 'more.broadcasts.hint' | 'more.settings.hint' | 'more.audit.hint'
 }
 
 const LINKS: MoreLink[] = [
   { href: '/more/promos', icon: 'star', titleKey: 'more.promos', hintKey: 'more.promos.hint' },
+  { href: '/more/broadcasts', icon: 'send', titleKey: 'more.broadcasts', hintKey: 'more.broadcasts.hint' },
   { href: '/more/settings', icon: 'settings', titleKey: 'more.settings', hintKey: 'more.settings.hint' },
   { href: '/more/audit', icon: 'clock', titleKey: 'more.audit', hintKey: 'more.audit.hint' }
 ]

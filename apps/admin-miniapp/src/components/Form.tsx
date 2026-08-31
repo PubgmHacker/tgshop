@@ -9,13 +9,23 @@ interface TextFieldProps {
   placeholder?: string
   maxLength?: number
   inputMode?: 'text' | 'numeric' | 'decimal' | 'url'
+  type?: 'text' | 'url' | 'datetime-local'
 }
 
-export function TextField({ label, value, onChange, placeholder, maxLength, inputMode = 'text' }: TextFieldProps): JSX.Element {
+export function TextField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  inputMode = 'text',
+  type = 'text'
+}: TextFieldProps): JSX.Element {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[13px] font-medium text-muted">{label}</span>
       <input
+        type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -37,7 +47,15 @@ interface TextAreaFieldProps {
   hint?: string
 }
 
-export function TextAreaField({ label, value, onChange, placeholder, rows = 3, maxLength, hint }: TextAreaFieldProps): JSX.Element {
+export function TextAreaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+  maxLength,
+  hint
+}: TextAreaFieldProps): JSX.Element {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[13px] font-medium text-muted">{label}</span>
@@ -90,6 +108,7 @@ export function ToggleField({ label, value, onChange }: ToggleFieldProps): JSX.E
   return (
     <button
       type="button"
+      aria-pressed={value}
       onClick={() => {
         triggerHaptic('light')
         onChange(!value)

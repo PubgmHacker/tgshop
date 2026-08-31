@@ -15,10 +15,30 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { href: '/', labelKey: 'tabs.home', icon: 'home', match: (path) => path === '/' },
-  { href: '/orders', labelKey: 'tabs.orders', icon: 'bag', match: (path) => path.startsWith('/orders') },
-  { href: '/catalog', labelKey: 'tabs.catalog', icon: 'grid', match: (path) => path.startsWith('/catalog') },
-  { href: '/users', labelKey: 'tabs.users', icon: 'users', match: (path) => path.startsWith('/users') },
-  { href: '/more', labelKey: 'tabs.more', icon: 'settings', match: (path) => path.startsWith('/more') }
+  {
+    href: '/orders',
+    labelKey: 'tabs.orders',
+    icon: 'bag',
+    match: (path) => path.startsWith('/orders')
+  },
+  {
+    href: '/catalog',
+    labelKey: 'tabs.catalog',
+    icon: 'grid',
+    match: (path) => path.startsWith('/catalog')
+  },
+  {
+    href: '/users',
+    labelKey: 'tabs.users',
+    icon: 'users',
+    match: (path) => path.startsWith('/users')
+  },
+  {
+    href: '/more',
+    labelKey: 'tabs.more',
+    icon: 'settings',
+    match: (path) => path.startsWith('/more')
+  }
 ]
 
 export function BottomTabBar(): JSX.Element {
@@ -37,6 +57,7 @@ export function BottomTabBar(): JSX.Element {
             <Link
               key={tab.href}
               href={tab.href}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => triggerHaptic('light')}
               className="flex h-[56px] w-[58px] flex-col items-center justify-end gap-0.5 pb-0.5"
             >
@@ -48,7 +69,11 @@ export function BottomTabBar(): JSX.Element {
                       : 'flex h-7 w-7 items-center justify-center rounded-full text-faint'
                   }
                 >
-                  <Icon name={tab.icon} size={isActive ? 22 : 16} strokeWidth={isActive ? 2.1 : 1.7} />
+                  <Icon
+                    name={tab.icon}
+                    size={isActive ? 22 : 16}
+                    strokeWidth={isActive ? 2.1 : 1.7}
+                  />
                 </span>
               </span>
               <span

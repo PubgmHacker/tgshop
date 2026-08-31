@@ -15,7 +15,12 @@ interface BuySheetProps {
   onProceedToCheckout: (params: { planId: string; qty: number; promoCode: string | null }) => void
 }
 
-export function BuySheet({ isOpen, onClose, plan, onProceedToCheckout }: BuySheetProps): JSX.Element {
+export function BuySheet({
+  isOpen,
+  onClose,
+  plan,
+  onProceedToCheckout
+}: BuySheetProps): JSX.Element {
   const { t } = useI18n()
   const [qty, setQty] = useState(1)
   const [promoCode, setPromoCode] = useState('')
@@ -63,6 +68,7 @@ export function BuySheet({ isOpen, onClose, plan, onProceedToCheckout }: BuyShee
             <button
               type="button"
               onClick={() => adjustQty(-1)}
+              aria-label={t('buySheet.qty.decrease')}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
             >
               −
@@ -71,6 +77,7 @@ export function BuySheet({ isOpen, onClose, plan, onProceedToCheckout }: BuyShee
             <button
               type="button"
               onClick={() => adjustQty(1)}
+              aria-label={t('buySheet.qty.increase')}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
             >
               +
@@ -84,6 +91,7 @@ export function BuySheet({ isOpen, onClose, plan, onProceedToCheckout }: BuyShee
             <input
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              aria-label={t('buySheet.promo')}
               placeholder="PROMO2026"
               className="min-w-0 flex-1 rounded-xl border border-line bg-card-strong px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-faint"
             />

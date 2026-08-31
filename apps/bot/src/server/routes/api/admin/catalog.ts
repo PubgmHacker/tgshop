@@ -1,9 +1,14 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { prisma, DeliveryType, Prisma, StockStatus } from '@tgshop/db'
+import { getSetting } from '@tgshop/core'
 import { badRequest, conflict, notFound, sendError } from '../../../../lib/httpErrors.js'
 import { requestLocale } from '../context.js'
 import { prismaErrorCode, writeAdminAudit } from './shared.js'
+import { createNewProductBroadcastDraft } from '../../../../domain/new-product-broadcast.js'
+import { publishPost } from '../../../../domain/content.js'
+import { redis } from '../../../../config/redis.js'
+import { logger } from '../../../../lib/logger.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET    /api/admin/catalog          — full tree incl. inactive + stock counts
@@ -115,6 +120,29 @@ function externalConfigValue(
   if (value === undefined) return undefined
   if (value === null) return Prisma.DbNull
   return value as Prisma.InputJsonValue
+}
+
+/** Creates the safe-by-default announcement and optionally queues it. */
+async function announceProductIfConfigured(req: FastifyRequest, product: {
+  id: string
+  title: string
+  slug: string
+  description: string
+  imageUrl: string | null
+  isActive: boolean
+}): Promise<{ draftId: string; queued: boolean } | null> {
+  if (!product.isActive) return null
+
+  const draft = await createNewProductBroadcastDraft(product)
+  const autoQueue = await getSetting(prisma, 'new_product_auto_broadcast', redis)
+  const published = autoQueue ? await publishPost(draft.id) : draft
+  await writeAdminAudit(req, autoQueue ? 'broadcast.auto_queue' : 'broadcast.auto_draft', 'BroadcastPost', draft.id, {
+    productId: product.id,
+    productSlug: product.slug,
+    autoQueue
+  }).catch((err) => logger.error({ err, postId: draft.id }, 'new-product broadcast audit write failed'))
+
+  return { draftId: draft.id, queued: published.status === 'QUEUED' }
 }
 
 export function registerAdminCatalogRoutes(app: FastifyInstance): void {
@@ -263,8 +291,19 @@ export function registerAdminCatalogRoutes(app: FastifyInstance): void {
           throw mapPrismaError(err, 'api.errors.category_not_found')
         })
       await writeAdminAudit(req, 'product.create', 'Product', product.id, { title: body.title, slug: body.slug })
+      let broadcastDraftId: string | null = null
+      if (product.isActive) {
+        try {
+          broadcastDraftId = (await announceProductIfConfigured(req, product))?.draftId ?? null
+        } catch (err) {
+          // Product creation is the primary mutation. A temporary Redis/DB
+          // issue in the optional announcement path must not make an admin
+          // retry the product form and create a duplicate product.
+          logger.error({ err, productId: product.id }, 'failed to create new-product broadcast draft')
+        }
+      }
       reply.code(201)
-      return { id: product.id }
+      return { id: product.id, broadcastDraftId }
     } catch (err) {
       await sendError(reply, err, requestLocale(req))
       return
@@ -277,7 +316,9 @@ export function registerAdminCatalogRoutes(app: FastifyInstance): void {
       const body = productPatchSchema.parse(req.body)
       const { externalConfig, ...rest } = body
       const configUpdate = externalConfigValue(externalConfig)
-      await prisma.product
+      const existing = await prisma.product.findUnique({ where: { id } })
+      if (!existing) throw notFound('api.errors.product_not_found')
+      const product = await prisma.product
         .update({
           where: { id },
           data: { ...rest, ...(configUpdate !== undefined ? { externalConfig: configUpdate } : {}) }
@@ -290,6 +331,13 @@ export function registerAdminCatalogRoutes(app: FastifyInstance): void {
         ...auditable,
         ...(externalConfig !== undefined ? { externalConfigChanged: true } : {})
       } as Prisma.InputJsonValue)
+      if (body.isActive === true && !existing.isActive && product.isActive) {
+        try {
+          await announceProductIfConfigured(req, product)
+        } catch (err) {
+          logger.error({ err, productId: product.id }, 'failed to create activation broadcast draft')
+        }
+      }
       return { id }
     } catch (err) {
       await sendError(reply, err, requestLocale(req))

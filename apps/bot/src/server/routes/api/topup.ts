@@ -3,7 +3,10 @@ import { z } from 'zod'
 import { PaymentProvider } from '@tgshop/db'
 import { createInvoice } from '../../../domain/payments.js'
 import { newTopupReference } from '../../../domain/topup.js'
-import { sendError } from '../../../lib/httpErrors.js'
+import { getTopupLimits } from '../../../domain/topup-policy.js'
+import { isTopupProviderAvailable } from '../../../domain/payment-availability.js'
+import { formatUsd } from '../../../lib/format.js'
+import { badRequest, sendError, unavailable } from '../../../lib/httpErrors.js'
 import { requestLocale, requireUserId } from './context.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,11 +17,8 @@ import { requestLocale, requireUserId } from './context.js'
 // BALANCE is deliberately not a top-up method (it would be a no-op transfer).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MIN_TOPUP_CENTS = 100
-const MAX_TOPUP_CENTS = 1_000_000
-
 const topupBodySchema = z.object({
-  amountCents: z.number().int().min(MIN_TOPUP_CENTS).max(MAX_TOPUP_CENTS),
+  amountCents: z.number().int().positive(),
   method: z.enum(['CRYPTOBOT', 'STARS', 'TRON_TRC20']),
   idempotencyKey: z.string().min(8).max(128)
 })
@@ -27,8 +27,16 @@ async function createTopup(req: FastifyRequest, reply: FastifyReply): Promise<un
   try {
     const body = topupBodySchema.parse(req.body)
     const userId = requireUserId(req)
+    const limits = await getTopupLimits()
+    if (body.amountCents < limits.minCents || body.amountCents > limits.maxCents) {
+      throw badRequest('api.errors.topup_amount_invalid', {
+        min: formatUsd(limits.minCents),
+        max: formatUsd(limits.maxCents)
+      })
+    }
 
     const provider = PaymentProvider[body.method]
+    if (!isTopupProviderAvailable(body.method)) throw unavailable()
     const reference = newTopupReference()
 
     const invoice = await createInvoice({
@@ -39,7 +47,8 @@ async function createTopup(req: FastifyRequest, reply: FastifyReply): Promise<un
       reference,
       // Top-ups are not tied to an order; TRON therefore cannot allocate a
       // per-order deposit address and will surface a clear error instead.
-      orderId: null
+      orderId: null,
+      idempotencyKey: body.idempotencyKey
     })
 
     return {

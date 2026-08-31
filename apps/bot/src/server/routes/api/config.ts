@@ -5,6 +5,7 @@ import { redis } from '../../../config/redis.js'
 import { env } from '../../../config/env.js'
 import { sendError } from '../../../lib/httpErrors.js'
 import { requestLocale } from './context.js'
+import { getPaymentAvailability } from '../../../domain/payment-availability.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/config — static-ish client configuration for the Mini App's
@@ -17,9 +18,14 @@ export function registerConfigRoutes(app: FastifyInstance): void {
   app.get('/api/config', async (req, reply) => {
     try {
       const supportUrl = await getSetting(prisma, 'support_url', redis)
+      const minTopupCents = await getSetting(prisma, 'min_topup_cents', redis)
+      const availability = getPaymentAvailability()
       return {
         botUsername: env.BOT_USERNAME,
-        supportUrl
+        supportUrl,
+        paymentMethods: availability.orderProviders,
+        topupMethods: availability.topupProviders,
+        minTopupCents
       }
     } catch (err) {
       await sendError(reply, err, requestLocale(req))

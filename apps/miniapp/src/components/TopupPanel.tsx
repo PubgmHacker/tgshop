@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
-import { useCreateTopup } from '@/hooks/useApi'
+import { useConfigData, useCreateTopup } from '@/hooks/useApi'
 import { formatCents, generateIdempotencyKey } from '@/lib/format'
 import { openPaymentUrl } from '@/lib/payments'
 import { triggerHaptic, triggerNotificationHaptic } from '@/lib/TelegramProvider'
+import { ApiClientError } from '@/lib/apiClient'
 import type { TopupMethod } from '@/types/api'
 import { QrCode } from './QrCode'
 import { SectionLabel } from './SectionLabel'
@@ -18,14 +19,18 @@ const TOPUP_METHODS: { value: TopupMethod; title: string; badge: string }[] = [
   { value: 'STARS', title: 'Telegram Stars', badge: '★' }
 ]
 
-const MIN_TOPUP_CENTS = 100
-
 export function TopupPanel(): JSX.Element {
   const { t } = useI18n()
-  const [method, setMethod] = useState<TopupMethod>('CRYPTOBOT')
+  const config = useConfigData()
+  const [method, setMethod] = useState<TopupMethod>('STARS')
   const [amountInput, setAmountInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const createTopup = useCreateTopup()
+
+  const availableMethodValues: TopupMethod[] = config.data?.topupMethods ?? ['STARS']
+  const availableMethods = TOPUP_METHODS.filter((option) => availableMethodValues.includes(option.value))
+  const selectedMethod = availableMethodValues.includes(method) ? method : (availableMethodValues[0] ?? 'STARS')
+  const minTopupCents = config.data?.minTopupCents ?? 500
 
   const amountCents = useMemo(() => {
     const parsed = Number.parseFloat(amountInput.replace(',', '.'))
@@ -34,20 +39,20 @@ export function TopupPanel(): JSX.Element {
   }, [amountInput])
 
   async function handleCreate(): Promise<void> {
-    if (amountCents < MIN_TOPUP_CENTS || createTopup.isPending) return
+    if (amountCents < minTopupCents || createTopup.isPending || !selectedMethod) return
     setError(null)
     try {
       const result = await createTopup.mutateAsync({
         amountCents,
-        method,
+        method: selectedMethod,
         idempotencyKey: generateIdempotencyKey()
       })
       triggerNotificationHaptic('success')
       if (result.redirectUrl) {
         openPaymentUrl(result.redirectUrl)
       }
-    } catch {
-      setError(t('common.error.generic'))
+    } catch (err) {
+      setError(err instanceof ApiClientError && err.code === 'PAYMENT_METHOD_UNAVAILABLE' ? t('checkout.methodUnavailable') : t('common.error.generic'))
       triggerNotificationHaptic('error')
     }
   }
@@ -57,8 +62,8 @@ export function TopupPanel(): JSX.Element {
       <SectionLabel>{t('profile.topupSection')}</SectionLabel>
 
       <div className="grid grid-cols-2 gap-2.5">
-        {TOPUP_METHODS.map((option) => {
-          const isActive = method === option.value
+        {availableMethods.map((option) => {
+          const isActive = selectedMethod === option.value
           return (
             <button
               key={option.value}
@@ -87,7 +92,9 @@ export function TopupPanel(): JSX.Element {
       <label className="flex items-center gap-2 rounded-card border border-line bg-card px-4 py-3">
         <input
           inputMode="decimal"
-          placeholder="0.00"
+          placeholder={(minTopupCents / 100).toFixed(2)}
+          aria-label={t('topup.amount')}
+          min={minTopupCents / 100}
           value={amountInput}
           onChange={(e) => setAmountInput(e.target.value)}
           className="tnum w-full bg-transparent text-sm text-ink outline-none placeholder:text-faint"
@@ -109,7 +116,7 @@ export function TopupPanel(): JSX.Element {
       <button
         type="button"
         onClick={() => void handleCreate()}
-        disabled={amountCents < MIN_TOPUP_CENTS || createTopup.isPending}
+        disabled={amountCents < minTopupCents || createTopup.isPending || availableMethods.length === 0}
         className="rounded-full bg-cta py-3.5 text-center text-sm font-semibold text-cta-ink transition-opacity disabled:opacity-40"
       >
         {t('topup.confirm')}
@@ -122,6 +129,12 @@ export function TopupPanel(): JSX.Element {
         </div>
       ) : null}
 
+      {availableMethods.length === 0 ? <p className="text-center text-xs text-muted">{t('topup.noMethods')}</p> : null}
+      {amountCents > 0 && amountCents < minTopupCents ? (
+        <p className="text-center text-xs text-muted">
+          {t('topup.minAmount', { amount: formatCents(minTopupCents) })}
+        </p>
+      ) : null}
       {error ? <p className="text-center text-xs text-danger">{error}</p> : null}
       <p className="px-2 text-center text-[11px] leading-relaxed text-faint">{t('topup.hint')}</p>
     </section>

@@ -213,9 +213,15 @@ export const MeResponseSchema = z.object({
 })
 export type MeResponse = z.infer<typeof MeResponseSchema>
 
+export const TopupMethodSchema = z.enum(['CRYPTOBOT', 'STARS'])
+export type TopupMethod = z.infer<typeof TopupMethodSchema>
+
 export const ConfigResponseSchema = z.object({
   botUsername: z.string(),
-  supportUrl: z.string()
+  supportUrl: z.string(),
+  paymentMethods: z.array(PaymentProviderSchema),
+  topupMethods: z.array(TopupMethodSchema),
+  minTopupCents: z.number().int().positive()
 })
 export type ConfigResponse = z.infer<typeof ConfigResponseSchema>
 
@@ -227,9 +233,6 @@ export const CatalogResponseSchema = z.object({
   )
 })
 export type CatalogResponse = z.infer<typeof CatalogResponseSchema>
-
-export const TopupMethodSchema = z.enum(['CRYPTOBOT', 'STARS', 'TRON_TRC20'])
-export type TopupMethod = z.infer<typeof TopupMethodSchema>
 
 export const CreateTopupResponseSchema = z.object({
   paymentId: z.string(),

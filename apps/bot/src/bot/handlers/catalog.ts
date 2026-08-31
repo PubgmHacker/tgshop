@@ -11,6 +11,7 @@ import {
   getPlanById
 } from '../../domain/catalog.js'
 import { categoriesKeyboard, productsKeyboard, plansKeyboard, paymentMethodsKeyboard } from '../keyboards/catalog.js'
+import { isPoolBacked } from '../../domain/stock.js'
 
 export async function showCategories(ctx: BotContext): Promise<void> {
   const locale = ctx.session.locale
@@ -58,11 +59,12 @@ export async function showProductPlans(ctx: BotContext, productSlug: string): Pr
 export async function showPlanDetails(ctx: BotContext, planId: string): Promise<void> {
   const locale = ctx.session.locale
   const plan = await getPlanById(planId)
-  if (!plan) {
+  if (!plan || !plan.isActive || !plan.product.isActive) {
     await ctx.reply(t(locale, 'common.not_found'))
     return
   }
   const stock = await getAvailableStockCount(planId)
+  const poolBacked = isPoolBacked(plan.product.deliveryType, plan.product.externalConfig)
   const price = formatUsd(
     plan.discountPercent > 0 ? Math.round((plan.priceCents * (100 - plan.discountPercent)) / 100) : plan.priceCents
   )
@@ -73,15 +75,15 @@ export async function showPlanDetails(ctx: BotContext, planId: string): Promise<
       planTitle: plan.title,
       description: plan.product.description,
       price,
-      stock
+      stock: poolBacked ? String(stock) : t(locale, 'catalog.manual_delivery')
     }),
     {
       parse_mode: 'HTML',
       reply_markup:
-        stock > 0 ? paymentMethodsKeyboard(locale, planId, 1) : undefined
+        !poolBacked || stock > 0 ? paymentMethodsKeyboard(locale, planId, 1) : undefined
     }
   )
-  if (stock === 0) {
+  if (poolBacked && stock === 0) {
     await ctx.reply(t(locale, 'catalog.out_of_stock'))
   }
 }

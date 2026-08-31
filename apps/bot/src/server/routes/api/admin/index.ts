@@ -10,6 +10,7 @@ import { registerAdminPromoRoutes } from './promos.js'
 import { registerAdminUserRoutes } from './users.js'
 import { registerAdminSettingsRoutes } from './settings.js'
 import { registerAdminAuditRoutes } from './audit.js'
+import { registerAdminBroadcastRoutes } from './broadcasts.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /api/admin/* — the Admin Mini App's API.
@@ -48,5 +49,6 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     registerAdminUserRoutes(admin)
     registerAdminSettingsRoutes(admin)
     registerAdminAuditRoutes(admin)
+    registerAdminBroadcastRoutes(admin)
   })
 }

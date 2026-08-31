@@ -1,6 +1,6 @@
 import type { Job } from 'bullmq'
 import { prisma, PostStatus } from '@tgshop/db'
-import { parseSegment, resolveSegmentRecipients, type SegmentRecipient } from '@tgshop/core'
+import { getSetting, parseSegment, resolveSegmentRecipients, type SegmentRecipient } from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, getQueue, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
 import { emitEvent } from '../events.js'
@@ -11,27 +11,21 @@ import {
   BROADCAST_SWEEP_JOB_NAME,
   type BroadcastJobData
 } from './broadcast.js'
-import { loadEnv } from '../env.js'
+import { getRedisConnection } from '../redis.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// broadcast worker: sends BroadcastPost.text (+ optional mediaUrl, sent as a
-// trailing link since our thin Telegram client only wraps sendMessage) to
+// broadcast worker: sends BroadcastPost.text with an optional media attachment to
 // every non-blocked User matching `segment`, at up to
-// BROADCAST_MAX_MSGS_PER_SEC messages/second globally, honoring 429
+// the configured messages/second globally, honoring 429
 // retry_after by pausing the whole batch, and flagging User.isBlocked on 403.
 // Writes final counts to BroadcastPost.statsJson and moves status to SENT
 // (or FAILED if the post could not be sent to anyone).
 //
-// This queue also carries a periodic sweep (`broadcast-sweep`), because a
-// delayed BullMQ job is the ONLY thing standing between a scheduled post and
-// its audience, and that job lives in Redis:
-//
-//   • SCHEDULED posts — the bot/agent content path creates these and never arms
-//     them. Without the sweep a post scheduled through that path is delivered
-//     never, which is indistinguishable from the feature not existing.
-//   • QUEUED posts whose job has gone missing — a Redis flush or an eviction
-//     drops the delayed job while Postgres still says the post is armed. The
-//     sweep re-arms it rather than leaving the row lying about its own future.
+// This queue also carries a periodic sweep (`broadcast-sweep`) to recover
+// QUEUED posts whose delayed BullMQ job has gone missing after a Redis flush or
+// eviction. SCHEDULED is intentionally an unarmed, reviewable state; only the
+// explicit admin/bot publish action moves a post to QUEUED and makes delivery
+// possible.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SWEEP_INTERVAL_MS = 60 * 1000 // minute-granularity is enough for a schedule the operator types by hand
@@ -90,31 +84,35 @@ async function sweepDuePosts(log: ReturnType<typeof jobLogger>): Promise<void> {
 
   // Uses the @@index([status, scheduledAt]) on broadcast_posts.
   const due = await prisma.broadcastPost.findMany({
-    where: {
-      OR: [
-        { status: PostStatus.SCHEDULED, scheduledAt: { lte: now } },
-        { status: PostStatus.QUEUED }
-      ]
-    },
-    select: { id: true, status: true, scheduledAt: true }
+    where: { status: { in: [PostStatus.QUEUED, PostStatus.SENDING] } },
+    select: { id: true, status: true, scheduledAt: true, statsJson: true }
   })
 
   let armed = 0
   for (const post of due) {
     try {
+      // A process can die after claiming SENDING but before writing SENT/FAILED.
+      // Recover only when BullMQ has no live job and the recorded start time is
+      // old enough that it cannot be a healthy long-running fan-out.
+      if (post.status === PostStatus.SENDING && !isStaleSending(post.statsJson, now)) continue
       if (await hasPendingJob(post.id)) continue
 
-      // A QUEUED post still in the future keeps its delay; a SCHEDULED one is
-      // only picked up once due, so its delay is always zero.
+      if (post.status === PostStatus.SENDING) {
+        const recovered = await prisma.broadcastPost.updateMany({
+          where: { id: post.id, status: PostStatus.SENDING },
+          data: { status: PostStatus.QUEUED }
+        })
+        if (recovered.count === 0) continue
+      }
+
+      // A QUEUED post still in the future keeps its delay; an immediate post
+      // has no scheduledAt and is armed with zero delay.
       const delayMs =
         post.scheduledAt && post.scheduledAt.getTime() > now.getTime()
           ? post.scheduledAt.getTime() - now.getTime()
           : 0
 
       await enqueueBroadcast(post.id, delayMs)
-      if (post.status === PostStatus.SCHEDULED) {
-        await prisma.broadcastPost.update({ where: { id: post.id }, data: { status: PostStatus.QUEUED } })
-      }
       armed += 1
       log.info({ postId: post.id, previousStatus: post.status, delayMs }, 'broadcast sweep: armed post')
     } catch (err) {
@@ -123,6 +121,15 @@ async function sweepDuePosts(log: ReturnType<typeof jobLogger>): Promise<void> {
   }
 
   if (armed > 0) log.info({ armed, scanned: due.length }, 'broadcast sweep complete')
+}
+
+/** Allow recovery after a crash without interrupting a healthy large send. */
+function isStaleSending(statsJson: unknown, now: Date): boolean {
+  if (!statsJson || typeof statsJson !== 'object' || Array.isArray(statsJson)) return true
+  const startedAt = (statsJson as Record<string, unknown>)['startedAt']
+  if (typeof startedAt !== 'string') return true
+  const startedMs = Date.parse(startedAt)
+  return !Number.isFinite(startedMs) || now.getTime() - startedMs >= 15 * 60 * 1000
 }
 
 /**
@@ -146,8 +153,6 @@ async function hasPendingJob(postId: string): Promise<boolean> {
 }
 
 async function sendPost(postId: string, log: ReturnType<typeof jobLogger>): Promise<void> {
-  const env = loadEnv()
-
   const post = await prisma.broadcastPost.findUnique({ where: { id: postId } })
   if (!post) {
     log.warn({ postId }, 'broadcast job: post not found, dropping')
@@ -173,17 +178,6 @@ async function sendPost(postId: string, log: ReturnType<typeof jobLogger>): Prom
   // IS the cancel guard: an admin who cancels while this job is being picked up
   // flips the row to CANCELLED, the claim then matches nothing, and not one
   // message goes out. A read-then-write would have raced straight past that.
-  const claimed = await prisma.broadcastPost.updateMany({
-    where: { id: postId, status: { notIn: [PostStatus.SENT, PostStatus.CANCELLED] } },
-    data: { status: PostStatus.SENDING }
-  })
-  if (claimed.count === 0) {
-    log.info({ postId, status: post.status }, 'broadcast job: post already sent or cancelled, skipping')
-    return
-  }
-
-  const text = post.mediaUrl ? `${post.text}\n\n${post.mediaUrl}` : post.text
-
   const stats: BroadcastStats = {
     total: recipients.length,
     sent: 0,
@@ -193,14 +187,35 @@ async function sendPost(postId: string, log: ReturnType<typeof jobLogger>): Prom
     finishedAt: ''
   }
 
-  const intervalMs = Math.max(1, Math.floor(1000 / env.BROADCAST_MAX_MSGS_PER_SEC))
+  const claimed = await prisma.broadcastPost.updateMany({
+    // Only an explicitly armed post may enter SENDING. This also makes
+    // cancel/edit safe while a delayed job is being picked up.
+    where: { id: postId, status: PostStatus.QUEUED },
+    // startedAt lands with the claim, not at the end: it is what lets the sweep
+    // tell a crashed fan-out from a healthy long-running one. Written only at
+    // completion it would always be absent during SENDING, making that check
+    // unconditionally true.
+    data: { status: PostStatus.SENDING, statsJson: stats as unknown as object }
+  })
+  if (claimed.count === 0) {
+    log.info({ postId, status: post.status }, 'broadcast job: post already sent or cancelled, skipping')
+    return
+  }
+
+  const text = post.text
+
+  // The admin setting is the live source of truth. Reading it once per post
+  // keeps a long fan-out internally consistent while allowing the next send to
+  // use a newly configured rate without a worker restart.
+  const messagesPerSecond = await getSetting(prisma, 'broadcast_rate_per_sec', getRedisConnection())
+  const intervalMs = Math.max(1, Math.floor(1000 / messagesPerSecond))
 
   for (const recipient of recipients) {
     let attemptsLeft = 3
     while (attemptsLeft > 0) {
       attemptsLeft -= 1
       try {
-        await sendTelegramMessage(recipient.tgId, text)
+        await sendTelegramMessage(recipient.tgId, text, post.mediaUrl ? { photoUrl: post.mediaUrl } : undefined)
         stats.sent += 1
         break
       } catch (err) {

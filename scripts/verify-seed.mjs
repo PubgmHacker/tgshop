@@ -6,12 +6,12 @@
 // `pnpm db:seed`, where nobody reads the log unless the job goes red. They are
 // exact rather than lower bounds so that a re-seed which duplicates rows fails
 // here too — the stock block is idempotent by construction (deterministic
-// `seed-stock-<sha256>` ids) and a regression that broke it would otherwise
+// `seed-stock-<plan>-<index>` ids) and a regression that broke it would otherwise
 // only surface as a slowly growing pool.
 import { prisma } from '../packages/db/dist/index.js'
 import { decrypt } from '../packages/core/dist/index.js'
 
-const EXPECTED = { categories: 3, products: 6, plans: 12, stock: 20 }
+const EXPECTED = { activeCategories: 3, activeProducts: 7, activePlans: 13, seededStock: 24 }
 const EXPECTED_SETTINGS = ['stars_usd_rate', 'min_topup_cents', 'support_url', 'referral_percent']
 
 let failures = 0
@@ -27,18 +27,20 @@ function check(label, actual, expected) {
 console.log('=== SEED ===')
 
 const [categories, products, plans, stock, admins] = await Promise.all([
-  prisma.category.count(),
-  prisma.product.count(),
-  prisma.plan.count(),
-  prisma.stockItem.count(),
+  prisma.category.count({ where: { isActive: true } }),
+  prisma.product.count({ where: { isActive: true } }),
+  prisma.plan.count({ where: { isActive: true, product: { isActive: true } } }),
+  prisma.stockItem.count({ where: { id: { startsWith: 'seed-stock-' } } }),
   prisma.adminUser.count()
 ])
-console.log(`categories=${categories} products=${products} plans=${plans} stock=${stock} admins=${admins}`)
+console.log(
+  `activeCategories=${categories} activeProducts=${products} activePlans=${plans} seededStock=${stock} admins=${admins}`
+)
 
-check('category count', categories, EXPECTED.categories)
-check('product count', products, EXPECTED.products)
-check('plan count', plans, EXPECTED.plans)
-check('stock count', stock, EXPECTED.stock)
+check('active category count', categories, EXPECTED.activeCategories)
+check('active product count', products, EXPECTED.activeProducts)
+check('active plan count', plans, EXPECTED.activePlans)
+check('seeded stock count', stock, EXPECTED.seededStock)
 // Lower bound on purpose: an operator who already ran create-admin.mjs against
 // this database has more than the seeded row, which is correct, not a failure.
 check('at least the seeded admin exists', admins >= 1, true)
@@ -46,37 +48,77 @@ check('at least the seeded admin exists', admins >= 1, true)
 const settings = await prisma.setting.findMany()
 console.log('settings:', settings.map((s) => `${s.key}=${JSON.stringify(s.value)}`).join(', '))
 for (const key of EXPECTED_SETTINGS) {
-  check(`setting ${key} is present`, settings.some((s) => s.key === key), true)
+  check(
+    `setting ${key} is present`,
+    settings.some((s) => s.key === key),
+    true
+  )
 }
 
-// The catalog's shape, not just its size: the seed gives every product two
-// plans and every category two products. Bare counts would still pass if the
-// rows all piled onto one parent, which renders as a mostly-empty storefront.
+// The catalog's shape, not just its size: the seed gives normal products two
+// plans, while Mirasim is a deliberate one-plan manual-delivery product. Bare
+// counts would still pass if rows all piled onto one parent.
 // (Plan.productId and Product.categoryId are both non-nullable, so there is no
 // orphan case to test — referential integrity already covers that.)
 const productsWithPlans = await prisma.product.findMany({
+  where: { isActive: true },
   select: { slug: true, _count: { select: { plans: true } } }
 })
 check(
-  'every product has exactly 2 plans',
-  productsWithPlans.filter((p) => p._count.plans !== 2).map((p) => p.slug),
+  'normal products have exactly 2 plans',
+  productsWithPlans.filter((p) => p.slug !== 'mirasim' && p._count.plans !== 2).map((p) => p.slug),
+  []
+)
+check(
+  'mirasim has exactly 1 plan',
+  productsWithPlans.filter((p) => p.slug === 'mirasim' && p._count.plans !== 1).map((p) => p.slug),
   []
 )
 
 const categoriesWithProducts = await prisma.category.findMany({
-  select: { slug: true, _count: { select: { products: true } } }
+  where: { isActive: true },
+  select: {
+    slug: true,
+    isActive: true,
+    _count: { select: { products: { where: { isActive: true } } } }
+  }
+})
+const expectedProductCounts = { chat: 2, image: 2, code: 3 }
+check(
+  'active category product distribution',
+  categoriesWithProducts
+    .filter((c) => c.isActive && c._count.products !== expectedProductCounts[c.slug])
+    .map((c) => `${c.slug}:${c._count.products}`),
+  []
+)
+
+const mirasim = await prisma.product.findFirst({
+  where: { slug: 'mirasim', isActive: true },
+  select: {
+    deliveryType: true,
+    imageUrl: true,
+    plans: { where: { isActive: true }, select: { id: true } }
+  }
 })
 check(
-  'every category has exactly 2 products',
-  categoriesWithProducts.filter((c) => c._count.products !== 2).map((c) => c.slug),
-  []
+  'mirasim is manual with official logo and one active plan',
+  mirasim && {
+    deliveryType: mirasim.deliveryType,
+    imageUrl: mirasim.imageUrl,
+    plans: mirasim.plans.length
+  },
+  {
+    deliveryType: 'MANUAL_FALLBACK',
+    imageUrl: 'https://mirasim.ai/site/mirasim-mark-white.png',
+    plans: 1
+  }
 )
 
 // Stock must be AVAILABLE to be sellable. Anything else means either a real
 // order consumed it (fine on a dev box, so this is a lower bound) or the seed
 // wrote the wrong status.
 const available = await prisma.stockItem.count({ where: { status: 'AVAILABLE' } })
-console.log(`available stock: ${available}/${stock}`)
+console.log(`available stock: ${available}/${stock} seeded rows`)
 check('some stock is sellable', available > 0, true)
 
 // The actual cross-package contract: seed.ts encrypts, @tgshop/core decrypts.

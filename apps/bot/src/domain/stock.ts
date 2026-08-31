@@ -68,9 +68,10 @@ export async function countAvailableForPlans(planIds: readonly string[]): Promis
 export function planAvailability(
   deliveryType: string,
   lowStockThreshold: number,
-  availableCount: number
+  availableCount: number,
+  externalConfig: unknown = null
 ): PlanAvailability {
-  if (!isPoolBacked(deliveryType)) {
+  if (!isPoolBacked(deliveryType, externalConfig)) {
     // Fulfilled out of band — never blocked by the local pool.
     return { available: availableCount, inStock: true, lowStock: false }
   }
@@ -108,7 +109,7 @@ export async function getLowStockPlans(): Promise<LowStockPlan[]> {
   const counts = await countAvailableForPlans(plans.map((p) => p.id))
 
   return plans
-    .filter((plan) => isPoolBacked(plan.product.deliveryType))
+    .filter((plan) => isPoolBacked(plan.product.deliveryType, plan.product.externalConfig))
     .map((plan) => ({
       planId: plan.id,
       planTitle: plan.title,

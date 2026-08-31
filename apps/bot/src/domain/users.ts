@@ -2,6 +2,30 @@ import { prisma } from '@tgshop/db'
 import { getBalance } from '@tgshop/core'
 import { emitEvent } from './events.js'
 
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: unknown }).code === 'P2002'
+  )
+}
+
+async function refreshUser(
+  id: string,
+  input: { username?: string | null; firstName?: string | null; languageCode?: string | null },
+  current: { username: string | null; firstName: string | null; languageCode: string | null }
+) {
+  return prisma.user.update({
+    where: { id },
+    data: {
+      username: input.username ?? current.username,
+      firstName: input.firstName ?? current.firstName,
+      languageCode: input.languageCode ?? current.languageCode
+    }
+  })
+}
+
 /** Finds or creates the internal User row for a Telegram user, applying referral/promo deep-link context on first sight. */
 export async function findOrCreateUser(input: {
   tgId: bigint
@@ -12,14 +36,7 @@ export async function findOrCreateUser(input: {
 }) {
   const existing = await prisma.user.findUnique({ where: { tgId: input.tgId } })
   if (existing) {
-    return prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        username: input.username ?? existing.username,
-        firstName: input.firstName ?? existing.firstName,
-        languageCode: input.languageCode ?? existing.languageCode
-      }
-    })
+    return refreshUser(existing.id, input, existing)
   }
 
   let referredById: string | null = null
@@ -28,15 +45,27 @@ export async function findOrCreateUser(input: {
     if (referrer) referredById = referrer.id
   }
 
-  const user = await prisma.user.create({
-    data: {
-      tgId: input.tgId,
-      username: input.username ?? null,
-      firstName: input.firstName ?? null,
-      languageCode: input.languageCode ?? null,
-      referredById
-    }
-  })
+  let user
+  try {
+    user = await prisma.user.create({
+      data: {
+        tgId: input.tgId,
+        username: input.username ?? null,
+        firstName: input.firstName ?? null,
+        languageCode: input.languageCode ?? null,
+        referredById
+      }
+    })
+  } catch (err) {
+    // Two surfaces can authenticate the same Telegram user at once (for
+    // example, the bot and Mini App opening together). The unique tgId index is
+    // the arbiter; recover the winner instead of turning a harmless race into a
+    // failed login. Only the creator emits user.registered below.
+    if (!isUniqueViolation(err)) throw err
+    const concurrent = await prisma.user.findUnique({ where: { tgId: input.tgId } })
+    if (!concurrent) throw err
+    return refreshUser(concurrent.id, input, concurrent)
+  }
 
   // user.registered is emitted here rather than in each entry point (/start,
   // Mini App auth, checkout, top-up) so it fires exactly once per genuinely new

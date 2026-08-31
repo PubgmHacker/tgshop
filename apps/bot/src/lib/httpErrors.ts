@@ -56,6 +56,9 @@ export const forbidden = (key = 'api.errors.forbidden'): HttpError => new HttpEr
 
 export const conflict = (key = 'api.errors.conflict'): HttpError => new HttpError(409, 'CONFLICT', key)
 
+export const unavailable = (key = 'api.errors.payment_method_unavailable'): HttpError =>
+  new HttpError(503, 'PAYMENT_METHOD_UNAVAILABLE', key)
+
 /** Builds the wire body for an error, localized for the caller. */
 export function toApiErrorBody(code: string, locale: Locale, messageKey: string, vars: Record<string, string | number> = {}): ApiErrorBody {
   return { error: { code, message: t(locale, messageKey, vars) } }

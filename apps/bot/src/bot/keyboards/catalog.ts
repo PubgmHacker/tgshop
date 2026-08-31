@@ -2,6 +2,7 @@ import { InlineKeyboard } from 'grammy'
 import type { Category, Product, Plan } from '@tgshop/db'
 import { formatUsd } from '../../lib/format.js'
 import { t, type Locale } from '../../i18n/index.js'
+import { getPaymentAvailability, type PaymentAvailability } from '../../domain/payment-availability.js'
 
 export function categoriesKeyboard(categories: Category[]): InlineKeyboard {
   const kb = new InlineKeyboard()
@@ -30,17 +31,23 @@ export function plansKeyboard(locale: Locale, productSlug: string, plans: Plan[]
   return kb
 }
 
-export function paymentMethodsKeyboard(locale: Locale, planId: string, qty: number): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(t(locale, 'order.pay_balance'), `pay:BALANCE:${planId}:${qty}`)
-    .row()
-    .text(t(locale, 'order.pay_cryptobot'), `pay:CRYPTOBOT:${planId}:${qty}`)
-    .row()
-    .text(t(locale, 'order.pay_stars'), `pay:STARS:${planId}:${qty}`)
-    .row()
-    .text(t(locale, 'order.pay_usdt'), `pay:TRON_TRC20:${planId}:${qty}`)
-    .row()
-    .text(t(locale, 'common.cancel'), 'order:cancel')
+export function paymentMethodsKeyboard(
+  locale: Locale,
+  planId: string,
+  qty: number,
+  availability: PaymentAvailability = getPaymentAvailability()
+): InlineKeyboard {
+  const labels: Record<string, string> = {
+    BALANCE: t(locale, 'order.pay_balance'),
+    CRYPTOBOT: t(locale, 'order.pay_cryptobot'),
+    STARS: t(locale, 'order.pay_stars'),
+    TRON_TRC20: t(locale, 'order.pay_usdt')
+  }
+  const keyboard = new InlineKeyboard()
+  for (const provider of availability.orderProviders) {
+    keyboard.text(labels[provider] ?? provider, `pay:${provider}:${planId}:${qty}`).row()
+  }
+  return keyboard.text(t(locale, 'common.cancel'), 'order:cancel')
 }
 
 export function reportProblemKeyboard(locale: Locale, orderId: string): InlineKeyboard {

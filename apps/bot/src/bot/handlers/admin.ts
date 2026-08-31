@@ -10,6 +10,7 @@ import { getBalance } from '@tgshop/core'
 import { encryptStockPayload } from '../../domain/orders.js'
 import { logger } from '../../lib/logger.js'
 import { versionedWebAppUrl } from '../webAppUrls.js'
+import { createPost, publishPost } from '../../domain/content.js'
 
 async function adminGuard(ctx: BotContext, next: NextFunction): Promise<void> {
   const tgId = ctx.from?.id
@@ -84,9 +85,8 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
       return
     }
     const recipientCount = await prisma.user.count({ where: { isBlocked: false } })
-    await prisma.broadcastPost.create({
-      data: { text, status: 'SCHEDULED', source: 'MANUAL', scheduledAt: new Date() }
-    })
+    const post = await createPost({ text, segment: 'all' })
+    await publishPost(post.id)
     await ctx.reply(t(locale, 'admin.broadcast_scheduled', { count: recipientCount }))
   })
 

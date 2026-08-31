@@ -42,12 +42,17 @@ async function ensureUser(tgId, username) {
 const adminUser = await ensureUser(adminTgId, 'verify-api-admin')
 const outsiderUser = await ensureUser(outsiderTgId, 'verify-api-outsider')
 
-const adminJwt = { authorization: `Bearer ${issueMiniAppJwt({ sub: adminUser.id, tgId: adminTgId })}` }
-const outsiderJwt = { authorization: `Bearer ${issueMiniAppJwt({ sub: outsiderUser.id, tgId: outsiderTgId })}` }
+const adminJwt = {
+  authorization: `Bearer ${issueMiniAppJwt({ sub: adminUser.id, tgId: adminTgId })}`
+}
+const outsiderJwt = {
+  authorization: `Bearer ${issueMiniAppJwt({ sub: outsiderUser.id, tgId: outsiderTgId })}`
+}
 
 // [method, url, headers, payload, expected]
 const checks = [
   ['GET', '/health', {}, undefined, 200],
+  ['GET', '/api/public/catalog', {}, undefined, 200],
   ['GET', '/api/catalog', {}, undefined, 401],
   ['GET', '/api/me', {}, undefined, 401],
   ['GET', '/internal/stats', {}, undefined, 401],
@@ -78,7 +83,13 @@ const checks = [
   ],
   ['POST', '/internal/orders/does-not-exist/refund', {}, { reason: 'x' }, 401],
   ['POST', '/internal/orders/does-not-exist/refund', auth, {}, 400],
-  ['POST', '/internal/orders/does-not-exist/refund', auth, { reason: 'verify-api smoke check' }, 404],
+  [
+    'POST',
+    '/internal/orders/does-not-exist/refund',
+    auth,
+    { reason: 'verify-api smoke check' },
+    404
+  ],
 
   // /api/admin gate: 401 without a JWT, 403 with a non-admin JWT, 200 as admin.
   ['GET', '/api/admin/stats', {}, undefined, 401],
@@ -99,7 +110,21 @@ const checks = [
   ['POST', '/api/admin/categories', adminJwt, { title: 'X', slug: 'BAD SLUG' }, 400],
   ['POST', '/api/admin/orders/does-not-exist/refund', adminJwt, { reason: 'verify-api' }, 404],
   ['POST', '/api/admin/orders/does-not-exist/refund', outsiderJwt, { reason: 'verify-api' }, 403],
-  ['POST', `/api/admin/users/${outsiderUser.id}/balance`, adminJwt, { amountCents: 0, comment: 'x', idempotencyKey: 'verify-api-zero' }, 400],
+  ['POST', '/api/admin/orders/does-not-exist/manual-deliver', {}, { payload: 'verify-api' }, 401],
+  [
+    'POST',
+    '/api/admin/orders/does-not-exist/manual-deliver',
+    adminJwt,
+    { payload: 'verify-api' },
+    404
+  ],
+  [
+    'POST',
+    `/api/admin/users/${outsiderUser.id}/balance`,
+    adminJwt,
+    { amountCents: 0, comment: 'x', idempotencyKey: 'verify-api-zero' },
+    400
+  ],
   ['GET', '/api/admin/plans/does-not-exist/stock', adminJwt, undefined, 404]
 ]
 
@@ -109,7 +134,9 @@ for (const [method, url, headers, payload, expected] of checks) {
   const res = await app.inject({ method, url, headers, payload })
   const ok = res.statusCode === expected
   if (!ok) failures += 1
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${method} ${url} -> ${res.statusCode} (expected ${expected})${ok ? '' : ' BODY=' + res.body.slice(0, 200)}`)
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'} ${method} ${url} -> ${res.statusCode} (expected ${expected})${ok ? '' : ' BODY=' + res.body.slice(0, 200)}`
+  )
 }
 
 // The anomaly check above writes one AuditLog row; remove it so repeated runs

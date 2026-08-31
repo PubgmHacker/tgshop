@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '@/lib/ThemeProvider'
 import { useI18n } from '@/i18n/I18nProvider'
@@ -53,7 +54,13 @@ export function AppHeader(): JSX.Element {
       ) : (
         <Link href="/" onClick={() => triggerHaptic('light')} className="flex items-center gap-3">
           <span className="flex h-10 w-10 overflow-hidden rounded-full">
-            <img src="/brand/logo.png" alt="" width={40} height={40} className="h-10 w-10 object-cover" />
+            <Image
+              src="/brand/logo.png"
+              alt=""
+              width={40}
+              height={40}
+              className="h-10 w-10 object-cover"
+            />
           </span>
           <span className="flex flex-col">
             <span className="whitespace-nowrap text-[15px] font-bold leading-none tracking-[-0.03em] text-ink">
@@ -65,7 +72,7 @@ export function AppHeader(): JSX.Element {
       )}
       <button
         type="button"
-        aria-label="Theme"
+        aria-label={t('settings.theme.toggle')}
         onClick={() => {
           triggerHaptic('light')
           toggleTheme()

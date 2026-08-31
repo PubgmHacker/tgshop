@@ -1,5 +1,5 @@
 import type { Job } from 'bullmq'
-import { prisma, LedgerType, PaymentProvider, PaymentStatus, OrderStatus } from '@tgshop/db'
+import { prisma, LedgerType, PaymentProvider, PaymentStatus, OrderStatus, Prisma } from '@tgshop/db'
 import { credit } from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
@@ -72,6 +72,16 @@ async function processPaymentsPoll(job: Job<Record<string, never>>): Promise<voi
     if (!invoice) continue
 
     if (invoice.status === 'paid') {
+      const invoiceAmountCents = parseUsdCents(invoice.amount)
+      const expectedAmountCents = Number(payment.amount)
+      if (
+        invoiceAmountCents === null ||
+        !Number.isSafeInteger(expectedAmountCents) ||
+        invoiceAmountCents !== expectedAmountCents
+      ) {
+        await markAmountMismatch(payment, invoice, invoiceAmountCents, log)
+        continue
+      }
       if (await settlePaidInvoice(payment, log)) settledCount += 1
     } else if (invoice.status === 'expired' && payment.status === PaymentStatus.PENDING) {
       await prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.EXPIRED } })
@@ -79,6 +89,79 @@ async function processPaymentsPoll(job: Job<Record<string, never>>): Promise<voi
   }
 
   log.info({ checked: pending.length, settled: settledCount }, 'payments-poll sweep complete')
+}
+
+/** CryptoBot fiat invoices are USD amounts; parse them without floating point. */
+function parseUsdCents(value: string): number | null {
+  if (!/^\d+(?:\.\d{1,2})?$/.test(value)) return null
+  const [wholePart = '0', fractionPart = ''] = value.split('.')
+  const whole = Number(wholePart)
+  const cents = Number(fractionPart.padEnd(2, '0'))
+  const result = whole * 100 + cents
+  return Number.isSafeInteger(result) ? result : null
+}
+
+/**
+ * A paid provider invoice with a different fiat amount is never auto-settled.
+ * Marking it UNDERPAID stops an endless poll loop while retaining the provider
+ * payload and an auditable high-severity record for manual reconciliation.
+ */
+async function markAmountMismatch(
+  payment: { id: string; providerInvoiceId: string | null; orderId: string | null; amount: bigint; rawPayload: unknown },
+  invoice: CryptoBotInvoiceLike,
+  receivedAmountCents: number | null,
+  log: ReturnType<typeof jobLogger>
+): Promise<void> {
+  const raw =
+    payment.rawPayload && typeof payment.rawPayload === 'object' && !Array.isArray(payment.rawPayload)
+      ? payment.rawPayload
+      : {}
+  const updated = await prisma.payment.updateMany({
+    where: { id: payment.id, status: { in: [PaymentStatus.PENDING, PaymentStatus.CONFIRMING] } },
+    data: {
+      status: PaymentStatus.UNDERPAID,
+      rawPayload: { ...(raw as Record<string, unknown>), polledInvoice: invoice } as unknown as Prisma.InputJsonValue
+    }
+  })
+  if (updated.count === 0) return
+
+  await prisma.auditLog.create({
+    data: {
+      actorType: 'system',
+      actorId: 'worker.payments-poll',
+      action: 'anomaly.flagged',
+      entity: payment.orderId ? 'Order' : 'Payment',
+      entityId: payment.orderId ?? payment.id,
+      diff: {
+        severity: 'high',
+        category: 'payments',
+        summary: 'CryptoBot reported a paid invoice with an amount different from the stored request',
+        evidence: {
+          paymentId: payment.id,
+          providerInvoiceId: payment.providerInvoiceId,
+          expectedAmountCents: Number(payment.amount),
+          receivedAmountCents,
+          invoice: invoice as unknown as Prisma.InputJsonValue
+        }
+      }
+    }
+  })
+  log.error(
+    { paymentId: payment.id, orderId: payment.orderId, expectedAmountCents: Number(payment.amount), receivedAmountCents },
+    'CryptoBot paid invoice amount mismatch — refusing automatic settlement'
+  )
+}
+
+/** Structural subset used by the mismatch recorder; keeps provider types local to this worker. */
+interface CryptoBotInvoiceLike {
+  invoice_id: number
+  status: string
+  hash: string
+  asset: string
+  amount: string
+  paid_asset?: string
+  paid_amount?: string
+  paid_at?: string
 }
 
 /** Terminal order states: a paid invoice landing on one of these is a real provider/DB disagreement. */

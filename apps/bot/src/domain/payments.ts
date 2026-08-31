@@ -1,13 +1,14 @@
 import { Api } from 'grammy'
-import { prisma, PaymentProvider, PaymentStatus } from '@tgshop/db'
+import { prisma, PaymentProvider, PaymentStatus, Prisma } from '@tgshop/db'
 import type { Payment } from '@tgshop/db'
-import { usdCentsToUsdt6 } from '@tgshop/core'
+import { getSetting, usdCentsToUsdt6 } from '@tgshop/core'
 import { createCryptoBotInvoice } from '../payments/cryptobot.js'
 import { amountCentsToStars } from '../payments/stars.js'
 import { allocateDepositAddress } from '../payments/tron.js'
 import { emitEvent } from './events.js'
 import { logger } from '../lib/logger.js'
 import { env } from '../config/env.js'
+import { redis } from '../config/redis.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider-agnostic invoice creation shared by the Mini App order and top-up
@@ -48,6 +49,10 @@ export interface CreateInvoiceInput {
   reference: string
   /** Set when this payment settles a specific order. */
   orderId?: string | null
+  /** Optional total Stars override, already adjusted for quantity/discounts. */
+  priceStars?: number | null
+  /** Client retry key, used for top-ups that do not have an orderId. */
+  idempotencyKey?: string
 }
 
 /**
@@ -72,10 +77,15 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceR
 
 async function createCryptoBotPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
   const existing = input.orderId
-    ? await prisma.payment.findFirst({
-        where: { orderId: input.orderId, provider: PaymentProvider.CRYPTOBOT, status: PaymentStatus.PENDING }
+      ? await prisma.payment.findFirst({
+        where: {
+          orderId: input.orderId,
+          provider: PaymentProvider.CRYPTOBOT,
+          status: { in: [PaymentStatus.PENDING, PaymentStatus.CONFIRMING] }
+        },
+        orderBy: { createdAt: 'desc' }
       })
-    : null
+    : await findPaymentByIdempotency(input, PaymentProvider.CRYPTOBOT)
 
   if (existing) {
     const rawUrl = readRawString(existing.rawPayload, 'payUrl')
@@ -105,9 +115,19 @@ async function createCryptoBotPayment(input: CreateInvoiceInput): Promise<Invoic
       amount: BigInt(input.amountCents),
       asset: 'USD',
       status: PaymentStatus.PENDING,
-      rawPayload: { payUrl: invoice.payUrl, reference: input.reference }
+      rawPayload: {
+        payUrl: invoice.payUrl,
+        reference: input.reference,
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {})
+      }
     },
-    update: { rawPayload: { payUrl: invoice.payUrl, reference: input.reference } }
+    update: {
+      rawPayload: {
+        payUrl: invoice.payUrl,
+        reference: input.reference,
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {})
+      }
+    }
   })
 
   return { payment, payUrl: invoice.payUrl, tron: null, stars: null }
@@ -128,7 +148,26 @@ function clampInvoiceText(text: string, max: number): string {
 }
 
 async function createStarsPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
-  const stars = amountCentsToStars(input.amountCents)
+  const existing = input.orderId
+    ? await prisma.payment.findFirst({
+        where: { orderId: input.orderId, provider: PaymentProvider.STARS, status: PaymentStatus.PENDING },
+        orderBy: { createdAt: 'desc' }
+      })
+    : await findPaymentByIdempotency(input, PaymentProvider.STARS)
+
+  if (existing) {
+    const rawUrl = readRawString(existing.rawPayload, 'payUrl')
+    const rawStars = readRawPositiveInt(existing.rawPayload, 'stars')
+    if (rawUrl && rawStars !== null) {
+      return { payment: existing, payUrl: rawUrl, tron: null, stars: rawStars }
+    }
+  }
+
+  // A per-plan override wins, otherwise use the live admin setting. The env
+  // value remains only as the documented fallback when the Setting row has not
+  // been created yet.
+  const stars =
+    input.priceStars ?? amountCentsToStars(input.amountCents, await getSetting(prisma, 'stars_usd_rate', redis))
 
   // createInvoiceLink gives the Mini App a URL it can open with openInvoice(),
   // so Stars work from the app, not only from the bot chat's sendInvoice flow.
@@ -155,7 +194,13 @@ async function createStarsPayment(input: CreateInvoiceInput): Promise<InvoiceRes
       amount: BigInt(stars),
       asset: 'XTR',
       status: PaymentStatus.PENDING,
-      rawPayload: { stars, reference: input.reference, amountCents: input.amountCents, payUrl }
+      rawPayload: {
+        stars,
+        reference: input.reference,
+        amountCents: input.amountCents,
+        payUrl,
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {})
+      }
     }
   })
 
@@ -178,22 +223,53 @@ async function createStarsPayment(input: CreateInvoiceInput): Promise<InvoiceRes
 export async function settleStarsPayment(
   orderId: string,
   telegramChargeId: string,
-  rawPayload: object
-): Promise<void> {
+  rawPayload: object,
+  options: { userId?: string; totalStars?: number } = {}
+): Promise<boolean> {
   const payment = await prisma.payment.findFirst({
     where: { orderId, provider: PaymentProvider.STARS },
     orderBy: { createdAt: 'desc' }
   })
   if (!payment) {
     logger.error({ orderId }, 'Stars payment succeeded but no Payment row exists — order settles without one')
-    return
+    return false
   }
 
+  if (options.userId !== undefined && payment.userId !== options.userId) {
+    logger.error({ orderId, paymentId: payment.id }, 'Stars payment payer does not own the order')
+    return false
+  }
+  if (
+    options.totalStars !== undefined &&
+    (!Number.isSafeInteger(options.totalStars) || options.totalStars <= 0 || payment.amount !== BigInt(options.totalStars))
+  ) {
+    logger.error(
+      { orderId, paymentId: payment.id, expectedStars: payment.amount.toString(), receivedStars: options.totalStars },
+      'Stars payment amount does not match the stored invoice'
+    )
+    return false
+  }
+  if (payment.status === PaymentStatus.PAID) return true
+  const settleableStatuses: readonly PaymentStatus[] = [PaymentStatus.PENDING, PaymentStatus.CONFIRMING]
+  if (!settleableStatuses.includes(payment.status)) {
+    logger.warn({ orderId, paymentId: payment.id, status: payment.status }, 'Stars payment is not settleable')
+    return false
+  }
+
+  const originalRaw =
+    payment.rawPayload && typeof payment.rawPayload === 'object' && !Array.isArray(payment.rawPayload)
+      ? (payment.rawPayload as Record<string, unknown>)
+      : {}
+  const mergedRaw = { ...originalRaw, successfulPayment: rawPayload } as Prisma.InputJsonValue
+
   const settled = await prisma.payment.updateMany({
-    where: { id: payment.id, status: { not: PaymentStatus.PAID } },
-    data: { status: PaymentStatus.PAID, txHash: telegramChargeId, rawPayload }
+    where: { id: payment.id, status: { in: [PaymentStatus.PENDING, PaymentStatus.CONFIRMING] } },
+    data: { status: PaymentStatus.PAID, txHash: telegramChargeId, rawPayload: mergedRaw }
   })
-  if (settled.count === 0) return
+  if (settled.count === 0) {
+    const current = await prisma.payment.findUnique({ where: { id: payment.id } })
+    return current?.status === PaymentStatus.PAID
+  }
 
   await emitEvent('payment.received', {
     paymentId: payment.id,
@@ -207,6 +283,7 @@ export async function settleStarsPayment(
     // hash, and it is what support quotes when reconciling a disputed charge.
     txHash: telegramChargeId
   })
+  return true
 }
 
 async function createTronPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
@@ -214,8 +291,21 @@ async function createTronPayment(input: CreateInvoiceInput): Promise<InvoiceResu
     throw new Error('TRON_TRC20 payments require an orderId to bind the deposit address to')
   }
 
-  const address = await allocateDepositAddress(input.userId, input.orderId)
   const amountUsdt6 = usdCentsToUsdt6(input.amountCents)
+  const existing = await prisma.payment.findFirst({
+    where: {
+      orderId: input.orderId,
+      provider: PaymentProvider.TRON_TRC20,
+      status: { in: [PaymentStatus.PENDING, PaymentStatus.CONFIRMING, PaymentStatus.UNDERPAID] }
+    },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (existing?.address) {
+    return { payment: existing, payUrl: null, stars: null, tron: tronDetailsFromPayment(existing) }
+  }
+
+  const address = await allocateDepositAddress(input.userId, input.orderId)
   const expiresAt = new Date(Date.now() + PAYMENT_WINDOW_MS)
 
   const payment = await prisma.payment.create({
@@ -228,7 +318,11 @@ async function createTronPayment(input: CreateInvoiceInput): Promise<InvoiceResu
       network: env.TRON_NETWORK,
       address,
       status: PaymentStatus.PENDING,
-      rawPayload: { reference: input.reference, expectedAmountUsdt6: amountUsdt6.toString() }
+      rawPayload: {
+        reference: input.reference,
+        expectedAmountUsdt6: amountUsdt6.toString(),
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {})
+      }
     }
   })
 
@@ -245,11 +339,37 @@ async function createTronPayment(input: CreateInvoiceInput): Promise<InvoiceResu
   }
 }
 
+/** Finds a non-terminal top-up payment created for the same client retry key. */
+async function findPaymentByIdempotency(
+  input: CreateInvoiceInput,
+  provider: PaymentProvider
+): Promise<Payment | null> {
+  if (!input.idempotencyKey) return null
+  return prisma.payment.findFirst({
+    where: {
+      userId: input.userId,
+      orderId: null,
+      provider,
+      status: { notIn: [PaymentStatus.EXPIRED, PaymentStatus.FAILED] },
+      rawPayload: { path: ['idempotencyKey'], equals: input.idempotencyKey }
+    },
+    orderBy: { createdAt: 'desc' }
+  })
+}
+
 /** Reads a string field out of a Prisma Json column without asserting `any`. */
 function readRawString(raw: unknown, key: string): string | null {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     const value = (raw as Record<string, unknown>)[key]
     if (typeof value === 'string') return value
+  }
+  return null
+}
+
+function readRawPositiveInt(raw: unknown, key: string): number | null {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const value = (raw as Record<string, unknown>)[key]
+    if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value
   }
   return null
 }

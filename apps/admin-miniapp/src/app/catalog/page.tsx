@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/States'
 import {
   CatalogResponseSchema,
   CreatedResponseSchema,
+  ProductCreatedResponseSchema,
   DeletedResponseSchema,
   DeliveryTypeSchema,
   UpdatedResponseSchema,
@@ -45,6 +46,7 @@ interface ProductDraft {
   description: string
   imageUrl: string
   deliveryType: string
+  externalConfig: string
   sortOrder: string
   isActive: boolean
 }
@@ -73,6 +75,7 @@ export default function CatalogPage(): JSX.Element {
   const [categoryDraft, setCategoryDraft] = useState<CategoryDraft | null>(null)
   const [productDraft, setProductDraft] = useState<ProductDraft | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   function invalidate(): void {
     void queryClient.invalidateQueries({ queryKey: ['admin', 'catalog'] })
@@ -117,21 +120,32 @@ export default function CatalogPage(): JSX.Element {
   })
 
   const createProduct = useMutation({
-    mutationFn: (draft: ProductDraft) =>
-      api.post('/api/admin/products', CreatedResponseSchema, {
+    mutationFn: (draft: ProductDraft) => {
+      let externalConfig: Record<string, unknown> | null = null
+      if (draft.externalConfig.trim() !== '') {
+        const parsed: unknown = JSON.parse(draft.externalConfig)
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          throw new Error('externalConfig must be a JSON object')
+        }
+        externalConfig = parsed as Record<string, unknown>
+      }
+      return api.post('/api/admin/products', ProductCreatedResponseSchema, {
         categoryId: draft.categoryId,
         title: draft.title.trim(),
         slug: draft.slug.trim(),
         description: draft.description.trim(),
         imageUrl: draft.imageUrl.trim() === '' ? null : draft.imageUrl.trim(),
         deliveryType: draft.deliveryType,
+        externalConfig,
         sortOrder: parseIntField(draft.sortOrder),
         isActive: draft.isActive
-      }),
-    onSuccess: () => {
+      })
+    },
+    onSuccess: (result) => {
       triggerNotificationHaptic('success')
       setProductDraft(null)
       setFormError(null)
+      setNotice(result.broadcastDraftId ? t('catalog.productCreated') : null)
       invalidate()
     },
     onError: onMutationError
@@ -140,6 +154,7 @@ export default function CatalogPage(): JSX.Element {
   function openCategorySheet(category: AdminCategory | null): void {
     triggerHaptic('light')
     setFormError(null)
+    setNotice(null)
     setCategoryDraft(
       category
         ? {
@@ -157,6 +172,7 @@ export default function CatalogPage(): JSX.Element {
   function openProductSheet(categories: AdminCategory[]): void {
     triggerHaptic('light')
     setFormError(null)
+    setNotice(null)
     setProductDraft({
       categoryId: categories[0]?.id ?? '',
       title: '',
@@ -164,6 +180,7 @@ export default function CatalogPage(): JSX.Element {
       description: '',
       imageUrl: '',
       deliveryType: DeliveryTypeSchema.options[0],
+      externalConfig: '',
       sortOrder: '0',
       isActive: true
     })
@@ -181,7 +198,15 @@ export default function CatalogPage(): JSX.Element {
     productDraft.title.trim().length > 0 &&
     productDraft.slug.trim().length > 0 &&
     productDraft.description.trim().length > 0 &&
-    !Number.isNaN(parseIntField(productDraft.sortOrder))
+    !Number.isNaN(parseIntField(productDraft.sortOrder)) &&
+    (productDraft.externalConfig.trim() === '' || (() => {
+      try {
+        const parsed: unknown = JSON.parse(productDraft.externalConfig)
+        return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      } catch {
+        return false
+      }
+    })())
 
   return (
     <main className="page-enter flex flex-col gap-4 pt-2">
@@ -189,6 +214,8 @@ export default function CatalogPage(): JSX.Element {
         <h1 className="text-xl font-bold tracking-[-0.02em] text-ink">{t('catalog.title')}</h1>
         <p className="text-sm text-muted">{t('catalog.subtitle')}</p>
       </div>
+
+      {notice ? <p className="mx-4 rounded-tile bg-success/10 px-3.5 py-3 text-sm text-success">{notice}</p> : null}
 
       <QueryGate
         data={catalogQuery.data}
@@ -396,6 +423,16 @@ export default function CatalogPage(): JSX.Element {
                       label: t(`delivery.${option}`)
                     }))}
                   />
+                  {productDraft.deliveryType === 'EXTERNAL_API' || productDraft.externalConfig.trim() !== '' ? (
+                    <TextAreaField
+                      label={`${t('field.externalConfig')} (${t('field.optional')})`}
+                      value={productDraft.externalConfig}
+                      onChange={(externalConfig) => setProductDraft({ ...productDraft, externalConfig })}
+                      rows={4}
+                      placeholder='{"endpoint":"https://…"}'
+                      hint={t('field.externalConfig.hint')}
+                    />
+                  ) : null}
                   <TextField
                     label={t('field.sortOrder')}
                     value={productDraft.sortOrder}

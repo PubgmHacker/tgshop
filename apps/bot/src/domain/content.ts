@@ -1,5 +1,6 @@
 import { prisma, PostStatus, PostSource } from '@tgshop/db'
 import type { BroadcastPost } from '@tgshop/db'
+import { SEGMENTS, type Segment as CoreSegment } from '@tgshop/core'
 import { Queue } from 'bullmq'
 import { redis } from '../config/redis.js'
 import { logger } from '../lib/logger.js'
@@ -17,9 +18,13 @@ import { logger } from '../lib/logger.js'
 const BROADCAST_QUEUE_NAME = 'broadcast'
 const BROADCAST_JOB_NAME = 'send-post'
 
-/** Segment codes apps/worker's broadcast worker knows how to resolve. */
-export const KNOWN_SEGMENTS = ['all', 'active_subscribers', 'no_purchases'] as const
-export type Segment = (typeof KNOWN_SEGMENTS)[number]
+/**
+ * Segment codes are owned by @tgshop/core. Keeping this alias here preserves
+ * the bot's existing import surface while making the API and worker share one
+ * closed list (including buyers and inactive_30d).
+ */
+export const KNOWN_SEGMENTS = SEGMENTS
+export type Segment = CoreSegment
 
 export function isKnownSegment(segment: string): segment is Segment {
   return (KNOWN_SEGMENTS as readonly string[]).includes(segment)
@@ -117,10 +122,29 @@ export async function publishPost(postId: string): Promise<BroadcastPost> {
   }
 
   const scheduledAt = post.scheduledAt ?? new Date()
-  const updated = await prisma.broadcastPost.update({
-    where: { id: postId },
+  const armed = await prisma.broadcastPost.updateMany({
+    where: {
+      id: postId,
+      status: { in: [PostStatus.DRAFT, PostStatus.SCHEDULED, PostStatus.FAILED, PostStatus.CANCELLED] }
+    },
     data: { status: PostStatus.QUEUED, scheduledAt }
   })
+
+  if (armed.count === 0) {
+    const current = await prisma.broadcastPost.findUnique({ where: { id: postId } })
+    const activeStatuses: readonly PostStatus[] = [PostStatus.QUEUED, PostStatus.SENDING, PostStatus.SENT]
+    if (current && activeStatuses.includes(current.status)) return current
+    throw new PostStateError(current?.status ?? PostStatus.FAILED)
+  }
+
+  // A failed/cancelled retry may have left the deterministic BullMQ id behind.
+  // Remove that terminal record before queue.add(), otherwise BullMQ treats the
+  // new publish as a duplicate and silently does nothing.
+  if (post.status === PostStatus.FAILED || post.status === PostStatus.CANCELLED) {
+    await removeQueuedBroadcast(postId)
+  }
+
+  const updated = await prisma.broadcastPost.findUniqueOrThrow({ where: { id: postId } })
 
   await enqueueBroadcast(postId, Math.max(0, scheduledAt.getTime() - Date.now()))
   return updated
@@ -141,6 +165,23 @@ export async function enqueueBroadcast(postId: string, delayMs = 0): Promise<voi
       removeOnFail: { count: 5_000, age: 7 * 24 * 60 * 60 }
     }
   )
+}
+
+/**
+ * Removes the deterministic pending job for a queued post. A missing job is
+ * expected (it may already have completed or been removed by a retry); an
+ * active job makes BullMQ throw, which callers must surface instead of marking
+ * a message cancelled while it is already being sent.
+ */
+export async function removeQueuedBroadcast(postId: string): Promise<void> {
+  const job = await getBroadcastQueue().getJob(`broadcast-${postId}`)
+  if (!job) return
+  const state = await job.getState()
+  if (state === 'completed' || state === 'failed') {
+    await job.remove()
+    return
+  }
+  await job.remove()
 }
 
 export async function getPostById(postId: string): Promise<BroadcastPost | null> {

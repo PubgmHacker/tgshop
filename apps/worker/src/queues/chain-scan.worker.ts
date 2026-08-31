@@ -112,7 +112,7 @@ type DepositAddressWithOrder = Awaited<ReturnType<typeof prisma.depositAddress.f
   order:
     | (Awaited<ReturnType<typeof prisma.order.findFirst>> & {
         user: { languageCode: string | null; tgId: bigint }
-        payments: Array<{ id: string; status: string }>
+        payments: Array<{ id: string; status: string; amount: bigint }>
       })
     | null
 }
@@ -127,8 +127,12 @@ async function scanOneAddress(
   const order = depositAddress.order
   if (!order) return // address not linked to an order (e.g. pre-generated pool) — nothing to reconcile yet
 
-  // Already settled terminal states: nothing left to do for this order.
-  if (order.status === OrderStatus.PAID || order.status === OrderStatus.DELIVERED) return
+  // A chain transfer can only settle an order that is still awaiting payment,
+  // with one deliberate exception: an EXPIRED order still owns its deposit
+  // address, so a late transfer must be credited to the user's balance rather
+  // than silently stranded. DELIVERING/DELIVERED/FAILED/REFUNDED are excluded;
+  // allowing those through would race delivery or resurrect a terminal order.
+  if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.EXPIRED) return
 
   const transfers = await client.getTrc20TransfersTo(
     depositAddress.address,
@@ -139,6 +143,15 @@ async function scanOneAddress(
 
   const totalReceivedUsdt6 = transfers.reduce((sum, tr) => sum + BigInt(tr.value), 0n)
   if (totalReceivedUsdt6 === 0n) return
+
+  const existingPayment = order.payments.find((p) => p.status !== 'FAILED')
+  // Underpayments are cumulative: a buyer may send the missing amount later.
+  // If the cumulative total has not changed, this scan already handled the
+  // exact same transfers and must not repeat the user notification.
+  if (existingPayment?.status === PaymentStatus.UNDERPAID && existingPayment.amount === totalReceivedUsdt6) return
+  // A late payment is terminal by design. Ignore the same transfer set on the
+  // next sweep after it has already been credited to the balance.
+  if (order.status === OrderStatus.EXPIRED && existingPayment?.status === PaymentStatus.PAID) return
 
   // Confirmations approximated as block depth since the transfer's own block;
   // TronGrid does not return block_number directly in this endpoint response,
@@ -157,7 +170,6 @@ async function scanOneAddress(
   const isExpired = order.expiresAt !== null && order.expiresAt.getTime() < Date.now()
   const txHash = transfers[0]?.transaction_id ?? null
 
-  const existingPayment = order.payments.find((p) => p.status !== 'FAILED')
   const paymentId =
     existingPayment?.id ??
     (

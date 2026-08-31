@@ -6,7 +6,12 @@ import { z } from 'zod'
 // apps/bot/src/server/routes/api/admin — change those, change these.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const DeliveryTypeSchema = z.enum(['STOCK_POOL', 'UNIQUE_CODE', 'EXTERNAL_API', 'MANUAL_FALLBACK'])
+export const DeliveryTypeSchema = z.enum([
+  'STOCK_POOL',
+  'UNIQUE_CODE',
+  'EXTERNAL_API',
+  'MANUAL_FALLBACK'
+])
 export type DeliveryType = z.infer<typeof DeliveryTypeSchema>
 
 export const OrderStatusSchema = z.enum([
@@ -20,10 +25,24 @@ export const OrderStatusSchema = z.enum([
 ])
 export type OrderStatus = z.infer<typeof OrderStatusSchema>
 
-export const PaymentStatusSchema = z.enum(['PENDING', 'CONFIRMING', 'PAID', 'UNDERPAID', 'EXPIRED', 'FAILED'])
+export const PaymentStatusSchema = z.enum([
+  'PENDING',
+  'CONFIRMING',
+  'PAID',
+  'UNDERPAID',
+  'EXPIRED',
+  'FAILED'
+])
 export const PaymentProviderSchema = z.enum(['BALANCE', 'CRYPTOBOT', 'STARS', 'TRON_TRC20'])
 export type PaymentProvider = z.infer<typeof PaymentProviderSchema>
-export const LedgerTypeSchema = z.enum(['TOPUP', 'PURCHASE', 'REFUND', 'ADMIN_ADJUST', 'REFERRAL', 'SWEEP_ADJUST'])
+export const LedgerTypeSchema = z.enum([
+  'TOPUP',
+  'PURCHASE',
+  'REFUND',
+  'ADMIN_ADJUST',
+  'REFERRAL',
+  'SWEEP_ADJUST'
+])
 export const StockStatusSchema = z.enum(['AVAILABLE', 'RESERVED', 'SOLD'])
 export const PromoTypeSchema = z.enum(['PERCENT', 'FIXED'])
 export type PromoType = z.infer<typeof PromoTypeSchema>
@@ -134,6 +153,8 @@ export const OrderDetailResponseSchema = z.object({
   order: AdminOrderRowSchema.extend({
     planId: z.string(),
     productId: z.string(),
+    deliveryType: DeliveryTypeSchema,
+    customerEmail: z.string().nullable(),
     deliveredAt: z.string().nullable(),
     expiresAt: z.string().nullable(),
     refundedCents: z.number().int()
@@ -169,6 +190,13 @@ export const RefundResponseSchema = z.object({
   refundedCents: z.number().int()
 })
 export type RefundResponse = z.infer<typeof RefundResponseSchema>
+
+export const ManualDeliveryResponseSchema = z.object({
+  orderId: z.string(),
+  status: z.literal('DELIVERED'),
+  buyerNotified: z.boolean()
+})
+export type ManualDeliveryResponse = z.infer<typeof ManualDeliveryResponseSchema>
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 
@@ -224,6 +252,9 @@ export const CatalogResponseSchema = z.object({
 export type CatalogResponse = z.infer<typeof CatalogResponseSchema>
 
 export const CreatedResponseSchema = z.object({ id: z.string() })
+export const ProductCreatedResponseSchema = CreatedResponseSchema.extend({
+  broadcastDraftId: z.string().nullable().optional()
+})
 export const UpdatedResponseSchema = z.object({ id: z.string() })
 export const DeletedResponseSchema = z.object({ id: z.string(), deleted: z.boolean() })
 
@@ -270,6 +301,65 @@ export const AdminPromoSchema = z.object({
 export type AdminPromo = z.infer<typeof AdminPromoSchema>
 
 export const PromoListResponseSchema = z.object({ promos: z.array(AdminPromoSchema) })
+
+// ── Broadcasts ──────────────────────────────────────────────────────────────
+
+export const PostStatusSchema = z.enum([
+  'DRAFT',
+  'SCHEDULED',
+  'QUEUED',
+  'SENDING',
+  'SENT',
+  'FAILED',
+  'CANCELLED'
+])
+export type PostStatus = z.infer<typeof PostStatusSchema>
+
+export const BroadcastSegmentSchema = z.enum([
+  'all',
+  'buyers',
+  'inactive_30d',
+  'active_subscribers',
+  'no_purchases'
+])
+export type BroadcastSegment = z.infer<typeof BroadcastSegmentSchema>
+
+export const BroadcastStatsSchema = z
+  .object({
+    total: z.number().int().nonnegative().optional(),
+    sent: z.number().int().nonnegative().optional(),
+    blocked: z.number().int().nonnegative().optional(),
+    failed: z.number().int().nonnegative().optional()
+  })
+  .passthrough()
+
+export const AdminBroadcastSchema = z.object({
+  id: z.string(),
+  status: PostStatusSchema,
+  source: z.enum(['MANUAL', 'AGENT']),
+  text: z.string(),
+  segment: BroadcastSegmentSchema.nullable(),
+  mediaUrl: z.string().nullable(),
+  scheduledAt: z.string().nullable(),
+  sentAt: z.string().nullable(),
+  statsJson: BroadcastStatsSchema.nullable(),
+  createdAt: z.string()
+})
+export type AdminBroadcast = z.infer<typeof AdminBroadcastSchema>
+
+export const BroadcastListResponseSchema = z.object({
+  posts: z.array(AdminBroadcastSchema),
+  segments: z.array(
+    z.object({
+      value: BroadcastSegmentSchema,
+      count: z.number().int().nonnegative()
+    })
+  )
+})
+export type BroadcastListResponse = z.infer<typeof BroadcastListResponseSchema>
+
+export const BroadcastMutationResponseSchema = z.object({ post: AdminBroadcastSchema })
+export const BroadcastDeleteResponseSchema = z.object({ id: z.string(), deleted: z.boolean() })
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
@@ -334,7 +424,7 @@ export const BlockResponseSchema = z.object({
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 
-export const SettingKindSchema = z.enum(['decimal', 'cents', 'int', 'percent', 'url', 'json'])
+export const SettingKindSchema = z.enum(['decimal', 'cents', 'int', 'percent', 'url', 'json', 'boolean'])
 export type SettingKind = z.infer<typeof SettingKindSchema>
 
 export const SettingItemSchema = z.object({

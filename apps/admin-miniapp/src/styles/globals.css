@@ -27,6 +27,7 @@
   --danger: #ff5c5c;
   --success: #3ccf7a;
   --warning: #e8c547;
+  --focus-ring: #ffffff;
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -51,6 +52,7 @@
   --danger: #e03131;
   --success: #0ca678;
   --warning: #b98900;
+  --focus-ring: #12141a;
 }
 
 :root {
@@ -74,20 +76,15 @@
   --glass-hi: rgba(255, 255, 255, 0.42);
   --glass-sheen: rgba(255, 255, 255, 0.72);
   --glass-depth:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -3px 10px rgba(0, 0, 0, 0.38),
-    inset 1px 0 0 rgba(255, 255, 255, 0.12),
-    0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.5), inset 0 -3px 10px rgba(0, 0, 0, 0.38),
+    inset 1px 0 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(255, 255, 255, 0.14),
     0 18px 40px rgba(0, 0, 0, 0.48);
   --glass-nested:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -2px 8px rgba(0, 0, 0, 0.28),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 8px rgba(0, 0, 0, 0.28),
     inset 1px 0 0 rgba(255, 255, 255, 0.1);
   --glass-tile:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.42),
-    inset 0 -4px 10px rgba(0, 0, 0, 0.38),
-    inset 1px 0 0 rgba(255, 255, 255, 0.1),
-    0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.42), inset 0 -4px 10px rgba(0, 0, 0, 0.38),
+    inset 1px 0 0 rgba(255, 255, 255, 0.1), 0 1px 0 rgba(255, 255, 255, 0.12),
     0 14px 28px rgba(0, 0, 0, 0.46);
   --spec: 0.2;
 }
@@ -106,25 +103,17 @@
   /* Inner volume only + a tight cool contact shadow. No 40px black blur:
      that composited with backdrop-filter into muddy ovals. */
   --glass-depth:
-    inset 0 1.5px 0 #fff,
-    inset 0 10px 18px rgba(255, 255, 255, 0.32),
-    inset 1px 0 0 rgba(255, 255, 255, 0.72),
-    inset 0 -8px 16px rgba(55, 75, 105, 0.14),
-    inset 0 -1.5px 0 rgba(70, 92, 120, 0.18),
-    0 1px 0 rgba(255, 255, 255, 0.88),
+    inset 0 1.5px 0 #fff, inset 0 10px 18px rgba(255, 255, 255, 0.32),
+    inset 1px 0 0 rgba(255, 255, 255, 0.72), inset 0 -8px 16px rgba(55, 75, 105, 0.14),
+    inset 0 -1.5px 0 rgba(70, 92, 120, 0.18), 0 1px 0 rgba(255, 255, 255, 0.88),
     0 8px 20px rgba(40, 60, 90, 0.1);
   --glass-nested:
-    inset 0 1.5px 0 #fff,
-    inset 1px 0 0 rgba(255, 255, 255, 0.68),
-    inset 0 -3px 8px rgba(55, 75, 105, 0.14),
-    inset 0 -1px 0 rgba(70, 92, 120, 0.16);
+    inset 0 1.5px 0 #fff, inset 1px 0 0 rgba(255, 255, 255, 0.68),
+    inset 0 -3px 8px rgba(55, 75, 105, 0.14), inset 0 -1px 0 rgba(70, 92, 120, 0.16);
   --glass-tile:
-    inset 0 1.5px 0 #fff,
-    inset 0 8px 14px rgba(255, 255, 255, 0.22),
-    inset 1px 0 0 rgba(255, 255, 255, 0.62),
-    inset 0 -6px 12px rgba(55, 75, 105, 0.12),
-    inset 0 -1px 0 rgba(70, 92, 120, 0.14),
-    0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 1.5px 0 #fff, inset 0 8px 14px rgba(255, 255, 255, 0.22),
+    inset 1px 0 0 rgba(255, 255, 255, 0.62), inset 0 -6px 12px rgba(55, 75, 105, 0.12),
+    inset 0 -1px 0 rgba(70, 92, 120, 0.14), 0 1px 0 rgba(255, 255, 255, 0.8),
     0 6px 14px rgba(40, 60, 90, 0.09);
 }
 
@@ -132,7 +121,13 @@ html,
 body {
   background-color: var(--bg);
   color: var(--ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, 'SF Pro Text', 'Segoe UI', sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'SF Pro Text',
+    'Segoe UI',
+    sans-serif;
   letter-spacing: -0.01em;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
@@ -150,11 +145,19 @@ html::before {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background: radial-gradient(ellipse 90% 50% at 50% -8%, rgba(255, 255, 255, 0.14), transparent 58%);
+  background: radial-gradient(
+    ellipse 90% 50% at 50% -8%,
+    rgba(255, 255, 255, 0.14),
+    transparent 58%
+  );
 }
 
 :root[data-theme='light'] html::before {
-  background: radial-gradient(ellipse 90% 50% at 50% -8%, rgba(255, 255, 255, 0.55), transparent 58%);
+  background: radial-gradient(
+    ellipse 90% 50% at 50% -8%,
+    rgba(255, 255, 255, 0.55),
+    transparent 58%
+  );
 }
 
 .stage {
@@ -495,4 +498,28 @@ input[type='number']::-webkit-inner-spin-button {
 input[type='number'] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* Keep keyboard focus visible even on controls that use Tailwind's
+   outline-none utility. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-sheen::after,
+  .skeleton,
+  .page-enter {
+    animation: none !important;
+  }
+
+  .glass-sheen::after {
+    transform: translate3d(60%, 0, 0);
+    opacity: 0.55;
+  }
 }

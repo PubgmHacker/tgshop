@@ -18,7 +18,7 @@ import { writeAdminAudit } from './shared.js'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** UI editor hint per key; the value contract itself stays in core. */
-const SETTING_KINDS: Record<SettingKey, 'decimal' | 'cents' | 'int' | 'percent' | 'url' | 'json'> = {
+const SETTING_KINDS: Record<SettingKey, 'decimal' | 'cents' | 'int' | 'percent' | 'url' | 'json' | 'boolean'> = {
   stars_usd_rate: 'decimal',
   min_topup_cents: 'cents',
   support_url: 'url',
@@ -26,7 +26,8 @@ const SETTING_KINDS: Record<SettingKey, 'decimal' | 'cents' | 'int' | 'percent' 
   price_override: 'json',
   manual_fallback_sla_minutes: 'int',
   broadcast_rate_per_sec: 'int',
-  refund_auto_approve_ceiling_cents: 'cents'
+  refund_auto_approve_ceiling_cents: 'cents',
+  new_product_auto_broadcast: 'boolean'
 }
 
 const keyParamsSchema = z.object({ key: z.string().min(1).max(100) })

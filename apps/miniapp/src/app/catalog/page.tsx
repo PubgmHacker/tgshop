@@ -21,7 +21,13 @@ export default function CatalogPage(): JSX.Element {
   const tiles = useMemo(() => {
     if (!data) return []
     const q = query.trim().toLowerCase()
-    const rows: { id: string; href: string; slug: string; title: string; meta: string; featured: boolean }[] = []
+    const rows: {
+      id: string
+      href: string
+      slug: string
+      title: string
+      meta: string
+    }[] = []
 
     const allCount = data.categories.reduce((sum, category) => sum + category.products.length, 0)
     if (!q && initialCat === 'all') {
@@ -30,8 +36,7 @@ export default function CatalogPage(): JSX.Element {
         href: '/catalog',
         slug: 'all',
         title: t('catalog.allServices'),
-        meta: t('catalog.positions', { count: allCount }),
-        featured: true
+        meta: t('catalog.positions', { count: allCount })
       })
     }
 
@@ -44,8 +49,7 @@ export default function CatalogPage(): JSX.Element {
           href: `/product/${product.slug}`,
           slug: product.slug,
           title: product.title,
-          meta: t('catalog.positions', { count: product.plans.length }),
-          featured: false
+          meta: t('catalog.positions', { count: product.plans.length })
         })
       }
     }
@@ -64,11 +68,17 @@ export default function CatalogPage(): JSX.Element {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          aria-label={t('catalog.search')}
           placeholder={t('catalog.search')}
           className="w-full bg-transparent text-[15px] font-medium text-ink outline-none placeholder:text-muted"
         />
         {query ? (
-          <button type="button" onClick={() => setQuery('')} aria-label={t('common.close')} className="text-faint">
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            aria-label={t('common.close')}
+            className="text-faint"
+          >
             <Icon name="close" size={15} />
           </button>
         ) : null}
@@ -81,9 +91,24 @@ export default function CatalogPage(): JSX.Element {
           ))}
         </div>
       ) : isError ? (
-        <ErrorState title={t('common.error.network')} onRetry={() => void refetch()} retryLabel={t('common.retry')} />
+        <ErrorState
+          title={t('common.error.network')}
+          onRetry={() => void refetch()}
+          retryLabel={t('common.retry')}
+        />
       ) : tiles.length === 0 ? (
-        <p className="py-14 text-center text-sm text-faint">{t('catalog.empty')}</p>
+        <div className="flex flex-col items-center gap-3 rounded-card border border-line bg-card px-5 py-10 text-center">
+          <p className="text-sm font-medium text-ink">{t('catalog.empty')}</p>
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="rounded-full bg-cta px-4 py-2.5 text-sm font-semibold text-cta-ink"
+            >
+              {t('common.clear')}
+            </button>
+          ) : null}
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-2.5 pb-4">
           {tiles.map((tile) => (
@@ -93,7 +118,6 @@ export default function CatalogPage(): JSX.Element {
               slug={tile.slug}
               title={tile.title}
               meta={tile.meta}
-              featured={tile.featured}
             />
           ))}
         </div>

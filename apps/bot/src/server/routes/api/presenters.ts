@@ -94,8 +94,13 @@ export function toCategoryDto(category: Category): CategoryDto {
   return { id: category.id, title: category.title, slug: category.slug, emoji: category.emoji }
 }
 
-export function toPlanDto(plan: Plan, deliveryType: string, availableCount: number): PlanDto {
-  const availability = planAvailability(deliveryType, plan.lowStockThreshold, availableCount)
+export function toPlanDto(
+  plan: Plan,
+  deliveryType: string,
+  availableCount: number,
+  externalConfig: unknown = null
+): PlanDto {
+  const availability = planAvailability(deliveryType, plan.lowStockThreshold, availableCount, externalConfig)
   return {
     id: plan.id,
     title: plan.title,
@@ -119,7 +124,9 @@ export function toProductSummaryDto(
   plans: readonly Plan[],
   availability: ReadonlyMap<string, number>
 ): ProductSummaryDto {
-  const planDtos = plans.map((plan) => toPlanDto(plan, product.deliveryType, availability.get(plan.id) ?? 0))
+  const planDtos = plans.map((plan) =>
+    toPlanDto(plan, product.deliveryType, availability.get(plan.id) ?? 0, product.externalConfig)
+  )
   const effectivePrices = plans.map((plan) =>
     plan.discountPercent > 0 ? Math.round((plan.priceCents * (100 - plan.discountPercent)) / 100) : plan.priceCents
   )
@@ -151,7 +158,9 @@ export function toProductDetailDto(
     deliveryType: product.deliveryType,
     categorySlug: category.slug,
     categoryTitle: category.title,
-    plans: plans.map((plan) => toPlanDto(plan, product.deliveryType, availability.get(plan.id) ?? 0))
+    plans: plans.map((plan) =>
+      toPlanDto(plan, product.deliveryType, availability.get(plan.id) ?? 0, product.externalConfig)
+    )
   }
 }
 

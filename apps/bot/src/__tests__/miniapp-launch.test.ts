@@ -56,6 +56,14 @@ describe('openShopKeyboard', () => {
       web_app: { url: env.MINIAPP_URL }
     })
   })
+
+  it('opens a requested product directly instead of dropping the deep-link intent', () => {
+    const rows = openShopKeyboard('ru', 'mirasim').inline_keyboard
+
+    expect(rows[0]?.[0]).toMatchObject({
+      web_app: { url: `${env.MINIAPP_URL}/product/mirasim` }
+    })
+  })
 })
 
 describe('/start', () => {
@@ -102,5 +110,20 @@ describe('/start', () => {
     ]
     expect(openText).toBe(t('ru', 'start.open_shop'))
     expect(openOpts.reply_markup.inline_keyboard[0]?.[0]?.web_app?.url).toBe(env.MINIAPP_URL)
+  })
+
+  it('preserves a product deep link in the miniapp button', async () => {
+    const { ctx, run } = runStart()
+    ctx.match = 'product_mirasim'
+
+    await run()
+
+    const [, openOpts] = ctx.reply.mock.calls[1] as unknown as [
+      string,
+      { reply_markup: { inline_keyboard: Array<Array<{ web_app?: { url: string } }>> } }
+    ]
+    expect(openOpts.reply_markup.inline_keyboard[0]?.[0]?.web_app?.url).toBe(
+      `${env.MINIAPP_URL}/product/mirasim`
+    )
   })
 })

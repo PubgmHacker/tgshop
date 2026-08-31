@@ -18,7 +18,11 @@ import { SettingsValidationError } from './errors.js'
 
 export const SETTING_SCHEMAS = {
   /** USD price of one Telegram Star, as a decimal STRING (never a float in a money path). */
-  stars_usd_rate: z.coerce.string().regex(/^\d+(\.\d{1,6})?$/, 'expected a decimal string like "0.013"'),
+  stars_usd_rate: z
+    .coerce
+    .string()
+    .regex(/^\d+(\.\d{1,6})?$/, 'expected a decimal string like "0.013"')
+    .refine((value) => /[1-9]/.test(value), 'rate must be greater than zero'),
   /** Minimum balance top-up, integer cents. */
   min_topup_cents: z.number().int().min(1),
   /** Support contact shown in the bot and Mini App. */
@@ -36,7 +40,9 @@ export const SETTING_SCHEMAS = {
    * without a human. Above this it records a pending-approval audit entry
    * instead (docs/AGENT_PLAN.md). 0 sends every agent refund to a human.
    */
-  refund_auto_approve_ceiling_cents: z.number().int().min(0)
+  refund_auto_approve_ceiling_cents: z.number().int().min(0),
+  /** When enabled, an active product creation also queues its announcement. */
+  new_product_auto_broadcast: z.boolean()
 } as const
 
 export type SettingKey = keyof typeof SETTING_SCHEMAS
@@ -52,7 +58,8 @@ const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   price_override: {},
   manual_fallback_sla_minutes: 60,
   broadcast_rate_per_sec: 25,
-  refund_auto_approve_ceiling_cents: 1000
+  refund_auto_approve_ceiling_cents: 1000,
+  new_product_auto_broadcast: false
 }
 
 const CACHE_PREFIX = 'tgshop:settings:'

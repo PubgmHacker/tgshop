@@ -33,6 +33,7 @@ export type IconName =
   | 'shield'
   | 'code'
   | 'card'
+  | 'send'
   | 'refresh'
   | 'alert'
 
@@ -197,6 +198,12 @@ const PATHS: Record<IconName, JSX.Element> = {
       <rect x="3" y="5.5" width="18" height="13" rx="3" />
       <path d="M3 10h18" />
       <path d="M6.5 14.5H11" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="m3.5 4.5 17 7.5-17 7.5 3.2-6.2L14 12 6.7 10.7 3.5 4.5Z" />
+      <path d="M6.7 10.7 3.5 4.5M6.7 13.3 3.5 19.5" />
     </>
   ),
   refresh: (

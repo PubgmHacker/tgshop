@@ -138,7 +138,7 @@ export interface SettingDefinition {
 export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
   {
     key: 'stars_usd_rate',
-    label: 'Stars per USD',
+    label: 'USD value of one Star',
     kind: 'decimal',
     hint: 'Decimal written as a JSON string, e.g. "0.013". Stored as a string to stay float-free.'
   },
@@ -154,6 +154,36 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     label: 'Referral percent',
     kind: 'percent',
     hint: 'Integer 0-100. Share of a purchase credited to the referrer.'
+  },
+  {
+    key: 'price_override',
+    label: 'Price overrides (JSON)',
+    kind: 'json',
+    hint: 'Optional map of plan ids to integer cents.'
+  },
+  {
+    key: 'manual_fallback_sla_minutes',
+    label: 'Manual delivery SLA (minutes)',
+    kind: 'int',
+    hint: 'After this time a stuck manual order is sent to the admin alert queue.'
+  },
+  {
+    key: 'broadcast_rate_per_sec',
+    label: 'Broadcast rate (messages/sec)',
+    kind: 'int',
+    hint: 'Keep at or below 30 to stay within Telegram limits.'
+  },
+  {
+    key: 'refund_auto_approve_ceiling_cents',
+    label: 'Agent auto-refund ceiling (cents)',
+    kind: 'int',
+    hint: 'Refunds above this amount require a human review.'
+  },
+  {
+    key: 'new_product_auto_broadcast',
+    label: 'Auto-queue new product announcements',
+    kind: 'boolean',
+    hint: 'When enabled, every newly active product announcement is queued automatically. Review drafts with it off.'
   }
 ] as const
 
@@ -162,7 +192,10 @@ const settingKindSchemas: Record<SettingKind, z.ZodTypeAny> = {
   url: z.string().url(),
   int: z.number().int().nonnegative(),
   percent: z.number().int().min(0).max(100),
-  decimal: z.string().regex(/^\d+(\.\d+)?$/, 'must be a decimal number written as a string, e.g. "0.013"'),
+  decimal: z
+    .string()
+    .regex(/^\d+(\.\d{1,6})?$/, 'must be a decimal number written as a string, e.g. "0.013"')
+    .refine((value) => /[1-9]/.test(value), 'must be greater than zero'),
   boolean: z.boolean(),
   json: z.unknown()
 }

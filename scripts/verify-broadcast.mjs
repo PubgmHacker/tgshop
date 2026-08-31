@@ -3,7 +3,7 @@
 // The four defects this covers were all invisible to a typecheck, because each
 // one was a correct-looking call whose effect landed in Redis:
 //
-//   1. a scheduled post that nothing ever arms          -> delivered never
+//   1. an explicitly published post that nothing ever arms -> delivered never
 //   2. a delayed job with no deterministic id           -> uncancellable
 //   3. QUEUED written as SENDING                        -> permanently frozen
 //   4. three producers spelling the job name differently
@@ -133,39 +133,32 @@ console.log('=== BROADCAST LIFECYCLE ===')
   await second.remove()
 }
 
-// ── 6. The sweep finds a due SCHEDULED post and an armed-but-jobless one ───
+// ── 6. The sweep finds an armed-but-jobless post, not a saved schedule ─────
 {
   const past = new Date(Date.now() - 60_000)
   const future = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
-  const due = await makePost({ status: PostStatus.SCHEDULED, scheduledAt: past })
+  const savedSchedule = await makePost({ status: PostStatus.SCHEDULED, scheduledAt: past })
   const notDue = await makePost({ status: PostStatus.SCHEDULED, scheduledAt: future })
   const orphan = await makePost({ status: PostStatus.QUEUED, scheduledAt: past })
   const draft = await makePost({ status: PostStatus.DRAFT })
 
   // The sweep's own query, verbatim from broadcast.worker.ts::sweepDuePosts.
-  const now = new Date()
   const found = await prisma.broadcastPost.findMany({
-    where: {
-      OR: [
-        { status: PostStatus.SCHEDULED, scheduledAt: { lte: now } },
-        { status: PostStatus.QUEUED }
-      ]
-    },
+    where: { status: PostStatus.QUEUED },
     select: { id: true }
   })
   const ids = new Set(found.map((p) => p.id))
 
-  check('sweep picks up a due SCHEDULED post', ids.has(due.id), true)
+  check('sweep ignores a saved SCHEDULED post', ids.has(savedSchedule.id), false)
   check('sweep picks up a QUEUED post whose job vanished', ids.has(orphan.id), true)
   check('sweep ignores a SCHEDULED post that is not due yet', ids.has(notDue.id), false)
   check('sweep ignores an unarmed DRAFT', ids.has(draft.id), false)
 }
 
 // ── 7. An AGENT-authored post never lands in an armable state ──────────────
-// The safety gate: the sweep arms SCHEDULED posts on its own, so an agent that
-// could write SCHEDULED would have a route to every customer with no human in
-// the loop. Goes through the real createPost() rather than restating its rule.
+// The safety gate: an agent-authored post stays DRAFT even when it carries a
+// requested schedule, so it cannot reach customers without a human publish.
 {
   const post = await makePost({ scheduledAt: new Date(Date.now() + 60_000), source: PostSource.AGENT })
   check('AGENT post with a scheduledAt is DRAFT, not SCHEDULED', post.status, PostStatus.DRAFT)

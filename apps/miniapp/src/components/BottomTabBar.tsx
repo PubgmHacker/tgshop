@@ -19,7 +19,8 @@ const TABS: TabDef[] = [
     href: '/catalog',
     labelKey: 'tabs.catalog',
     icon: 'grid',
-    match: (path) => path.startsWith('/catalog') || path.startsWith('/category') || path.startsWith('/product')
+    match: (path) =>
+      path.startsWith('/catalog') || path.startsWith('/category') || path.startsWith('/product')
   },
   {
     href: '/orders',
@@ -57,6 +58,7 @@ export function BottomTabBar(): JSX.Element {
             <Link
               key={tab.href}
               href={tab.href}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => triggerHaptic('light')}
               className="flex h-[56px] w-[58px] flex-col items-center justify-end gap-0.5 pb-0.5"
             >
@@ -68,7 +70,11 @@ export function BottomTabBar(): JSX.Element {
                       : 'flex h-7 w-7 items-center justify-center rounded-full text-faint'
                   }
                 >
-                  <Icon name={tab.icon} size={isActive ? 22 : 16} strokeWidth={isActive ? 2.1 : 1.7} />
+                  <Icon
+                    name={tab.icon}
+                    size={isActive ? 22 : 16}
+                    strokeWidth={isActive ? 2.1 : 1.7}
+                  />
                 </span>
               </span>
               <span

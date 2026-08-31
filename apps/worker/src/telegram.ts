@@ -45,18 +45,32 @@ export class TelegramRateLimitError extends Error {
 export async function sendTelegramMessage(
   chatId: string | bigint,
   text: string,
-  options?: { buttons?: InlineButton[][] }
+  options?: { buttons?: InlineButton[][]; photoUrl?: string }
 ): Promise<void> {
   const telegramApi = getTelegramApi()
   try {
+    const replyMarkup = options?.buttons
+      ? {
+          inline_keyboard: options.buttons.map((row) =>
+            row.map((b) => ({ text: b.text, callback_data: b.callbackData }))
+          )
+        }
+      : undefined
+
+    if (options?.photoUrl) {
+      // Telegram captions are limited to 1,024 characters. The full message is
+      // still stored in BroadcastPost; the operator's media attachment gets a
+      // readable caption instead of turning into a bare URL in every chat.
+      await telegramApi.sendPhoto(chatId.toString(), options.photoUrl, {
+        caption: text.length > 1_024 ? `${text.slice(0, 1_021)}…` : text,
+        reply_markup: replyMarkup,
+        parse_mode: undefined
+      })
+      return
+    }
+
     await telegramApi.sendMessage(chatId.toString(), text, {
-      reply_markup: options?.buttons
-        ? {
-            inline_keyboard: options.buttons.map((row) =>
-              row.map((b) => ({ text: b.text, callback_data: b.callbackData }))
-            )
-          }
-        : undefined,
+      reply_markup: replyMarkup,
       parse_mode: undefined
     })
   } catch (err) {

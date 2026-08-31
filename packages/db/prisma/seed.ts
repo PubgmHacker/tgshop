@@ -114,7 +114,7 @@ async function main(): Promise<void> {
     throw new Error('failed to seed categories')
   }
 
-  // ── Products (6) ────────────────────────────────────────────────────────
+  // ── Products (7) ────────────────────────────────────────────────────────
   const productsData = [
     {
       categoryId: chat.id,
@@ -150,11 +150,22 @@ async function main(): Promise<void> {
     },
     {
       categoryId: code.id,
+      title: 'Mirasim',
+      slug: 'mirasim',
+      description:
+        'Mirasim — IDE для agentic coding и eval. Доступ оформляется оператором вручную.',
+      imageUrl: 'https://mirasim.ai/site/mirasim-mark-white.png',
+      deliveryType: DeliveryType.MANUAL_FALLBACK,
+      externalConfig: { sourceUrl: 'https://mirasim.ai', fulfillmentMode: 'manual' },
+      sortOrder: 0
+    },
+    {
+      categoryId: code.id,
       title: 'GitHub Copilot',
       slug: 'github-copilot',
       description: 'GitHub Copilot: автодополнение кода в IDE.',
       deliveryType: DeliveryType.UNIQUE_CODE,
-      sortOrder: 0
+      sortOrder: 1
     },
     {
       categoryId: code.id,
@@ -162,7 +173,7 @@ async function main(): Promise<void> {
       slug: 'cursor-pro',
       description: 'Cursor Pro: агентный редактор с доступом к моделям.',
       deliveryType: DeliveryType.STOCK_POOL,
-      sortOrder: 1
+      sortOrder: 2
     }
   ]
 
@@ -176,9 +187,42 @@ async function main(): Promise<void> {
     products.push(product)
   }
 
-  // ── Plans (12, 2 per product) ───────────────────────────────────────────
+  // ── Plans ────────────────────────────────────────────────────────────────
   const plans = []
   for (const product of products) {
+    // Mirasim is intentionally manual until a licensed supplier/invite-code
+    // integration is configured. Do not create fake stock for it.
+    if (product.slug === 'mirasim') {
+      const plan = await prisma.plan.upsert({
+        where: { id: 'mirasim-pro-1m' },
+        update: {
+          productId: product.id,
+          title: 'Mirasim Pro · 1 месяц',
+          durationDays: 30,
+          priceCents: 2900,
+          priceStars: null,
+          discountPercent: 0,
+          lowStockThreshold: 0,
+          isActive: true,
+          sortOrder: 0
+        },
+        create: {
+          id: 'mirasim-pro-1m',
+          productId: product.id,
+          title: 'Mirasim Pro · 1 месяц',
+          durationDays: 30,
+          priceCents: 2900,
+          priceStars: null,
+          discountPercent: 0,
+          lowStockThreshold: 0,
+          isActive: true,
+          sortOrder: 0
+        }
+      })
+      plans.push(plan)
+      continue
+    }
+
     const plan1 = await prisma.plan.upsert({
       where: { id: `${product.slug}-1m` },
       update: {},
@@ -214,7 +258,7 @@ async function main(): Promise<void> {
     plans.push(plan1, plan2)
   }
 
-  // ── Stock items (2 per active plan, encrypted) ──────────────────────────
+  // ── Stock items (2 per active pool-backed plan, encrypted) ───────────────
   // StockItem has no natural unique column, and payloadEnc cannot serve as one
   // (a fresh IV per encrypt means the same plaintext yields different ciphertext
   // each run). So the deterministic id is derived from (plan.id, index): keying
@@ -225,6 +269,8 @@ async function main(): Promise<void> {
   // yanks a row back to AVAILABLE after a real order already consumed it.
   let stockCount = 0
   for (const plan of plans) {
+    const product = products.find((item) => item.id === plan.productId)
+    if (product?.deliveryType === DeliveryType.MANUAL_FALLBACK) continue
     const itemsForPlan = 2
     for (let i = 0; i < itemsForPlan; i++) {
       const demoPayload = `demo-login:${plan.id}-${i}@example.com|password:Demo${i}!Pass`
@@ -246,28 +292,43 @@ async function main(): Promise<void> {
   // ── Settings ─────────────────────────────────────────────────────────────
   await prisma.setting.upsert({
     where: { key: 'stars_usd_rate' },
-    update: { value: '0.013' },
+    update: {},
     create: { key: 'stars_usd_rate', value: '0.013' }
   })
   await prisma.setting.upsert({
     where: { key: 'min_topup_cents' },
-    update: { value: 500 },
+    update: {},
     create: { key: 'min_topup_cents', value: 500 }
   })
   await prisma.setting.upsert({
     where: { key: 'support_url' },
-    update: { value: 'https://t.me/tgshop_support' },
+    update: {},
     create: { key: 'support_url', value: 'https://t.me/tgshop_support' }
   })
   await prisma.setting.upsert({
     where: { key: 'referral_percent' },
-    update: { value: 5 },
+    update: {},
     create: { key: 'referral_percent', value: 5 }
   })
   await prisma.setting.upsert({
     where: { key: 'refund_auto_approve_ceiling_cents' },
-    update: { value: 1000 },
+    update: {},
     create: { key: 'refund_auto_approve_ceiling_cents', value: 1000 }
+  })
+  await prisma.setting.upsert({
+    where: { key: 'manual_fallback_sla_minutes' },
+    update: {},
+    create: { key: 'manual_fallback_sla_minutes', value: 60 }
+  })
+  await prisma.setting.upsert({
+    where: { key: 'broadcast_rate_per_sec' },
+    update: {},
+    create: { key: 'broadcast_rate_per_sec', value: 25 }
+  })
+  await prisma.setting.upsert({
+    where: { key: 'new_product_auto_broadcast' },
+    update: {},
+    create: { key: 'new_product_auto_broadcast', value: false }
   })
 
   // ── Default admin user ───────────────────────────────────────────────────

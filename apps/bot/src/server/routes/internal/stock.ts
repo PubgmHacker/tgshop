@@ -23,7 +23,7 @@ export function registerStockRoutes(app: FastifyInstance): void {
 
       const items = plans.map((plan) => {
         const available = counts.get(plan.id) ?? 0
-        const poolBacked = isPoolBacked(plan.product.deliveryType)
+        const poolBacked = isPoolBacked(plan.product.deliveryType, plan.product.externalConfig)
         return {
           planId: plan.id,
           planTitle: plan.title,
