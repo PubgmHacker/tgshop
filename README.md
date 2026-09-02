@@ -16,7 +16,7 @@ apps/
 packages/
   db/         Prisma schema, migrations, seed, generated client (@tgshop/db)
   core/       Domain logic: money, pricing, crypto (payload encryption), ledger, errors (@tgshop/core)
-  payments/   Payment provider adapters: BALANCE, CRYPTOBOT, STARS, TRON_TRC20 (@tgshop/payments)
+  payments/   Payment provider adapters: CRYPTOBOT, STARS + price oracle (@tgshop/payments); USDT-TRC20 is a static wallet watched by the worker
   ui/         Design tokens, Tailwind preset, shared React components (@tgshop/ui)
 docs/         This documentation
 scripts/      Ops scripts (backup, restore, webhook setup, key generation)
@@ -130,18 +130,22 @@ Stars amount charged is always the integer computed via
 
 ### 7. Configure TRON / USDT-TRC20 (optional)
 
-1. Get a free API key at [TronGrid](https://www.trongrid.io/) →
-   `TRONGRID_API_KEY`.
-2. Generate (or bring your own) a BIP32 extended public key for deriving
-   per-order deposit addresses → `TRON_MASTER_XPUB`. **The corresponding
-   private key must never touch this repo or any app process** — it's used
-   offline/in a vault to derive per-address private keys only when sweeping.
-3. Set `TRON_HOT_WALLET_KEY` for the wallet that sweeps consolidated funds
-   (production: use a proper secrets vault, not a bare `.env` value).
-4. Start on `TRON_NETWORK=nile` (testnet) and get free test USDT from a Nile
-   faucet before touching mainnet.
-5. `TRON_MIN_CONFIRMATIONS=19` and `TRON_SWEEP_THRESHOLD` are tuned defaults;
-   see `docs/PAYMENTS.md` for the reasoning.
+1. Put your own USDT-TRC20 receive address (for example the TRC-20 address of
+   your Trust Wallet) into `TRON_RECEIVE_ADDRESS` on **both** the `bot` and
+   the `worker` service. The legacy name `TRON_SWEEP_TO_ADDRESS` is accepted
+   too. That is the only wallet-side setting: the shop holds no keys, derives
+   no addresses and never signs a transaction — customers pay straight into
+   your wallet and the worker only *reads* it.
+2. Get a free API key at [TronGrid](https://www.trongrid.io/) →
+   `TRONGRID_API_KEY` (worker). Anonymous access is rate-limited hard.
+3. Leave `TRON_USDT_CONTRACT` at the mainnet USDT contract and
+   `TRON_MIN_CONFIRMATIONS=19` unless you know why not; `TRON_NETWORK` is
+   informational (buyers pay from real wallets, so mainnet).
+4. Every buyer is shown an exact amount with a unique sub-cent tag
+   (`29.0057 USDT`) and must send it to the last decimal — the tag is how the
+   worker tells invoices apart on one shared address. A rounded transfer is
+   not lost: it surfaces as a `tron_unmatched` admin alert plus an `AuditLog`
+   anomaly, to be credited by hand. Details in `docs/PAYMENTS.md`.
 
 ### 8. Register the Telegram webhook
 

@@ -109,76 +109,84 @@ charged always matches what `Order.amountCents` implies.
 
 ### TRON_TRC20 (USDT)
 
+Every customer pays into **one static wallet** — the owner's own USDT-TRC20
+address (`TRON_RECEIVE_ADDRESS`; the legacy name `TRON_SWEEP_TO_ADDRESS` is
+accepted). The shop holds no keys, derives no addresses and never signs a
+transaction: the worker only *reads* that wallet on TronGrid.
+
+What tells one invoice from another is the **amount**. Each open invoice for a
+given price gets a unique sub-cent tag in 0.0001-USDT steps
+(`tronTaggedAmountUsdt6` in `@tgshop/core`): `$29.00` is shown as
+`29.0057 USDT` to one buyer and `29.0058` to the next. There are 99 tags per
+price; a tag is held while its payment is `PENDING`/`CONFIRMING`/`UNDERPAID`
+and for a 30-minute grace after the 20-minute payment window, then released.
+A Redis `SET NX` reservation closes the race between two checkouts allocating
+in the same instant (`apps/bot/src/payments/tron.ts`).
+
 ```mermaid
 sequenceDiagram
     participant U as User
     participant B as bot API
-    participant W as worker (TronGrid poller)
+    participant W as worker (chain-scan)
     participant TG as TronGrid API
     participant DB as Postgres
 
-    U->>B: POST /api/orders (provider=TRON_TRC20)
-    B->>DB: derive/allocate DepositAddress (from TRON_MASTER_XPUB, unique derivationIndex)
-    B-->>U: deposit address + exact USDT amount + expiresAt
-    U->>U: sends USDT-TRC20 from any wallet
-    loop every N seconds
-        W->>TG: getTransactionsByAccount / TRC20 transfer events
-        TG-->>W: transfer(to=depositAddress, amount6, confirmations)
+    U->>B: POST /api/orders (provider=TRON_TRC20) or POST /api/topup
+    B->>DB: Payment PENDING, amount = price + unique sub-cent tag
+    B-->>U: receive address + EXACT tagged amount + expiresAt
+    U->>U: sends exactly that amount from any wallet
+    loop every 20 s
+        W->>TG: /v1/accounts/{wallet}/transactions/trc20 (only_to, only_confirmed, USDT contract, 6 h lookback)
+        TG-->>W: transfers that landed on the wallet
     end
-    W->>DB: lookup Payment by (TRON_TRC20, txHash) — idempotent
-    alt confirmations < TRON_MIN_CONFIRMATIONS
-        W->>DB: Payment.status=CONFIRMING
-    else amount6 < expected
-        W->>DB: Payment.status=UNDERPAID
-        W->>B: notify user of shortfall
-    else amount6 >= expected and confirmed
-        W->>DB: Payment.status=PAID, Order.status=PAID
-        W->>Q: enqueue delivery job
+    W->>DB: drop txids already recorded (Payment.txHash) or flagged (AuditLog)
+    W->>W: matchTransfer(): exact amount -> unique tag -> unmatched
+    alt order PENDING, in window, amount >= tagged
+        W->>DB: Order PAID (CAS on status), Payment PAID, surplus -> balance
+        W->>Q: enqueue delivery
+    else order PENDING, amount short
+        W->>DB: Payment UNDERPAID (keeps its tag), received -> balance, notify
+    else order expired / already paid another way
+        W->>DB: Payment PAID, full amount -> balance, notify
+    else top-up (no order)
+        W->>DB: Payment PAID, amount -> balance (ledger key topup:<paymentId>)
+    else unmatched
+        W->>DB: AuditLog anomaly (once per txid) + tron_unmatched admin alert
     end
-    Note over W,TG: separately, once DepositAddress balance >= TRON_SWEEP_THRESHOLD,<br/>worker sweeps to TRON_SWEEP_TO_ADDRESS and sets isSwept=true
 ```
 
+**Confirmations.** TronGrid is queried with `only_confirmed=true`, so only
+transfers in solidified blocks are ever returned; on top of that the worker
+waits `TRON_MIN_CONFIRMATIONS × 3 s` from the transfer's block timestamp
+before settling. In between the invoice sits in `CONFIRMING` with the tx
+already bound, which is what the checkout page polls.
+
+**Unmatched transfers** — a round amount with no tag, a tag no open invoice
+holds (paid after the grace, typo), or two open invoices sharing a tag — are
+never guessed at. The worker writes an `AuditLog` row
+(`entity=TronTransfer`, `entityId=<txid>`, `action=anomaly.flagged`) with the
+sender, amount and reason — that row is also the dedupe so the alert fires
+once — and enqueues a `tron_unmatched` admin notification. The money is
+already in the owner's wallet; the operator credits the right user by hand.
+
+**Second transfers.** An `UNDERPAID` invoice keeps holding its tag, so a
+buyer who re-sends the full tagged amount is recognised; the new transfer gets
+its own `Payment` row on the same order (`(provider, txHash)` is unique) and
+settles the order, while the earlier partial already sits on the balance.
+
 Use `bruno/tgshop/webhook-simulators/tron-usdt-deposit.bru` (and the
-`-underpayment` variant) to exercise this without a real testnet transfer.
-They drive `scripts/fake-trongrid.mjs`, a local stand-in for api.trongrid.io:
-TRON has no push webhooks, so the only faithful simulation is one the real
-polling code discovers. Point the worker at it with
+`-underpayment` variant) to exercise this without a real transfer. They drive
+`scripts/fake-trongrid.mjs`, a local stand-in for api.trongrid.io: TRON has
+no push webhooks, so the only faithful simulation is one the real polling
+code discovers. Point the worker at it with
 `TRONGRID_API_BASE=http://localhost:8099`.
 
-### Sweeping deposits to the treasury
+### No sweeping
 
-Deposits land on per-invoice addresses derived at `m/44'/195'/0'/0/<index>`,
-so consolidating them means signing one transfer per address.
-
-**An xpub cannot sweep.** `TRON_MASTER_XPUB` derives deposit *addresses* and
-nothing more; moving funds needs the matching private keys, so live sweeping
-requires `TRON_MASTER_XPRV` (AES-256-GCM encrypted under `ENCRYPTION_KEY`, in
-the same `v1:<iv>:<tag>:<ct>` keystore format as the stock payloads).
-
-**Energy.** A TRC-20 transfer from a fresh address needs TRX for energy and
-bandwidth, and deposit addresses receive only USDT. The sweeper therefore
-reads the address's TRX balance, tops it up from the hot wallet
-(`TRON_HOT_WALLET_KEY`) when below `TRON_SWEEP_ENERGY_RESERVE_SUN`, waits for
-that top-up to confirm, and only then sweeps. If the hot wallet itself falls
-below `TRON_SWEEP_HOT_WALLET_FLOOR_SUN` it raises a `low_trx` admin alert and
-skips, rather than stranding itself unable to fund any sweep at all.
-
-**No double-sweep.** The address is claimed with a compare-and-swap
-(`UPDATE ... WHERE address = $1 AND "isSwept" = false`) *before* broadcasting.
-Under READ COMMITTED a second worker blocks on the row lock, re-evaluates the
-predicate, and matches zero rows — so the guard holds across concurrent jobs,
-processes and machines. The claim is taken before the broadcast on purpose: if
-the process dies mid-sweep the claim stays held and the funds are recoverable
-by hand, whereas a double broadcast is not recoverable.
-
-**All-or-nothing.** If any inbound deposit to that address is still
-unconfirmed, the address is skipped rather than partially swept — a partial
-sweep against a lagging balance read could produce a duplicate broadcast on
-the next pass.
-
-**Read-only mode** is the default (`TRON_SWEEP_READ_ONLY=true`). The sweeper
-logs what it *would* sweep and signs nothing, which is the correct posture
-when no hot key is deployed; consolidation is then a manual operation.
+Funds land directly in the owner's wallet, so there is nothing to
+consolidate and no hot key anywhere in the system. The former per-invoice
+deposit addresses (xpub derivation, energy top-ups, sweeper) were removed by
+migration `20260902090000_drop_deposit_addresses`.
 
 ## Failure modes
 
@@ -214,18 +222,18 @@ a webhook-signature verification bug silently dropping legitimate callbacks.
 
 ### Underpayment (TRON)
 
-**Risk**: user sends less USDT than the order requires (wrong amount, or a
+**Risk**: user sends less USDT than the invoice asks (wrong amount, or a
 wallet that deducts network fees from the send amount rather than adding
 them).
 
-**Mitigation**: `Payment.status=UNDERPAID` is a distinct terminal-ish state
-(not `FAILED` — the funds did arrive, just not enough). The user is notified
-of the shortfall and can either send the difference to the same
-`DepositAddress` (the worker re-evaluates cumulative deposits against the
-order total) or request a refund of the partial amount to their balance
-(`LedgerType.REFUND`, `BalanceTransaction` credit) rather than to a TRON
-address, since consolidating dust back out on-chain rarely nets positive
-after fees.
+**Mitigation**: `Payment.status=UNDERPAID` is a distinct state (not `FAILED`
+— the funds did arrive, just not enough). The received amount is credited to
+the user's balance immediately (`LedgerType.TOPUP`, key
+`tron-underpaid:<paymentId>`), so nothing is stranded, and the user is told
+the shortfall. They can pay the order from balance after topping up the
+difference by any rail, or re-send the full tagged amount — the invoice keeps
+its tag, so the second transfer settles the order. Dust is never sent back
+on-chain: consolidating it out rarely nets positive after fees.
 
 ### Late payment (after Order.expiresAt)
 

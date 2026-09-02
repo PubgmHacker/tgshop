@@ -118,7 +118,6 @@ model User {
   orders               Order[]
   payments             Payment[]
   balanceTransactions  BalanceTransaction[]
-  depositAddresses     DepositAddress[]
   subscriptions        Subscription[]
 
   @@index([referredById])
@@ -221,7 +220,6 @@ model Order {
   stockItem     StockItem?
   payments      Payment[]
   ledgerEntries BalanceTransaction[]
-  depositAddress DepositAddress?
   subscription  Subscription?
 
   @@index([userId, status])
@@ -276,32 +274,6 @@ model BalanceTransaction {
   @@index([orderId])
   @@index([paymentId])
   @@map("balance_transactions")
-}
-
-model DepositAddress {
-  id               String   @id @default(cuid())
-  userId           String
-  orderId          String?  @unique
-  network          String
-  address          String   @unique
-  derivationIndex  Int      @unique
-  isSwept          Boolean  @default(false)
-  // Hash of the sweep transfer that drained this address. NULL until a sweep is
-  // actually broadcast — including while isSwept is already true, because the
-  // sweep claims the row before broadcasting so that a crash strands funds
-  // rather than risking a double-spend. `isSwept && txHash == null` is therefore
-  // the exact signature of an interrupted sweep, and the one an operator looks
-  // for. The tx also lands in AuditLog; this column is what makes it queryable.
-  txHash           String?
-  sweptAt          DateTime?
-  createdAt        DateTime @default(now())
-
-  user  User   @relation(fields: [userId], references: [id])
-  order Order? @relation(fields: [orderId], references: [id])
-
-  @@index([userId])
-  @@index([network, isSwept])
-  @@map("deposit_addresses")
 }
 
 model Subscription {

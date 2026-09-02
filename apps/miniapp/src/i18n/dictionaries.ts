@@ -128,6 +128,9 @@ export const dictionaries = {
     'checkout.tron.underpaid': 'Получена неполная сумма',
     'checkout.tron.expired': 'Время оплаты истекло',
     'checkout.tron.copyAddress': 'Скопировать адрес',
+    'checkout.tron.exact':
+      'Переведите ровно эту сумму, до последнего знака: по ней мы узнаём ваш платёж. Округлите — и зачисление придётся делать вручную.',
+    'checkout.tron.copyAmount': 'Скопировать сумму',
     'checkout.status.pending': 'Ожидание оплаты',
     'checkout.status.confirming': 'Подтверждение',
     'checkout.status.paid': 'Оплачено',
@@ -307,6 +310,9 @@ export const dictionaries = {
     'checkout.tron.underpaid': 'Underpaid amount received',
     'checkout.tron.expired': 'Payment window expired',
     'checkout.tron.copyAddress': 'Copy address',
+    'checkout.tron.exact':
+      'Send exactly this amount, every decimal included: it is how we recognise your payment. A rounded amount has to be credited by hand.',
+    'checkout.tron.copyAmount': 'Copy amount',
     'checkout.status.pending': 'Awaiting payment',
     'checkout.status.confirming': 'Confirming',
     'checkout.status.paid': 'Paid',

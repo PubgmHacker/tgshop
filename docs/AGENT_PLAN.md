@@ -144,7 +144,7 @@ entries the worker's own reconciliation job already emits.
    to trigger an out-of-band pass (e.g. a support ticket mentions "I paid
    but nothing arrived") and *what to do* with a mismatch that reconciliation
    surfaces but doesn't auto-resolve (per `docs/PAYMENTS.md`, ambiguous
-   cases like a `txHash` that matches no known `DepositAddress` amount
+   cases like a `txHash` whose amount carries no open invoice tag
    exactly are left as `payment.reconcile_mismatch` events rather than
    guessed at automatically).
 2. On a mismatch, the agent gathers context (order history, user's other

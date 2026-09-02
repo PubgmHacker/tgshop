@@ -101,15 +101,19 @@ export default function CheckoutOrderPage(): JSX.Element {
       {data.tron && data.status === 'PENDING' ? (
         <section className="flex flex-col items-center gap-3 rounded-card border border-line bg-card p-4">
           <p className="text-sm font-semibold text-ink">{t('checkout.tron.network')}</p>
-          <QrCode value={`tron:${data.tron.address}?amount=${data.tron.amountUsdt6}`} />
+          <QrCode value={data.tron.address} />
           <div className="flex w-full items-center justify-between gap-2 rounded-xl bg-card-strong px-3 py-2.5">
             <p className="truncate text-xs text-ink">{data.tron.address}</p>
             <CopyButton value={data.tron.address} label={t('checkout.tron.copyAddress')} />
           </div>
-          <div className="flex w-full items-center justify-between">
-            <p className="text-sm text-muted">{t('checkout.tron.amount')}</p>
-            <p className="tnum text-sm font-semibold text-ink">{data.tron.amountUsdt6} USDT</p>
+          <div className="flex w-full items-center justify-between gap-2 rounded-xl bg-card-strong px-3 py-2.5">
+            <div className="flex min-w-0 flex-col">
+              <p className="text-xs text-muted">{t('checkout.tron.amount')}</p>
+              <p className="tnum text-base font-semibold text-ink">{data.tron.amountDisplay} USDT</p>
+            </div>
+            <CopyButton value={data.tron.amountDisplay} label={t('checkout.tron.copyAmount')} />
           </div>
+          <p className="text-center text-xs leading-relaxed text-danger">{t('checkout.tron.exact')}</p>
           <p className="animate-pulse text-xs text-faint">{t('checkout.tron.waiting')}</p>
         </section>
       ) : null}

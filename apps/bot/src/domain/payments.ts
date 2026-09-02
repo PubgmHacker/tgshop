@@ -1,10 +1,10 @@
 import { Api } from 'grammy'
 import { prisma, PaymentProvider, PaymentStatus, Prisma } from '@tgshop/db'
 import type { Payment } from '@tgshop/db'
-import { getSetting, usdCentsToUsdt6 } from '@tgshop/core'
+import { getSetting, tronTaggedAmountUsdt6, usdt6ToDisplay } from '@tgshop/core'
 import { createCryptoBotInvoice } from '../payments/cryptobot.js'
 import { amountCentsToStars } from '../payments/stars.js'
-import { allocateDepositAddress } from '../payments/tron.js'
+import { TRON_OPEN_STATUSES, allocateTronTag, getTronReceiveAddress } from '../payments/tron.js'
 import { emitEvent } from './events.js'
 import { logger } from '../lib/logger.js'
 import { env } from '../config/env.js'
@@ -24,9 +24,13 @@ import { redis } from '../config/redis.js'
 const PAYMENT_WINDOW_MS = 20 * 60 * 1000
 
 export interface TronPaymentDetails {
+  /** The owner's static USDT-TRC20 receive address (same for every invoice). */
   address: string
   network: 'TRC20'
+  /** Exact amount due in USDT smallest units (6 decimals), tagged per invoice. */
   amountUsdt6: string
+  /** The same amount as the customer must type it into a wallet, e.g. "29.0057". */
+  amountDisplay: string
   expiresAt: string
 }
 
@@ -59,8 +63,8 @@ export interface CreateInvoiceInput {
  * Creates (or reuses) a provider invoice plus its Payment row.
  *
  * Idempotency: keyed on `(provider, providerInvoiceId)` for CryptoBot, and on
- * the linked orderId for TRON deposit addresses, so a retried checkout does not
- * mint a second invoice for the same money.
+ * the linked orderId (or top-up retry key) for TRON invoices, so a retried
+ * checkout does not mint a second invoice for the same money.
  */
 export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceResult> {
   switch (input.provider) {
@@ -287,53 +291,70 @@ export async function settleStarsPayment(
 }
 
 async function createTronPayment(input: CreateInvoiceInput): Promise<InvoiceResult> {
-  if (!input.orderId) {
-    throw new Error('TRON_TRC20 payments require an orderId to bind the deposit address to')
+  const receiveAddress = getTronReceiveAddress()
+  if (!receiveAddress) {
+    throw new Error(
+      'TRON_RECEIVE_ADDRESS (or legacy TRON_SWEEP_TO_ADDRESS) is not a valid TRON address; cannot accept USDT-TRC20'
+    )
   }
 
-  const amountUsdt6 = usdCentsToUsdt6(input.amountCents)
-  const existing = await prisma.payment.findFirst({
-    where: {
-      orderId: input.orderId,
-      provider: PaymentProvider.TRON_TRC20,
-      status: { in: [PaymentStatus.PENDING, PaymentStatus.CONFIRMING, PaymentStatus.UNDERPAID] }
-    },
-    orderBy: { createdAt: 'desc' }
-  })
+  // One open TRON invoice per order (or per client retry key for a top-up).
+  // Re-issuing would burn a second tag and leave the customer two different
+  // amounts, only one of which we would ever match.
+  const existing = input.orderId
+    ? await prisma.payment.findFirst({
+        where: {
+          orderId: input.orderId,
+          provider: PaymentProvider.TRON_TRC20,
+          status: { in: TRON_OPEN_STATUSES }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+    : await findPaymentByIdempotency(input, PaymentProvider.TRON_TRC20)
 
-  if (existing?.address) {
-    return { payment: existing, payUrl: null, stars: null, tron: tronDetailsFromPayment(existing) }
+  if (existing) {
+    const reused = tronDetailsFromPayment(existing)
+    if (reused) return { payment: existing, payUrl: null, stars: null, tron: reused }
   }
 
-  const address = await allocateDepositAddress(input.userId, input.orderId)
+  const tag = await allocateTronTag(input.amountCents, PAYMENT_WINDOW_MS)
+  const amountUsdt6 = tronTaggedAmountUsdt6(input.amountCents, tag)
   const expiresAt = new Date(Date.now() + PAYMENT_WINDOW_MS)
 
   const payment = await prisma.payment.create({
     data: {
-      orderId: input.orderId,
+      orderId: input.orderId ?? null,
       userId: input.userId,
       provider: PaymentProvider.TRON_TRC20,
       amount: amountUsdt6,
       asset: 'USDT',
       network: env.TRON_NETWORK,
-      address,
+      address: receiveAddress,
       status: PaymentStatus.PENDING,
       rawPayload: {
         reference: input.reference,
+        amountCents: input.amountCents,
+        tag,
         expectedAmountUsdt6: amountUsdt6.toString(),
         ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {})
       }
     }
   })
 
+  logger.info(
+    { paymentId: payment.id, orderId: input.orderId ?? null, amountCents: input.amountCents, tag },
+    'TRON invoice issued'
+  )
+
   return {
     payment,
     payUrl: null,
     stars: null,
     tron: {
-      address,
+      address: receiveAddress,
       network: 'TRC20',
       amountUsdt6: amountUsdt6.toString(),
+      amountDisplay: usdt6ToDisplay(amountUsdt6),
       expiresAt: expiresAt.toISOString()
     }
   }
@@ -387,6 +408,7 @@ export function tronDetailsFromPayment(payment: Payment): TronPaymentDetails | n
     address: payment.address,
     network: 'TRC20',
     amountUsdt6: payment.amount.toString(),
+    amountDisplay: usdt6ToDisplay(BigInt(payment.amount)),
     expiresAt: expiresAt.toISOString()
   }
 }

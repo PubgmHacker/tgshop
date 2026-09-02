@@ -2,7 +2,6 @@ import { z } from 'zod'
 import type { PaymentProvider, PaymentProviderId } from './types.js'
 import { CryptoBotConfigSchema, createCryptoBotProvider, type CryptoBotDeps } from './cryptobot.js'
 import { StarsConfigSchema, createStarsProvider, type StarsDeps } from './stars.js'
-import { TronConfigSchema, createTronProvider, type TronDeps, type TronProviderState } from './tron.js'
 import { PaymentConfigError } from './errors.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,20 +15,17 @@ import { PaymentConfigError } from './errors.js'
 
 export const ProviderConfigSchemas = {
   cryptobot: CryptoBotConfigSchema,
-  stars: StarsConfigSchema,
-  tron_trc20: TronConfigSchema
+  stars: StarsConfigSchema
 } as const
 
 export type ProviderConfigMap = {
   cryptobot: z.infer<typeof CryptoBotConfigSchema>
   stars: z.infer<typeof StarsConfigSchema>
-  tron_trc20: z.infer<typeof TronConfigSchema>
 }
 
 export interface RegistryDeps {
   cryptobot?: CryptoBotDeps
   stars?: StarsDeps
-  tron_trc20?: TronDeps & { state: TronProviderState }
 }
 
 /**
@@ -47,14 +43,6 @@ export function getProvider<Id extends PaymentProviderId>(
       return createCryptoBotProvider(config as ProviderConfigMap['cryptobot'], deps.cryptobot)
     case 'stars':
       return createStarsProvider(config as ProviderConfigMap['stars'], deps.stars)
-    case 'tron_trc20': {
-      const tronDeps = deps.tron_trc20
-      if (!tronDeps) {
-        throw new PaymentConfigError('tron_trc20 provider requires deps.tron_trc20.state')
-      }
-      const { state, ...rest } = tronDeps
-      return createTronProvider(config as ProviderConfigMap['tron_trc20'], state, rest)
-    }
     default: {
       const exhaustiveCheck: never = id
       throw new PaymentConfigError(`Unknown payment provider id: ${String(exhaustiveCheck)}`)

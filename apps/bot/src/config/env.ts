@@ -58,9 +58,12 @@ const envSchema = z.object({
 
   TRON_NETWORK: z.enum(['mainnet', 'nile', 'shasta']).default('nile'),
   TRONGRID_API_KEY: z.string().optional().default(''),
-  TRON_MASTER_XPUB: z.string().optional().default(''),
   TRON_USDT_CONTRACT: z.string().optional().default(''),
   TRON_MIN_CONFIRMATIONS: z.coerce.number().int().positive().default(19),
+  // Owner's own USDT-TRC20 wallet every customer pays into. TRON_SWEEP_TO_ADDRESS is
+  // the legacy name (retired hot-wallet sweep target) and is honoured as a fallback.
+  TRON_RECEIVE_ADDRESS: z.string().optional().default(''),
+  TRON_SWEEP_TO_ADDRESS: z.string().optional().default(''),
 
   PRICE_ORACLE_URL: z.string().optional().default(''),
   MINIAPP_URL: z.string().url(),

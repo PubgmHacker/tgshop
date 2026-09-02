@@ -28,15 +28,17 @@ docs {
   TRON has NO push webhooks — the worker POLLS TronGrid — so this deliberately
   does not post to the app. It queues a transfer inside
   `scripts/fake-trongrid.mjs`, a local stand-in for api.trongrid.io, and the
-  REAL apps/worker polling path then discovers it. That exercises deposit
-  address matching, confirmation counting, settlement and delivery for real,
-  instead of pretending an ingestion endpoint exists.
+  REAL apps/worker polling path then discovers it. That exercises amount-tag
+  matching against the single receive wallet, confirmation counting,
+  settlement and delivery for real, instead of pretending an ingestion
+  endpoint exists.
 
   Setup:
   1. `node scripts/fake-trongrid.mjs`            # listens on :8099
   2. `TRONGRID_API_BASE=http://localhost:8099 pnpm --filter @tgshop/worker dev`
-  3. Create a TRON order so a `DepositAddress` row exists, then put that
-     row's `address` into `to` above.
+  3. Set `to` above to your TRON_RECEIVE_ADDRESS, create a TRON order in the
+     Mini App and copy the EXACT tagged amount it shows (e.g. 29.0057 USDT ->
+     `amount6` 29005700): the sub-cent tag is what identifies the invoice.
 
   `amount6` is USDT in 6-decimal integer units — 9990000 = 9.99 USDT, never a
   float. `confirmations` is how deep the transfer is mined: set it below

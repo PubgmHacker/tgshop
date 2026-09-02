@@ -9,9 +9,10 @@ import { getQueue, QueueName, defaultJobOptions } from '../queue.js'
 export type NotifyJobData =
   | { kind: 'low_stock'; planTitle: string; remaining: number; threshold: number }
   | { kind: 'order_failed'; orderId: string; reason: string }
-  | { kind: 'low_trx'; address: string; balanceTrxDisplay: string }
   | { kind: 'manual_fallback_sla'; orderId: string; ageMinutes: number }
-  | { kind: 'sweep_failed'; address: string; reason: string }
+  // A USDT transfer landed on the receive wallet that no open invoice can claim
+  // (untagged, unknown or ambiguous amount): an operator credits it by hand.
+  | { kind: 'tron_unmatched'; txHash: string; from: string; amountDisplay: string; reason: string }
   | { kind: 'chain_scan_error'; reason: string }
 
 export async function enqueueNotify(data: NotifyJobData): Promise<void> {

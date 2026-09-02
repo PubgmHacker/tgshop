@@ -46,6 +46,7 @@
     "pay_usdt": "💵 USDT (TRC-20)",
     "insufficient_balance": "Insufficient balance. Top up or choose another payment method.",
     "created": "✅ Order #{orderId} created. Waiting for payment…",
+    "usdt_instructions": "💵 Send <b>exactly {amount} USDT</b> (TRC-20) to:\n<code>{address}</code>\n\nThe amount must match to the last decimal — that is how your payment is recognised. Any other amount is credited manually by support.\nWindow: {minutes} min. Delivery follows automatically once the network confirms.",
     "enter_email": "📧 This product is delivered to your email. Send the address to issue the order to:",
     "invalid_email": "That doesn't look like an email. Send an address like name@example.com:",
     "email_accepted": "Email accepted: {email}",

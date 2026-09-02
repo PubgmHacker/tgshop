@@ -7,7 +7,6 @@ import { startHealthServer } from './health.js'
 
 import { startPaymentsPollWorker, registerPaymentsPollRepeatables } from './queues/payments-poll.worker.js'
 import { startChainScanWorker, registerChainScanRepeatables } from './queues/chain-scan.worker.js'
-import { startChainSweepWorker, registerChainSweepRepeatables } from './queues/chain-sweep.worker.js'
 import { startDeliveryWorker } from './queues/delivery.worker.js'
 import { startOrdersExpireWorker, registerOrdersExpireRepeatables } from './queues/orders-expire.worker.js'
 import { startSubsRemindWorker, registerSubsRemindRepeatables } from './queues/subs-remind.worker.js'
@@ -28,7 +27,6 @@ async function main(): Promise<void> {
   // moment repeatable schedulers begin enqueuing them.
   startPaymentsPollWorker()
   startChainScanWorker()
-  startChainSweepWorker()
   startDeliveryWorker()
   startOrdersExpireWorker()
   startSubsRemindWorker()
@@ -40,7 +38,6 @@ async function main(): Promise<void> {
   await Promise.all([
     registerPaymentsPollRepeatables(),
     registerChainScanRepeatables(),
-    registerChainSweepRepeatables(),
     registerOrdersExpireRepeatables(),
     registerSubsRemindRepeatables(),
     registerBroadcastRepeatables(),

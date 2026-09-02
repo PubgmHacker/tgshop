@@ -13,7 +13,7 @@ import { logger } from '../lib/logger.js'
 // (same contract note as domain/content.ts).
 //
 //   CRYPTOBOT   -> "payments-poll"  re-checks PENDING/CONFIRMING invoices
-//   TRON_TRC20  -> "chain-scan"     re-scans deposit addresses on TronGrid
+//   TRON_TRC20  -> "chain-scan"     re-reads the receive wallet on TronGrid
 //
 // BALANCE and STARS have no provider-side ledger to disagree with (balance is
 // our own ledger; Stars settle synchronously inside Telegram before the order

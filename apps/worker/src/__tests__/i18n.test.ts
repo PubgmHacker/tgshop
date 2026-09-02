@@ -56,8 +56,8 @@ describe('adminStrings', () => {
     expect(adminStrings.lowStock('VPN Pro', 2, 5)).toContain('5')
     expect(adminStrings.orderFailed('O-1', 'boom')).toContain('O-1')
     expect(adminStrings.orderFailed('O-1', 'boom')).toContain('boom')
-    expect(adminStrings.lowTrx('TQx..', '12.5')).toContain('TQx..')
-    expect(adminStrings.sweepFailed('TQx..', 'bad key')).toContain('bad key')
+    expect(adminStrings.tronUnmatched('29.0057', 'abc', 'TQx..', 'no-tag')).toContain('29.0057')
+    expect(adminStrings.tronUnmatched('29.0057', 'abc', 'TQx..', 'no-tag')).toContain('no-tag')
   })
 })
 

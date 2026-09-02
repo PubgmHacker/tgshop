@@ -8,15 +8,17 @@ import { openPaymentUrl } from '@/lib/payments'
 import { triggerHaptic, triggerNotificationHaptic } from '@/lib/TelegramProvider'
 import { ApiClientError } from '@/lib/apiClient'
 import type { TopupMethod } from '@/types/api'
+import { CopyButton } from './CopyButton'
 import { QrCode } from './QrCode'
 import { SectionLabel } from './SectionLabel'
 
-// TRON_TRC20 is deliberately absent: top-ups have no order to bind a deposit
-// address to (see apps/bot/src/server/routes/api/topup.ts), so offering it
-// here would only produce an error after the tap.
-const TOPUP_METHODS: { value: TopupMethod; title: string; badge: string }[] = [
-  { value: 'CRYPTOBOT', title: 'CryptoBot USDT', badge: 'T' },
-  { value: 'STARS', title: 'Telegram Stars', badge: '★' }
+// The server decides which of these are offered (config.topupMethods). TRON
+// needs no order: the invoice is identified by its unique tagged amount, so a
+// top-up works exactly like an order payment (apps/bot/src/payments/tron.ts).
+const TOPUP_METHODS: { value: TopupMethod; title: string; badge: string; badgeClass: string }[] = [
+  { value: 'CRYPTOBOT', title: 'CryptoBot USDT', badge: 'T', badgeClass: 'bg-[#26a17b] text-white' },
+  { value: 'STARS', title: 'Telegram Stars', badge: '★', badgeClass: 'bg-card-strong text-warning' },
+  { value: 'TRON_TRC20', title: 'USDT TRC-20', badge: '₮', badgeClass: 'bg-[#c23631] text-white' }
 ]
 
 export function TopupPanel(): JSX.Element {
@@ -76,11 +78,7 @@ export function TopupPanel(): JSX.Element {
                 isActive ? 'border-line-strong bg-card-strong' : 'border-line bg-card'
               }`}
             >
-              <span
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${
-                  option.value === 'CRYPTOBOT' ? 'bg-[#26a17b] text-white' : 'bg-card-strong text-warning'
-                }`}
-              >
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${option.badgeClass}`}>
                 {option.badge}
               </span>
               <span className="text-xs font-semibold text-ink">{option.title}</span>
@@ -124,8 +122,21 @@ export function TopupPanel(): JSX.Element {
 
       {createTopup.data?.tron ? (
         <div className="flex flex-col items-center gap-3 rounded-card border border-line bg-card p-4">
-          <QrCode value={`tron:${createTopup.data.tron.address}?amount=${createTopup.data.tron.amountUsdt6}`} />
-          <p className="break-all text-center text-xs text-muted">{createTopup.data.tron.address}</p>
+          <p className="text-sm font-semibold text-ink">{t('checkout.tron.network')}</p>
+          <QrCode value={createTopup.data.tron.address} />
+          <div className="flex w-full items-center justify-between gap-2 rounded-xl bg-card-strong px-3 py-2.5">
+            <p className="truncate text-xs text-ink">{createTopup.data.tron.address}</p>
+            <CopyButton value={createTopup.data.tron.address} label={t('checkout.tron.copyAddress')} />
+          </div>
+          <div className="flex w-full items-center justify-between gap-2 rounded-xl bg-card-strong px-3 py-2.5">
+            <div className="flex min-w-0 flex-col">
+              <p className="text-xs text-muted">{t('checkout.tron.amount')}</p>
+              <p className="tnum text-base font-semibold text-ink">{createTopup.data.tron.amountDisplay} USDT</p>
+            </div>
+            <CopyButton value={createTopup.data.tron.amountDisplay} label={t('checkout.tron.copyAmount')} />
+          </div>
+          <p className="text-center text-xs leading-relaxed text-danger">{t('checkout.tron.exact')}</p>
+          <p className="animate-pulse text-xs text-faint">{t('checkout.tron.waiting')}</p>
         </div>
       ) : null}
 

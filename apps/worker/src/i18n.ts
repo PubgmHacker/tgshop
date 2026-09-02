@@ -17,6 +17,7 @@ interface Strings {
   orderUnderpaid: (shortfallDisplay: string, asset: string) => string
   orderOverpaidCredited: (surplusDisplay: string, asset: string) => string
   latePaymentCredited: (amountDisplay: string, asset: string, orderId: string) => string
+  topupCredited: (amountDisplay: string, asset: string) => string
   deliveryFailedRefunded: (orderId: string) => string
   subReminder3Day: (planTitle: string, expiresAtDisplay: string) => string
   subReminder1Day: (planTitle: string, expiresAtDisplay: string) => string
@@ -34,6 +35,7 @@ const ru: Strings = {
     `✅ Оплата получена с переплатой. Излишек ${surplusDisplay} ${asset} зачислен на ваш баланс.`,
   latePaymentCredited: (amountDisplay, asset, orderId) =>
     `ℹ️ Платёж по заказу ${orderId} пришёл после истечения срока оплаты. ${amountDisplay} ${asset} зачислены на баланс.`,
+  topupCredited: (amountDisplay, asset) => `✅ Баланс пополнен: зачислено ${amountDisplay} ${asset}.`,
   deliveryFailedRefunded: (orderId) =>
     `❌ Не удалось доставить заказ ${orderId}. Средства возвращены на баланс. Мы уже разбираемся.`,
   subReminder3Day: (planTitle, expiresAtDisplay) =>
@@ -58,6 +60,7 @@ const en: Strings = {
     `✅ Payment received with overpayment. The surplus of ${surplusDisplay} ${asset} was credited to your balance.`,
   latePaymentCredited: (amountDisplay, asset, orderId) =>
     `ℹ️ Payment for order ${orderId} arrived after the payment window expired. ${amountDisplay} ${asset} was credited to your balance.`,
+  topupCredited: (amountDisplay, asset) => `✅ Balance topped up: ${amountDisplay} ${asset} credited.`,
   deliveryFailedRefunded: (orderId) =>
     `❌ We could not deliver order ${orderId}. Your funds were refunded to your balance. We're looking into it.`,
   subReminder3Day: (planTitle, expiresAtDisplay) =>
@@ -85,10 +88,9 @@ export const adminStrings = {
     `📦 LOW STOCK: plan "${planTitle}" has ${remaining} item(s) left (threshold ${threshold}).`,
   orderFailed: (orderId: string, reason: string) =>
     `🛑 ORDER FAILED: ${orderId} — ${reason}. Refunded to user balance.`,
-  lowTrx: (address: string, balanceTrxDisplay: string) =>
-    `⛽ LOW TRX: hot wallet ${address} has only ${balanceTrxDisplay} TRX for energy/bandwidth. Top up soon.`,
   manualFallbackSla: (orderId: string, ageMinutes: number) =>
     `🐢 MANUAL FALLBACK SLA: order ${orderId} has been pending manual delivery for ${ageMinutes} min.`,
-  sweepFailed: (address: string, reason: string) => `🧹 SWEEP FAILED for ${address}: ${reason}`,
+  tronUnmatched: (amountDisplay: string, txHash: string, from: string, reason: string) =>
+    `💸 UNMATCHED USDT: ${amountDisplay} USDT arrived on the receive wallet from ${from} (tx ${txHash}) but matches no open invoice (${reason}). Credit the customer manually.`,
   chainScanError: (reason: string) => `🔴 chain-scan job errored: ${reason}`
 }

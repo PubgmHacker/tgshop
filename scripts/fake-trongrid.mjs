@@ -7,7 +7,7 @@
 // TRON has no push webhooks: the worker POLLS TronGrid. So the honest way to
 // simulate a deposit is to make the poller see one, not to invent a webhook
 // endpoint the app does not have. Point the worker at this server and the
-// REAL apps/worker code path runs — address matching, confirmation counting,
+// REAL apps/worker code path runs — amount-tag matching, confirmation counting,
 // under/overpayment classification, settlement and delivery all included.
 //
 // Usage:
@@ -20,7 +20,7 @@
 // Queue a deposit (see bruno/tgshop/webhook-simulators/, or curl directly):
 //   curl -X POST http://localhost:8099/_sim/transfer \
 //     -H 'content-type: application/json' \
-//     -d '{"to":"<DepositAddress.address>","amount6":"9990000"}'
+//     -d '{"to":"<TRON_RECEIVE_ADDRESS>","amount6":"9990123"}'   # amount = the tagged sum shown to the buyer
 //
 // Implements only the four endpoints apps/worker/src/lib/trongrid.ts calls.
 // ─────────────────────────────────────────────────────────────────────────────

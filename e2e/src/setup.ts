@@ -218,7 +218,6 @@ export async function createFixture(options: FixtureOptions = {}): Promise<TestF
       await prisma.balanceTransaction.deleteMany({ where: { userId: user.id } })
       await prisma.subscription.deleteMany({ where: { userId: user.id } })
       await prisma.payment.deleteMany({ where: { userId: user.id } })
-      await prisma.depositAddress.deleteMany({ where: { userId: user.id } })
 
       if (orderIds.length > 0) {
         await prisma.auditLog.deleteMany({ where: { entityId: { in: orderIds } } })

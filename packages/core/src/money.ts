@@ -146,3 +146,58 @@ export function multiplyCents(unitCents: number, qty: number): number {
   }
   return total
 }
+
+// ─── USDT-TRC20 on a single receive address: "unique amount" tagging ─────────
+//
+// Every TRON payment lands on ONE static address (the owner's own wallet), so
+// the transferred amount is the only thing that can say which invoice a
+// transfer belongs to. Each open invoice therefore gets a unique sub-cent tag
+// in the 3rd–4th decimals (0.0001 USDT steps): 29.0057 USDT means "$29.00,
+// tag 57". The tag never moves the price by a whole cent, USDT keeps 6
+// decimals so wallets send it exactly, and the worker matches an inbound
+// transfer back to its invoice by the exact tagged amount.
+
+/** USDT smallest units (6 decimals) per USD cent at the 1:1 peg. */
+export const CENTS_TO_USDT6 = 10_000n
+/** One tag step, 0.0001 USDT. */
+export const TRON_TAG_UNIT_USDT6 = 100n
+/** Tags run 1..99 so the tagged amount always stays strictly inside its cent. */
+export const TRON_TAG_MAX = 99
+
+/** Whole USD cents contained in a USDT6 amount (sub-cent dust floored away). */
+export function usdt6ToUsdCents(amountUsdt6: bigint): number {
+  if (amountUsdt6 < 0n) throw new RangeError(`usdt6ToUsdCents: amount must be non-negative, got ${amountUsdt6}`)
+  return Number(amountUsdt6 / CENTS_TO_USDT6)
+}
+
+/** The exact USDT6 amount a customer must send for `cents` with sub-cent `tag`. */
+export function tronTaggedAmountUsdt6(cents: number, tag: number): bigint {
+  if (!Number.isInteger(cents) || cents < 0) {
+    throw new RangeError(`tronTaggedAmountUsdt6: cents must be a non-negative integer, got ${cents}`)
+  }
+  if (!Number.isInteger(tag) || tag < 1 || tag > TRON_TAG_MAX) {
+    throw new RangeError(`tronTaggedAmountUsdt6: tag must be an integer in 1..${TRON_TAG_MAX}, got ${tag}`)
+  }
+  return BigInt(cents) * CENTS_TO_USDT6 + BigInt(tag) * TRON_TAG_UNIT_USDT6
+}
+
+/** Sub-cent tag carried by a USDT6 amount; 0 when the amount is a whole number of cents. */
+export function tronTagOfAmountUsdt6(amountUsdt6: bigint): number {
+  const abs = amountUsdt6 < 0n ? -amountUsdt6 : amountUsdt6
+  return Number((abs % CENTS_TO_USDT6) / TRON_TAG_UNIT_USDT6)
+}
+
+/**
+ * USDT6 -> human string with trailing zeros trimmed, never fewer than
+ * `minDecimals` places: 29005700n -> "29.0057", 29000000n -> "29.00".
+ * This is the string a customer types into a wallet, so it must be exact.
+ */
+export function usdt6ToDisplay(amountUsdt6: bigint | string, minDecimals = 2): string {
+  const value = typeof amountUsdt6 === 'string' ? BigInt(amountUsdt6) : amountUsdt6
+  const negative = value < 0n
+  const abs = negative ? -value : value
+  const whole = abs / USDT_SCALE
+  let frac = (abs % USDT_SCALE).toString().padStart(USDT_DECIMALS, '0').replace(/0+$/, '')
+  if (frac.length < minDecimals) frac = frac.padEnd(minDecimals, '0')
+  return `${negative ? '-' : ''}${whole}${frac ? `.${frac}` : ''}`
+}

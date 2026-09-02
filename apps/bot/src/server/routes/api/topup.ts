@@ -45,8 +45,8 @@ async function createTopup(req: FastifyRequest, reply: FastifyReply): Promise<un
       provider,
       description: `Balance top-up ${(body.amountCents / 100).toFixed(2)} USD`,
       reference,
-      // Top-ups are not tied to an order; TRON therefore cannot allocate a
-      // per-order deposit address and will surface a clear error instead.
+      // Top-ups are not tied to an order; TRON keys its invoice on the client
+      // idempotency key instead (one tagged amount per retry key).
       orderId: null,
       idempotencyKey: body.idempotencyKey
     })

@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import {
+  TRON_TAG_MAX,
   USDT_DECIMALS,
   applyFixedDiscount,
   applyPercentDiscount,
   centsToDisplay,
   displayToCents,
   multiplyCents,
+  tronTagOfAmountUsdt6,
+  tronTaggedAmountUsdt6,
   usdCentsToStars,
-  usdCentsToUsdt6
+  usdCentsToUsdt6,
+  usdt6ToDisplay,
+  usdt6ToUsdCents
 } from '../money.js'
 
 describe('centsToDisplay / displayToCents', () => {
@@ -141,5 +146,43 @@ describe('multiplyCents', () => {
 
   it('guards against exceeding the safe integer range', () => {
     expect(() => multiplyCents(Number.MAX_SAFE_INTEGER, 2)).toThrow(RangeError)
+  })
+})
+
+describe('TRON unique-amount tagging', () => {
+  it('builds the exact tagged amount and reads the tag back', () => {
+    const amount = tronTaggedAmountUsdt6(2900, 57)
+    expect(amount).toBe(29_005_700n)
+    expect(tronTagOfAmountUsdt6(amount)).toBe(57)
+    expect(usdt6ToUsdCents(amount)).toBe(2900)
+    expect(usdt6ToDisplay(amount)).toBe('29.0057')
+  })
+
+  it('keeps every tag strictly inside its own cent', () => {
+    for (let tag = 1; tag <= TRON_TAG_MAX; tag += 1) {
+      const amount = tronTaggedAmountUsdt6(1, tag)
+      expect(usdt6ToUsdCents(amount)).toBe(1)
+      expect(tronTagOfAmountUsdt6(amount)).toBe(tag)
+    }
+  })
+
+  it('rejects tags outside 1..99 and negative cents', () => {
+    expect(() => tronTaggedAmountUsdt6(100, 0)).toThrow(RangeError)
+    expect(() => tronTaggedAmountUsdt6(100, 100)).toThrow(RangeError)
+    expect(() => tronTaggedAmountUsdt6(-1, 5)).toThrow(RangeError)
+    expect(() => tronTaggedAmountUsdt6(1.5, 5)).toThrow(RangeError)
+  })
+
+  it('reports tag 0 for untagged (whole-cent) amounts', () => {
+    expect(tronTagOfAmountUsdt6(29_000_000n)).toBe(0)
+    expect(tronTagOfAmountUsdt6(0n)).toBe(0)
+  })
+
+  it('formats display amounts exactly with at least two decimals', () => {
+    expect(usdt6ToDisplay(29_000_000n)).toBe('29.00')
+    expect(usdt6ToDisplay('29005700')).toBe('29.0057')
+    expect(usdt6ToDisplay(100n)).toBe('0.0001')
+    expect(usdt6ToDisplay(1_234_567n)).toBe('1.234567')
+    expect(usdt6ToDisplay(0n)).toBe('0.00')
   })
 })

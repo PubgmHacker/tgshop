@@ -42,11 +42,10 @@ describe('QUEUE_CONFIG', () => {
     }
   })
 
-  // Serial by design: chain-scan and chain-sweep read and move real funds, so
-  // two concurrent runs could double-spend a sweep or double-credit a deposit.
-  it('keeps the chain queues strictly serial', () => {
+  // Serial by design: chain-scan credits real money, so two concurrent runs
+  // could match the same on-chain transfer twice.
+  it('keeps the chain-scan queue strictly serial', () => {
     expect(QUEUE_CONFIG[QueueName.ChainScan].concurrency).toBe(1)
-    expect(QUEUE_CONFIG[QueueName.ChainSweep].concurrency).toBe(1)
   })
 
   // BullMQ's QueueBase throws "Queue name cannot contain :" — ':' is its Redis

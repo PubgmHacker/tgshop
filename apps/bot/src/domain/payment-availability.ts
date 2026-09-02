@@ -1,5 +1,6 @@
 import { PaymentProvider } from '@tgshop/db'
 import { env } from '../config/env.js'
+import { isTronAddress, resolveTronReceiveAddress } from '../payments/tron-address.js'
 
 /**
  * Payment rails are feature flags derived from the credentials that are
@@ -18,8 +19,7 @@ const EMPTY_OR_PLACEHOLDER = new Set([
   'change-me',
   'replace-me',
   'replace_me',
-  'placeholder',
-  'xpub-placeholder'
+  'placeholder'
 ])
 
 function configured(value: string | undefined): boolean {
@@ -27,24 +27,35 @@ function configured(value: string | undefined): boolean {
   return !EMPTY_OR_PLACEHOLDER.has(value.trim().toLowerCase())
 }
 
+/** Rails that can fund the internal balance (BALANCE itself obviously cannot). */
+export type TopupProvider = 'CRYPTOBOT' | 'STARS' | 'TRON_TRC20'
+
 export interface PaymentAvailability {
   orderProviders: PaymentProvider[]
-  topupProviders: Array<'CRYPTOBOT' | 'STARS'>
+  topupProviders: TopupProvider[]
+}
+
+/**
+ * TRON needs exactly two things: the owner's receive address (a well-formed
+ * T-address, or money is lost) and the USDT contract the worker filters
+ * transfers by. No keys — the rail is read-only on our side.
+ */
+export function isTronConfigured(): boolean {
+  return resolveTronReceiveAddress(env) !== null && isTronAddress(env.TRON_USDT_CONTRACT)
 }
 
 export function getPaymentAvailability(): PaymentAvailability {
   const orderProviders: PaymentProvider[] = [PaymentProvider.BALANCE, PaymentProvider.STARS]
-  const topupProviders: Array<'CRYPTOBOT' | 'STARS'> = ['STARS']
+  const topupProviders: TopupProvider[] = ['STARS']
 
   if (configured(env.CRYPTOBOT_API_TOKEN)) {
     orderProviders.splice(1, 0, PaymentProvider.CRYPTOBOT)
     topupProviders.unshift('CRYPTOBOT')
   }
 
-  // A static treasury address is not enough for this implementation: each
-  // order needs a derived deposit address that the worker can later reconcile.
-  if (configured(env.TRON_MASTER_XPUB) && configured(env.TRON_USDT_CONTRACT)) {
+  if (isTronConfigured()) {
     orderProviders.push(PaymentProvider.TRON_TRC20)
+    topupProviders.push('TRON_TRC20')
   }
 
   return { orderProviders, topupProviders }
@@ -54,6 +65,6 @@ export function isPaymentProviderAvailable(provider: PaymentProvider): boolean {
   return getPaymentAvailability().orderProviders.includes(provider)
 }
 
-export function isTopupProviderAvailable(provider: string): provider is 'CRYPTOBOT' | 'STARS' {
-  return getPaymentAvailability().topupProviders.includes(provider as 'CRYPTOBOT' | 'STARS')
+export function isTopupProviderAvailable(provider: string): provider is TopupProvider {
+  return getPaymentAvailability().topupProviders.includes(provider as TopupProvider)
 }

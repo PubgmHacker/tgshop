@@ -16,7 +16,6 @@ import { nanoid } from 'nanoid'
 export const QueueName = {
   PaymentsPoll: 'payments-poll',
   ChainScan: 'chain-scan',
-  ChainSweep: 'chain-sweep',
   Delivery: 'delivery',
   OrdersExpire: 'orders-expire',
   SubsRemind: 'subs-remind',
@@ -40,7 +39,6 @@ export interface QueueConfig {
 export const QUEUE_CONFIG: Record<QueueNameValue, QueueConfig> = {
   [QueueName.PaymentsPoll]: { name: QueueName.PaymentsPoll, concurrency: 5, attempts: 5, backoffDelayMs: 5_000 },
   [QueueName.ChainScan]: { name: QueueName.ChainScan, concurrency: 1, attempts: 5, backoffDelayMs: 5_000 },
-  [QueueName.ChainSweep]: { name: QueueName.ChainSweep, concurrency: 1, attempts: 3, backoffDelayMs: 10_000 },
   [QueueName.Delivery]: { name: QueueName.Delivery, concurrency: 10, attempts: 5, backoffDelayMs: 3_000 },
   [QueueName.OrdersExpire]: { name: QueueName.OrdersExpire, concurrency: 3, attempts: 3, backoffDelayMs: 5_000 },
   [QueueName.SubsRemind]: { name: QueueName.SubsRemind, concurrency: 3, attempts: 3, backoffDelayMs: 5_000 },

@@ -1,14 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // @tgshop/payments public types
 //
-// One `PaymentProvider` interface, three adapters (cryptobot, stars, tron_trc20).
+// One `PaymentProvider` interface, two adapters (cryptobot, stars).
 // Adding a new provider requires only: a new adapter file implementing this
 // interface + registering it in registry.ts + a corresponding `Setting` row
 // for its config (see registry.ts `ProviderConfigSchemas`).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Identifiers for the three built-in providers. New providers extend this union. */
-export type PaymentProviderId = 'cryptobot' | 'stars' | 'tron_trc20'
+/**
+ * Identifiers for the built-in adapters. New providers extend this union.
+ * The USDT-TRC20 rail is not an adapter: it is a static receive wallet the
+ * worker watches (apps/worker chain-scan) and the bot tags amounts for.
+ */
+export type PaymentProviderId = 'cryptobot' | 'stars'
 
 /** Input to createInvoice — always integer amounts, never floats. */
 export interface CreateInvoiceInput {

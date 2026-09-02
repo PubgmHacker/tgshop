@@ -44,14 +44,13 @@ async function processNotify(job: Job<NotifyJobPayload>): Promise<void> {
     case 'order_failed':
       await notifyAdmins(adminStrings.orderFailed(data.orderId, data.reason))
       break
-    case 'low_trx':
-      await notifyAdmins(adminStrings.lowTrx(data.address, data.balanceTrxDisplay))
-      break
     case 'manual_fallback_sla':
       await notifyAdmins(adminStrings.manualFallbackSla(data.orderId, data.ageMinutes))
       break
-    case 'sweep_failed':
-      await notifyAdmins(adminStrings.sweepFailed(data.address, data.reason))
+    case 'tron_unmatched':
+      await notifyAdmins(
+        adminStrings.tronUnmatched(data.amountDisplay, data.txHash, data.from, data.reason)
+      )
       break
     case 'chain_scan_error':
       await notifyAdmins(adminStrings.chainScanError(data.reason))

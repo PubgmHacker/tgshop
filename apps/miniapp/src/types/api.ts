@@ -125,6 +125,7 @@ export const CreateOrderResponseSchema = z.object({
       address: z.string(),
       network: z.literal('TRC20'),
       amountUsdt6: z.string(),
+      amountDisplay: z.string(),
       expiresAt: z.string()
     })
     .nullish()
@@ -135,6 +136,8 @@ export const TronPaymentDetailsSchema = z.object({
   address: z.string(),
   network: z.literal('TRC20'),
   amountUsdt6: z.string(),
+  /** Exact amount as the customer must type it, e.g. "29.0057" — the sub-cent tail identifies the invoice. */
+  amountDisplay: z.string(),
   expiresAt: z.string()
 })
 export type TronPaymentDetails = z.infer<typeof TronPaymentDetailsSchema>
@@ -213,7 +216,7 @@ export const MeResponseSchema = z.object({
 })
 export type MeResponse = z.infer<typeof MeResponseSchema>
 
-export const TopupMethodSchema = z.enum(['CRYPTOBOT', 'STARS'])
+export const TopupMethodSchema = z.enum(['CRYPTOBOT', 'STARS', 'TRON_TRC20'])
 export type TopupMethod = z.infer<typeof TopupMethodSchema>
 
 export const ConfigResponseSchema = z.object({

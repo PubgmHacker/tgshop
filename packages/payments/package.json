@@ -19,14 +19,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@noble/curves": "^1.7.0",
-    "@noble/hashes": "^1.6.1",
-    "@scure/base": "^1.1.9",
-    "@scure/bip32": "^1.6.2",
     "@tgshop/core": "workspace:*",
     "@tgshop/db": "workspace:*",
     "ioredis": "^5.4.1",
-    "tronweb": "6.4.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

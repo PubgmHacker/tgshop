@@ -196,10 +196,10 @@ async function launchCheckout(ctx: BotContext, params: CheckoutParams): Promise<
 
     case PaymentProvider.TRON_TRC20: {
       try {
-        // Route through the shared invoice creator so the deposit address and
-        // Payment row are persisted together. A chat checkout that only handed
-        // out an address was invisible to the chain scanner and could never be
-        // reconciled automatically.
+        // Route through the shared invoice creator so the tagged amount and the
+        // Payment row are persisted together. A chat checkout that only quoted
+        // the address would be invisible to the chain scanner and could never
+        // be matched automatically.
         const invoice = await createInvoice({
           userId: user.id,
           amountCents: pricing.totalCents,
@@ -208,15 +208,20 @@ async function launchCheckout(ctx: BotContext, params: CheckoutParams): Promise<
           reference: order.id,
           orderId: order.id
         })
-        const address = invoice.tron?.address
-        if (!address) throw new Error('TRON invoice returned no deposit address')
+        const tron = invoice.tron
+        if (!tron) throw new Error('TRON invoice returned no payment instructions')
         await ctx.reply(
           t(locale, 'order.created', { orderId: order.id }) +
-            `\n\nSend ${formatUsd(pricing.totalCents)} worth of USDT (TRC-20) to:\n<code>${address}</code>`,
+            '\n\n' +
+            t(locale, 'order.usdt_instructions', {
+              amount: tron.amountDisplay,
+              address: tron.address,
+              minutes: Math.round((new Date(tron.expiresAt).getTime() - Date.now()) / 60_000)
+            }),
           { parse_mode: 'HTML' }
         )
       } catch (err) {
-        logger.error({ err, orderId: order.id }, 'USDT deposit address allocation failed')
+        logger.error({ err, orderId: order.id }, 'USDT invoice creation failed')
         await ctx.reply(t(locale, 'common.error_generic'))
       }
       return
