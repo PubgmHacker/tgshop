@@ -169,6 +169,15 @@ frontend-only development.
 
 ## How to add a new product
 
+The catalog ships with one seeded product, **Mirasim**
+(`packages/db/prisma/migrations/20260829060000_add_mirasim_catalog`): category
+`code`, `deliveryType = MANUAL_FALLBACK` (an operator issues access by hand), one
+plan `mirasim-pro-1m`. The migration only inserts (`ON CONFLICT DO NOTHING`), so
+edit its price and description in the admin Mini App, not in SQL. Its official
+marks are bundled: `apps/miniapp/public/brands/mirasim*.png` (theme-aware via
+`BrandMark.tsx`) and `apps/landing/public/brands/mirasim.png`; the DB `imageUrl`
+points at the vendor's own asset on mirasim.ai.
+
 1. **Category** (skip if it already exists): insert a `Category` row —
    `title`, unique `slug`, optional `emoji`, `sortOrder`, `isActive`. Easiest
    via the admin panel (`docs/ADMIN.md`) or `prisma studio` (`pnpm db:studio`).

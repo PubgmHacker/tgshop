@@ -129,7 +129,7 @@ const ruCopy: LandingCopy = {
   meta: {
     title: 'AI Access Rage — подписки на нейросети в Telegram',
     description:
-      'ChatGPT, Claude, Midjourney и другие модели: оплата картой, USDT TRC-20 или Stars, выдача за секунды, 24/7.',
+      'Mirasim, ChatGPT, Claude, Midjourney и другие AI-инструменты: оплата картой, USDT TRC-20 или Stars, выдача за секунды, 24/7.',
     ogTitle: 'AI Access Rage — подписки на нейросети',
     ogDescription:
       'Выбирайте модель, оплачивайте любым способом и получайте доступ мгновенно. Работает прямо в Telegram.'
@@ -150,7 +150,7 @@ const ruCopy: LandingCopy = {
     headline: 'Покупки за 30 секунд,',
     headlineAccent: 'доступ сразу',
     subheadline:
-      'ChatGPT, Claude, Midjourney — оплата CryptoBot, Telegram Stars или USDT TRC-20. Никаких сайтов, всё в чате бота.',
+      'Mirasim, ChatGPT, Claude, Midjourney — оплата CryptoBot, Telegram Stars или USDT TRC-20. Никаких сайтов, всё в чате бота.',
     ctaPrimary: 'Открыть в Telegram',
     ctaSecondary: 'Смотреть каталог',
     stat1Value: '24/7',
@@ -308,6 +308,15 @@ const ruCopy: LandingCopy = {
   },
   demoProducts: [
     {
+      id: 'mirasim',
+      slug: 'mirasim',
+      title: 'Mirasim',
+      description: 'IDE для agentic coding и eval. Доступ оформляется оператором вручную.',
+      categoryTitle: 'Код',
+      imageUrl: '/brands/mirasim.png',
+      plans: [{ id: 'mirasim-pro-1m', title: '1 месяц', priceCents: 2900, durationDays: 30 }]
+    },
+    {
       id: 'demo-chatgpt',
       title: 'ChatGPT Plus',
       description: 'GPT-4o, приоритетный доступ, DALL·E.',
@@ -336,15 +345,6 @@ const ruCopy: LandingCopy = {
         { id: 'p5', title: '1 месяц', priceCents: 499, durationDays: 30 },
         { id: 'p6', title: '3 месяца', priceCents: 1299, durationDays: 90, badge: 'Топ' }
       ]
-    },
-    {
-      id: 'mirasim',
-      slug: 'mirasim',
-      title: 'Mirasim',
-      description: 'IDE для agentic coding и eval. Доступ оформляется оператором вручную.',
-      categoryTitle: 'Код',
-      imageUrl: '/brands/mirasim.png',
-      plans: [{ id: 'mirasim-pro-1m', title: '1 месяц', priceCents: 2900, durationDays: 30 }]
     }
   ]
 }
@@ -353,7 +353,7 @@ const enCopy: LandingCopy = {
   meta: {
     title: 'AI Access Rage — neural-net subscriptions in Telegram',
     description:
-      'ChatGPT, Claude, Midjourney and other models: pay with card, USDT TRC-20 or Stars, delivered in seconds, 24/7.',
+      'Mirasim, ChatGPT, Claude, Midjourney and other AI tools: pay with card, USDT TRC-20 or Stars, delivered in seconds, 24/7.',
     ogTitle: 'AI Access Rage — neural-net subscriptions',
     ogDescription:
       'Pick a model, pay any way you like, get access instantly. Works entirely inside Telegram.'
@@ -374,7 +374,7 @@ const enCopy: LandingCopy = {
     headline: 'Checkout in 30 seconds,',
     headlineAccent: 'access instantly',
     subheadline:
-      'ChatGPT, Claude, Midjourney — pay with CryptoBot, Telegram Stars or USDT TRC-20. No websites, everything inside the bot chat.',
+      'Mirasim, ChatGPT, Claude, Midjourney — pay with CryptoBot, Telegram Stars or USDT TRC-20. No websites, everything inside the bot chat.',
     ctaPrimary: 'Open in Telegram',
     ctaSecondary: 'Browse catalog',
     stat1Value: '24/7',
@@ -531,6 +531,15 @@ const enCopy: LandingCopy = {
   },
   demoProducts: [
     {
+      id: 'mirasim',
+      slug: 'mirasim',
+      title: 'Mirasim',
+      description: 'One agent IDE for agentic coding and eval. Manual access setup.',
+      categoryTitle: 'Code',
+      imageUrl: '/brands/mirasim.png',
+      plans: [{ id: 'mirasim-pro-1m', title: '1 month', priceCents: 2900, durationDays: 30 }]
+    },
+    {
       id: 'demo-chatgpt',
       title: 'ChatGPT Plus',
       description: 'GPT-4o, priority access, DALL·E.',
@@ -559,15 +568,6 @@ const enCopy: LandingCopy = {
         { id: 'p5', title: '1 month', priceCents: 499, durationDays: 30 },
         { id: 'p6', title: '3 months', priceCents: 1299, durationDays: 90, badge: 'Top pick' }
       ]
-    },
-    {
-      id: 'mirasim',
-      slug: 'mirasim',
-      title: 'Mirasim',
-      description: 'One agent IDE for agentic coding and eval. Manual access setup.',
-      categoryTitle: 'Code',
-      imageUrl: '/brands/mirasim.png',
-      plans: [{ id: 'mirasim-pro-1m', title: '1 month', priceCents: 2900, durationDays: 30 }]
     }
   ]
 }

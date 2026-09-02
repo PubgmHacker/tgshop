@@ -2,6 +2,7 @@ import { Container } from '../ui/Container'
 import { RevealOnScroll } from '../ui/RevealOnScroll'
 import { GlowCard } from '../ui/GlowCard'
 import Image from 'next/image'
+import { brandMarkUrl } from '../../lib/brands'
 import { botDeepLink } from '../../lib/env'
 import { formatPriceCents } from '../../lib/format'
 import type { DemoProduct, LandingCopy, Locale } from '../../lib/i18n'
@@ -39,16 +40,17 @@ export function Showcase({
             const cheapestPlan = product.plans.reduce((min, plan) =>
               plan.priceCents < min.priceCents ? plan : min
             )
+            const markUrl = brandMarkUrl(product)
 
             return (
               <RevealOnScroll key={product.id} delay={(index % 3) * 0.1}>
                 <GlowCard className="flex h-full flex-col">
                   <div className="flex items-center justify-between">
                     <div className="flex min-w-0 items-center gap-2">
-                      {product.imageUrl ? (
+                      {markUrl ? (
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 p-1.5 ring-1 ring-white/10">
                           <Image
-                            src={product.imageUrl}
+                            src={markUrl}
                             alt=""
                             width={28}
                             height={28}

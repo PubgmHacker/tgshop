@@ -10,13 +10,13 @@ import type { ProductSummary } from '@/types/api'
 // These slugs have no product pages behind them, so the tiles lead to the
 // catalog (which owns the honest empty state) — never to /product/<missing>.
 const SHOWCASE = [
+  { slug: 'mirasim', title: 'Mirasim' },
   { slug: 'chatgpt-plus', title: 'ChatGPT' },
   { slug: 'claude-pro', title: 'Claude' },
   { slug: 'midjourney', title: 'Midjourney' },
   { slug: 'flux-pro', title: 'Flux' },
   { slug: 'github-copilot', title: 'Copilot' },
-  { slug: 'cursor-pro', title: 'Cursor' },
-  { slug: 'mirasim', title: 'Mirasim' }
+  { slug: 'cursor-pro', title: 'Cursor' }
 ] as const
 
 export function ModelRail({
