@@ -42,7 +42,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://tgshop:tgshop@localhost:5432/tgshop_test?schema=public
       REDIS_URL: redis://localhost:6379
-      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000001
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
       JWT_SECRET: ci-jwt-secret-not-for-prod
       # The admin app enforces a 32-character minimum on this one.
       SESSION_SECRET: ci-session-secret-not-for-prod-32c
@@ -50,6 +50,9 @@ jobs:
       SERVICE_TOKEN: ci-service-token-not-for-prod
       BOT_TOKEN: 000000:CI-PLACEHOLDER-TOKEN
       BOT_USERNAME: ci_placeholder_bot
+      # scripts/verify-api.mjs mints a JWT for the first id here to exercise the
+      # /api/admin gate; its hard-coded outsider id is 444555666777.
+      ADMIN_IDS: "111111111"
       # The bot validates these as URLs at boot; absent values fail env parsing.
       MINIAPP_URL: https://miniapp.ci.invalid
       LANDING_URL: https://ci.invalid
