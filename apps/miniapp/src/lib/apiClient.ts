@@ -9,6 +9,13 @@ import { readInitDataFromLocation } from './launchParams'
 // server-side, so the WebView never has to reach a second host.
 const API_URL = process.env.NODE_ENV === 'production' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? '')
 
+const REQUEST_TIMEOUT_MS = 15_000
+
+function requestTimeoutSignal(ms: number): AbortSignal | undefined {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') return undefined
+  return AbortSignal.timeout(ms)
+}
+
 export class ApiClientError extends Error {
   public readonly status: number
   public readonly code: string
@@ -99,7 +106,10 @@ async function request<T>(path: string, schema: z.ZodType<T>, options: RequestOp
   const res = await fetch(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    // A stalled mobile connection otherwise leaves the screen loading forever;
+    // callers treat the resulting TimeoutError as a network failure.
+    signal: requestTimeoutSignal(REQUEST_TIMEOUT_MS)
   })
 
   if (res.status === 401 && !options.skipAuth) {

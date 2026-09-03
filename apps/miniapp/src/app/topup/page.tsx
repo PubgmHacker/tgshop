@@ -20,7 +20,6 @@ export default function TopupPage(): JSX.Element {
 
       <BalanceCard
         balanceCents={me.data?.balanceCents ?? null}
-        tgId={me.data?.user.tgId ?? null}
         isLoading={me.isLoading}
       />
 

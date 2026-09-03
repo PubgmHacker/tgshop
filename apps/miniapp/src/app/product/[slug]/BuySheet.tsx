@@ -34,7 +34,16 @@ export function BuySheet({
 
   function adjustQty(delta: number): void {
     triggerHaptic('light')
-    setQty((prev) => Math.max(1, Math.min(99, prev + delta)))
+    const next = Math.max(1, Math.min(99, qty + delta))
+    if (next === qty) return
+    setQty(next)
+    setPromoError(null)
+    // A quoted breakdown belongs to the old quantity: re-quote with the applied promo, or drop it.
+    if (breakdown?.promoCode) {
+      previewMutation.mutate({ planId: plan.id, qty: next, promoCode: breakdown.promoCode })
+    } else {
+      previewMutation.reset()
+    }
   }
 
   async function handleApplyPromo(): Promise<void> {
@@ -69,7 +78,7 @@ export function BuySheet({
               type="button"
               onClick={() => adjustQty(-1)}
               aria-label={t('buySheet.qty.decrease')}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
             >
               −
             </button>
@@ -78,7 +87,7 @@ export function BuySheet({
               type="button"
               onClick={() => adjustQty(1)}
               aria-label={t('buySheet.qty.increase')}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card-strong text-lg text-ink"
             >
               +
             </button>
@@ -90,7 +99,11 @@ export function BuySheet({
           <div className="flex gap-2">
             <input
               value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              onChange={(e) => {
+                setPromoCode(e.target.value.toUpperCase())
+                setPromoError(null)
+                if (breakdown?.promoCode) previewMutation.reset()
+              }}
               aria-label={t('buySheet.promo')}
               placeholder="PROMO2026"
               className="min-w-0 flex-1 rounded-xl border border-line bg-card-strong px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-faint"

@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: ReactNode }): JSX.E
         <div className="stage" aria-hidden />
         <Providers>
           <div
-            className="relative z-[1] mx-auto flex min-h-screen w-full max-w-md min-w-0 flex-col overflow-x-hidden pb-36"
+            className="relative z-[1] mx-auto flex min-h-[100dvh] w-full max-w-md min-w-0 flex-col overflow-x-hidden pb-36"
             style={{ paddingTop: 'var(--safe-top)' }}
           >
             <AppHeader />
@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: ReactNode }): JSX.E
           </div>
           <BottomTabBar />
         </Providers>
-        <div className="pointer-events-none fixed bottom-1 right-2 z-50 text-[9px] text-white/25">
+        <div aria-hidden className="pointer-events-none fixed bottom-1 right-2 z-[1] text-[9px] text-faint opacity-60">
           {`v.${(process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7)}`}
         </div>
       </body>

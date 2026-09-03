@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 
 /** Renders a TRC-20 payment URI as a QR code (client-side, no network dependency). */
-export function QrCode({ value, size = 200 }: { value: string; size?: number }): JSX.Element {
+export function QrCode({ value, size = 200, alt = 'QR code' }: { value: string; size?: number; alt?: string }): JSX.Element {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -26,5 +26,5 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }):
   }
 
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={dataUrl} alt="QR code" width={size} height={size} className="rounded-card bg-white p-2" />
+  return <img src={dataUrl} alt={alt} width={size} height={size} className="rounded-card bg-white p-2" />
 }

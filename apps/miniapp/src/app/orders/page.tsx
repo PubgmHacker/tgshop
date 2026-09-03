@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
+import { errorMessageKey } from '@/lib/errors'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useProfileData } from '@/hooks/useApi'
 import { OrderRow } from '@/components/OrderRow'
@@ -21,7 +22,7 @@ const FILTERS: { value: OrdersFilter; labelKey: 'orders.filter.all' | 'orders.fi
 
 export default function OrdersPage(): JSX.Element {
   const { t } = useI18n()
-  const { data, isLoading, isError, refetch } = useProfileData()
+  const { data, isLoading, isError, error, refetch } = useProfileData()
   const [filter, setFilter] = useState<OrdersFilter>('all')
 
   useBackButton(false)
@@ -67,7 +68,7 @@ export default function OrdersPage(): JSX.Element {
           ))}
         </div>
       ) : isError ? (
-        <ErrorState title={t('common.error.network')} onRetry={() => void refetch()} retryLabel={t('common.retry')} />
+        <ErrorState title={t(errorMessageKey(error))} onRetry={() => void refetch()} retryLabel={t('common.retry')} />
       ) : orders.length === 0 ? (
         <div className="rounded-card border border-line bg-card px-4 py-8 text-center text-sm text-faint">
           {t('orders.empty')}

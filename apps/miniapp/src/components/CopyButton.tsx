@@ -31,7 +31,7 @@ export function CopyButton({ value, label }: CopyButtonProps): JSX.Element {
         triggerHaptic('light')
         void handleCopy()
       }}
-      className="shrink-0 rounded-full bg-cta px-3.5 py-1.5 text-xs font-semibold text-cta-ink active:opacity-80"
+      className="flex min-h-[44px] shrink-0 items-center rounded-full bg-cta px-4 text-xs font-semibold text-cta-ink active:opacity-80"
     >
       {copied ? t('common.copied') : label ?? t('common.copy')}
     </button>

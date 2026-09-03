@@ -227,6 +227,31 @@ export function toOrderDetailDto(order: OrderWithPlan, payment: Payment | null):
   }
 }
 
+/**
+ * Top-up status for the Mini App's balance screen. Same wire shape as the
+ * POST /api/topups response (apps/miniapp CreateTopupResponseSchema), so the
+ * client polls with the schema it already has. The pay link is only exposed
+ * while the payment can still be completed.
+ */
+export interface TopupDetailDto {
+  paymentId: string
+  provider: Payment['provider']
+  status: Payment['status']
+  redirectUrl: string | null
+  tron: TronPaymentDetails | null
+}
+
+export function toTopupDetailDto(payment: Payment): TopupDetailDto {
+  const open = payment.status === 'PENDING' || payment.status === 'CONFIRMING'
+  return {
+    paymentId: payment.id,
+    provider: payment.provider,
+    status: payment.status,
+    redirectUrl: open ? payUrlOf(payment) : null,
+    tron: open ? tronDetailsFromPayment(payment) : null
+  }
+}
+
 type SubscriptionWithPlan = Subscription & { plan: Plan & { product: Product } }
 
 export function toSubscriptionItemDto(subscription: SubscriptionWithPlan): SubscriptionItemDto {

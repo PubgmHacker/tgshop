@@ -1,5 +1,6 @@
 'use client'
 
+import { useI18n } from '@/i18n/I18nProvider'
 import { Icon, type IconName } from './Icons'
 
 interface EmptyStateProps {
@@ -26,9 +27,10 @@ interface ErrorStateProps {
   retryLabel?: string
 }
 
-export function ErrorState({ title, onRetry, retryLabel = 'Retry' }: ErrorStateProps): JSX.Element {
+export function ErrorState({ title, onRetry, retryLabel }: ErrorStateProps): JSX.Element {
+  const { t } = useI18n()
   return (
-    <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+    <div role="alert" className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-full border border-line bg-card text-danger">
         <Icon name="alert" size={24} />
       </div>
@@ -40,7 +42,7 @@ export function ErrorState({ title, onRetry, retryLabel = 'Retry' }: ErrorStateP
           className="flex items-center gap-2 rounded-full bg-cta px-5 py-2.5 text-sm font-semibold text-cta-ink active:opacity-80"
         >
           <Icon name="refresh" size={15} />
-          {retryLabel}
+          {retryLabel ?? t('common.retry')}
         </button>
       ) : null}
     </div>

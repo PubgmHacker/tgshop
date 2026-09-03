@@ -115,7 +115,7 @@ export function TelegramProvider({ children }: { children: ReactNode }): JSX.Ele
       setLanguageCode(launchParams.initData?.user?.languageCode ?? window.navigator.language ?? null)
 
       if (viewport.mount.isAvailable()) {
-        void viewport.mount().then(() => {
+        void viewport.mount().catch(() => undefined).then(() => {
           viewport.expand()
           viewport.bindCssVars()
         })

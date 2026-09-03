@@ -114,7 +114,7 @@ export default function ProductPage(): JSX.Element {
           plan={selectedPlan}
           onProceedToCheckout={({ planId, qty, promoCode }) => {
             setIsSheetOpen(false)
-            const search = new URLSearchParams({ planId, qty: String(qty) })
+            const search = new URLSearchParams({ planId, qty: String(qty), product: data.slug })
             if (promoCode) search.set('promo', promoCode)
             router.push(`/checkout/new?${search.toString()}`)
           }}

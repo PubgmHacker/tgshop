@@ -400,6 +400,11 @@ export async function getLatestPaymentForOrder(orderId: string): Promise<Payment
   return prisma.payment.findFirst({ where: { orderId }, orderBy: { createdAt: 'desc' } })
 }
 
+/** Single payment row by id (top-up status polling); ownership is the caller's job. */
+export async function getPaymentById(paymentId: string): Promise<Payment | null> {
+  return prisma.payment.findUnique({ where: { id: paymentId } })
+}
+
 /** Rebuilds TRON instructions for an existing pending payment (checkout polling). */
 export function tronDetailsFromPayment(payment: Payment): TronPaymentDetails | null {
   if (payment.provider !== PaymentProvider.TRON_TRC20 || !payment.address) return null

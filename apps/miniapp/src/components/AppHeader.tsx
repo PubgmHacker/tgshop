@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '@/lib/ThemeProvider'
 import { useI18n } from '@/i18n/I18nProvider'
-import { triggerHaptic } from '@/lib/TelegramProvider'
+import { triggerHaptic, useTelegram } from '@/lib/TelegramProvider'
 import { BRAND_NAME, BRAND_TAGLINE } from '@/lib/tokens'
 import { Icon } from './Icons'
 
@@ -30,7 +30,9 @@ export function AppHeader(): JSX.Element {
   const { t } = useI18n()
   const pathname = usePathname()
   const router = useRouter()
-  const showBack = isInnerRoute(pathname ?? '/')
+  const { isTelegramEnvironment } = useTelegram()
+  // Inside Telegram the native BackButton (useBackButton) owns navigation; a second chevron would duplicate it.
+  const showBack = isInnerRoute(pathname ?? '/') && !isTelegramEnvironment
 
   return (
     <header className="flex items-center justify-between px-4 pb-2 pt-3">

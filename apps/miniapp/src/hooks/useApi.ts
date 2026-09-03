@@ -65,12 +65,14 @@ export function useMeData() {
 
 export function useConfigData() {
   const enabled = useApiEnabled()
-  return useQuery({
-    queryKey: ['config'],
-    queryFn: () => api.get('/api/config', ConfigResponseSchema),
-    staleTime: Infinity,
-    enabled
-  })
+  return asLoading(
+    useQuery({
+      queryKey: ['config'],
+      queryFn: () => api.get('/api/config', ConfigResponseSchema),
+      staleTime: Infinity,
+      enabled
+    })
+  )
 }
 
 export function useCategoryData(slug: string) {
@@ -133,29 +135,43 @@ interface CreateOrderInput {
   idempotencyKey: string
 }
 
+/** Money moved (or may move soon): every screen that shows a balance refetches. */
+function invalidateBalanceViews(queryClient: ReturnType<typeof useQueryClient>): void {
+  void queryClient.invalidateQueries({ queryKey: ['me'] })
+  void queryClient.invalidateQueries({ queryKey: ['profile'] })
+}
+
 export function useCreateOrder() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateOrderInput) => api.post('/api/orders', CreateOrderResponseSchema, input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['profile'] })
-    }
+    onSuccess: () => invalidateBalanceViews(queryClient)
   })
 }
 
 export function useOrderDetail(orderId: string, pollWhilePending: boolean) {
   const enabled = useApiEnabled()
-  return useQuery({
-    queryKey: ['order', orderId],
-    queryFn: () => api.get(`/api/orders/${orderId}`, OrderDetailSchema),
-    enabled: enabled && Boolean(orderId),
-    refetchInterval: (query) => {
-      if (!pollWhilePending) return false
-      const status = query.state.data?.status
-      if (status === 'PENDING' || status === 'DELIVERING') return 3_000
-      return false
-    }
-  })
+  const queryClient = useQueryClient()
+  return asLoading(
+    useQuery({
+      queryKey: ['order', orderId],
+      queryFn: async () => {
+        const order = await api.get(`/api/orders/${orderId}`, OrderDetailSchema)
+        // The order left PENDING between two polls — its payment (balance
+        // debit, top-up credit on refund) is reflected in the cached balance.
+        const previous = queryClient.getQueryData<{ status: string }>(['order', orderId])
+        if (previous && previous.status !== order.status) invalidateBalanceViews(queryClient)
+        return order
+      },
+      enabled: enabled && Boolean(orderId),
+      refetchInterval: (query) => {
+        if (!pollWhilePending) return false
+        const status = query.state.data?.status
+        if (status === 'PENDING' || status === 'DELIVERING') return 3_000
+        return false
+      }
+    })
+  )
 }
 
 interface CreateTopupInput {
@@ -165,7 +181,38 @@ interface CreateTopupInput {
 }
 
 export function useCreateTopup() {
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (input: CreateTopupInput) => api.post('/api/topups', CreateTopupResponseSchema, input)
+    mutationFn: (input: CreateTopupInput) => api.post('/api/topups', CreateTopupResponseSchema, input),
+    onSuccess: () => invalidateBalanceViews(queryClient)
   })
+}
+
+const OPEN_TOPUP_STATUSES = new Set(['PENDING', 'CONFIRMING'])
+
+/**
+ * Polls a created top-up until the provider settles it. GET /api/topups/:id
+ * answers with the same shape as the create call, so the balance screen can
+ * keep rendering the invoice and switch to a success/failure state in place.
+ */
+export function useTopupDetail(paymentId: string | null) {
+  const enabled = useApiEnabled()
+  const queryClient = useQueryClient()
+  return asLoading(
+    useQuery({
+      queryKey: ['topup', paymentId],
+      queryFn: async () => {
+        const topup = await api.get(`/api/topups/${paymentId}`, CreateTopupResponseSchema)
+        const previous = queryClient.getQueryData<{ status: string }>(['topup', paymentId])
+        if (previous && previous.status !== topup.status) invalidateBalanceViews(queryClient)
+        return topup
+      },
+      enabled: enabled && Boolean(paymentId),
+      refetchInterval: (query) => {
+        const status = query.state.data?.status
+        if (!status || OPEN_TOPUP_STATUSES.has(status)) return 3_000
+        return false
+      }
+    })
+  )
 }

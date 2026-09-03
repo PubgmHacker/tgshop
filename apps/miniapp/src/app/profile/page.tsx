@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
+import { errorMessageKey } from '@/lib/errors'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useMeData, useProfileData } from '@/hooks/useApi'
 import { Icon } from '@/components/Icons'
@@ -21,7 +22,7 @@ export default function ProfilePage(): JSX.Element {
   if (me.isError && profile.isError) {
     return (
       <ErrorState
-        title={t('common.error.network')}
+        title={t(errorMessageKey(me.error ?? profile.error))}
         onRetry={() => {
           void me.refetch()
           void profile.refetch()

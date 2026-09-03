@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation'
 import { useI18n } from '@/i18n/I18nProvider'
+import { errorMessageKey } from '@/lib/errors'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useCategoryData } from '@/hooks/useApi'
 import { ServiceTile } from '@/components/ServiceTile'
@@ -12,7 +13,7 @@ export default function CategoryPage(): JSX.Element {
   const params = useParams<{ slug: string }>()
   const slug = params.slug
   const { t } = useI18n()
-  const { data, isLoading, isError, refetch } = useCategoryData(slug)
+  const { data, isLoading, isError, error, refetch } = useCategoryData(slug)
 
   useBackButton(true)
 
@@ -35,7 +36,7 @@ export default function CategoryPage(): JSX.Element {
           ))}
         </div>
       ) : isError ? (
-        <ErrorState title={t('common.error.network')} onRetry={() => void refetch()} retryLabel={t('common.retry')} />
+        <ErrorState title={t(errorMessageKey(error))} onRetry={() => void refetch()} retryLabel={t('common.retry')} />
       ) : (data?.products.length ?? 0) === 0 ? (
         <EmptyState title={t('category.empty')} />
       ) : (

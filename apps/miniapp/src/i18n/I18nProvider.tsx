@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { retrieveLaunchParams } from '@telegram-apps/sdk-react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DEFAULT_LOCALE, type DictionaryKey, type Locale, dictionaries } from './dictionaries'
 
 interface I18nContextValue {
@@ -27,12 +28,23 @@ function detectInitialLocale(): Locale {
   } catch {
     // Private mode / blocked storage: use the browser language below.
   }
+  // The Telegram profile language beats the WebView locale: that is the language the
+  // user reads the bot in, and the two often disagree on iOS.
+  try {
+    const tgLanguage = retrieveLaunchParams().initData?.user?.languageCode?.toLowerCase() ?? ''
+    if (tgLanguage) return tgLanguage.startsWith('ru') ? 'ru' : 'en'
+  } catch {
+    // Not launched from Telegram (browser preview): fall through to the browser language.
+  }
   const nav = window.navigator.language?.toLowerCase() ?? ''
   return nav.startsWith('ru') ? 'ru' : 'en'
 }
 
 export function I18nProvider({ children }: { children: ReactNode }): JSX.Element {
   const [locale, setLocale] = useState<Locale>(() => detectInitialLocale())
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
   const changeLocale = useCallback((next: Locale) => {
     setLocale(next)
     try {

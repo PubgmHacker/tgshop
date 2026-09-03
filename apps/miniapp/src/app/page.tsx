@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
+import { errorMessageKey } from '@/lib/errors'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useHomeData, useMeData } from '@/hooks/useApi'
 import { CollectionGrid } from '@/components/CollectionGrid'
@@ -29,7 +30,7 @@ export default function HomePage(): JSX.Element {
     <div className="page-enter flex min-w-0 flex-1 flex-col gap-5 overflow-x-hidden px-4 pt-2">
       {me.isError ? (
         <ErrorState
-          title={t('common.error.network')}
+          title={t(errorMessageKey(me.error ?? home.error))}
           onRetry={() => void me.refetch()}
           retryLabel={t('common.retry')}
         />

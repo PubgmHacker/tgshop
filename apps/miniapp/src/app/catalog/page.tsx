@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useI18n } from '@/i18n/I18nProvider'
+import { errorMessageKey } from '@/lib/errors'
 import { useBackButton } from '@/hooks/useBackButton'
 import { useCatalogData } from '@/hooks/useApi'
 import { Icon } from '@/components/Icons'
@@ -12,7 +13,7 @@ import { ErrorState } from '@/components/States'
 export default function CatalogPage(): JSX.Element {
   const { t } = useI18n()
   const searchParams = useSearchParams()
-  const { data, isLoading, isError, refetch } = useCatalogData()
+  const { data, isLoading, isError, error, refetch } = useCatalogData()
   const [query, setQuery] = useState(searchParams.get('q') ?? '')
   const initialCat = searchParams.get('cat') ?? 'all'
 
@@ -92,7 +93,7 @@ export default function CatalogPage(): JSX.Element {
         </div>
       ) : isError ? (
         <ErrorState
-          title={t('common.error.network')}
+          title={t(errorMessageKey(error))}
           onRetry={() => void refetch()}
           retryLabel={t('common.retry')}
         />

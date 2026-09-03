@@ -40,17 +40,31 @@ export function useMainButton(options: MainButtonOptions): void {
 
     return () => {
       off?.()
+      // The button belongs to the screen that configured it. Without this a
+      // sticky "Pay" / "Buy" survives navigation to a screen that never asked
+      // for a MainButton and fires the previous screen's handler.
+      if (mainButton.setParams.isAvailable()) {
+        try {
+          mainButton.setParams({ isVisible: false, isLoaderVisible: false })
+        } catch {
+          // unmounted by the SDK in the meantime
+        }
+      }
     }
   }, [])
 
   useEffect(() => {
     if (!mainButton.setParams.isAvailable()) return
 
-    mainButton.setParams({
-      text,
-      isEnabled: isEnabled && !isLoading,
-      isLoaderVisible: isLoading,
-      isVisible
-    })
+    try {
+      mainButton.setParams({
+        text,
+        isEnabled: isEnabled && !isLoading,
+        isLoaderVisible: isLoading,
+        isVisible
+      })
+    } catch {
+      // not mounted / not in Telegram
+    }
   }, [text, isEnabled, isLoading, isVisible])
 }
