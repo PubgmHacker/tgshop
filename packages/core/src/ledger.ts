@@ -104,10 +104,11 @@ async function writeLedgerEntry(
   input: LedgerEntryInput,
   signedAmountCents: number
 ): Promise<LedgerEntryResult> {
+  // Lock first: two writers with the same key must serialise before the idempotency
+  // read, or both miss the record and the second insert dies on the unique key.
+  await lockUserBalance(tx, input.userId)
   const existing = await findExistingLedgerResult(tx, input.idempotencyKey)
   if (existing) return existing
-
-  await lockUserBalance(tx, input.userId)
 
   const currentBalance = await getBalance(tx, input.userId)
   const newBalance = currentBalance + signedAmountCents

@@ -1,5 +1,5 @@
 import { prisma, PaymentProvider, PaymentStatus } from '@tgshop/db'
-import { CENTS_TO_USDT6, TRON_TAG_MAX, tronTagOfAmountUsdt6 } from '@tgshop/core'
+import { TRON_TAG_MAX, tronTagOfAmountUsdt6 } from '@tgshop/core'
 import { env } from '../config/env.js'
 import { redis } from '../config/redis.js'
 import { logger } from '../lib/logger.js'
@@ -36,11 +36,17 @@ export const TRON_OPEN_STATUSES: PaymentStatus[] = [
 export const TRON_TAG_GRACE_MS = 30 * 60 * 1000
 
 export class TronTagsExhaustedError extends Error {
-  constructor(amountCents: number) {
-    super(
-      `all ${TRON_TAG_MAX} USDT tags for ${amountCents} cents are in use; try again in a few minutes`
-    )
+  constructor() {
+    super(`all ${TRON_TAG_MAX} USDT invoice tags are in use; try again in a few minutes`)
     this.name = 'TronTagsExhaustedError'
+  }
+}
+
+/** Redis could not confirm the reservation; the checkout is refused rather than guessed. */
+export class TronTagReservationError extends Error {
+  constructor() {
+    super('USDT invoice tag could not be reserved; payment method temporarily unavailable')
+    this.name = 'TronTagReservationError'
   }
 }
 
@@ -49,8 +55,8 @@ export function getTronReceiveAddress(): string | null {
   return resolveTronReceiveAddress(env)
 }
 
-function reservationKey(amountCents: number, tag: number): string {
-  return `tron:tag:${amountCents}:${tag}`
+function reservationKey(tag: number): string {
+  return `tron:tag:${tag}`
 }
 
 function shuffled<T>(items: T[]): T[] {
@@ -80,32 +86,34 @@ export async function allocateTronTag(amountCents: number, windowMs: number): Pr
       `allocateTronTag: amountCents must be a positive integer, got ${amountCents}`
     )
   }
-  const base = BigInt(amountCents) * CENTS_TO_USDT6
   const holdMs = windowMs + TRON_TAG_GRACE_MS
-
+  // The namespace is global, not per price: the worker resolves an inexact transfer by
+  // tag alone, so two open invoices must never share one regardless of their amounts.
+  // The database pass survives a Redis flush; the SET NX below closes the race between
+  // two checkouts that both passed it before either row exists.
   const open = await prisma.payment.findMany({
     where: {
       provider: PaymentProvider.TRON_TRC20,
       status: { in: TRON_OPEN_STATUSES },
-      createdAt: { gte: new Date(Date.now() - holdMs) },
-      amount: { gt: base, lt: base + CENTS_TO_USDT6 }
+      createdAt: { gte: new Date(Date.now() - holdMs) }
     },
     select: { amount: true }
   })
   const taken = new Set(open.map((p) => tronTagOfAmountUsdt6(BigInt(p.amount))))
-
   const free: number[] = []
   for (let tag = 1; tag <= TRON_TAG_MAX; tag += 1) if (!taken.has(tag)) free.push(tag)
-  if (free.length === 0) throw new TronTagsExhaustedError(amountCents)
-
+  if (free.length === 0) throw new TronTagsExhaustedError()
   for (const tag of shuffled(free)) {
+    let reserved: string | null
     try {
-      const reserved = await redis.set(reservationKey(amountCents, tag), '1', 'PX', holdMs, 'NX')
-      if (reserved === 'OK') return tag
+      reserved = await redis.set(reservationKey(tag), '1', 'PX', holdMs, 'NX')
     } catch (err) {
-      logger.warn({ err, amountCents, tag }, 'TRON tag reservation skipped: redis unavailable')
-      return tag
+      // Fail closed: an unreserved tag can be handed to two checkouts at once and the
+      // worker would then have to guess whose money arrived. The buyer retries instead.
+      logger.error({ err, tag }, 'TRON tag reservation failed: redis unavailable')
+      throw new TronTagReservationError()
     }
+    if (reserved === 'OK') return tag
   }
-  throw new TronTagsExhaustedError(amountCents)
+  throw new TronTagsExhaustedError()
 }

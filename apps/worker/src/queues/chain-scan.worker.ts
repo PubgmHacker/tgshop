@@ -1,6 +1,16 @@
 import type { Job } from 'bullmq'
 import { prisma, Prisma, PaymentProvider, PaymentStatus, OrderStatus, LedgerType } from '@tgshop/db'
-import { credit, resolveTronReceiveAddress, usdt6ToDisplay, usdt6ToUsdCents } from '@tgshop/core'
+import {
+  CENTS_TO_USDT6,
+  InsufficientBalanceError,
+  TRON_TAG_UNIT_USDT6,
+  credit,
+  debit,
+  resolveTronReceiveAddress,
+  tronTagOfAmountUsdt6,
+  usdt6ToDisplay,
+  usdt6ToUsdCents
+} from '@tgshop/core'
 import { createWorker, QueueName, newCorrelationId, upsertRepeatable } from '../queue.js'
 import { jobLogger } from '../logger.js'
 import { emitEvent } from '../events.js'
@@ -19,19 +29,34 @@ import { enqueueNotify } from './notify.js'
 // each open invoice a unique sub-cent tag on its amount (29.0057 USDT), so the
 // amount of an inbound transfer says which invoice it belongs to. Each scan:
 //
-//   1. lists confirmed USDT transfers INTO the wallet (TronGrid, lookback),
+//   1. lists solidified USDT transfers INTO the wallet (TronGrid asks for
+//      only_confirmed, so nothing here is provisional and nothing waits),
 //   2. drops transfers already recorded (Payment.txHash) or already flagged
 //      (AuditLog anomaly) — that is the idempotency layer,
 //   3. matches the rest to open invoices (lib/tron-match.ts) and settles:
-//        order PENDING, in window, amount >= tagged  -> Order PAID, delivery
+//        order PENDING, amount >= tagged             -> Order PAID, delivery
 //                                                       (surplus -> balance)
-//        order PENDING, amount short                 -> Payment UNDERPAID,
-//                                                       received -> balance
-//        order expired / paid another way            -> received -> balance
-//        top-up (no order)                           -> received -> balance
-//        nothing matches                             -> AuditLog anomaly +
+//        order PENDING, this + earlier short payments
+//          on the order cover it                    -> Order PAID, the earlier
+//                                                       balance credits are
+//                                                       reclaimed as the purchase
+//        order PENDING, still short                 -> Payment UNDERPAID,
+//                                                       received -> balance,
+//                                                       customer told the exact
+//                                                       tagged remainder to send
+//        order expired / paid another way           -> received -> balance
+//                                                       (paid another way is also
+//                                                       flagged for an admin)
+//        top-up (no order)                          -> received -> balance
+//        nothing matches                            -> AuditLog anomaly +
 //                                                       admin alert, never
 //                                                       a guess.
+//   4. re-enqueues delivery for any order that has sat in PAID without being
+//      picked up, whichever rail paid it.
+//
+// Every state change on a Payment is a compare-and-set on its current status:
+// during a rolling deploy two workers can run the same sweep, and the second
+// must find nothing left to do rather than credit the same transfer twice.
 //
 // Nothing here can move funds: there are no keys in the system at all.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,8 +80,14 @@ const TAG_HOLD_MS = PAYMENT_WINDOW_MS + TAG_GRACE_MS
  */
 const SCAN_LOOKBACK_MS = 6 * 60 * 60 * 1000
 
-/** Average TRON block time; confirmations are approximated as elapsed time. */
-const TRON_BLOCK_MS = 3_000
+/**
+ * A PAID order normally has its delivery job within milliseconds. One that is
+ * still PAID after this long lost the enqueue (crash between commit and queue
+ * add, Redis blip) and is handed to the delivery queue again — the jobId keys
+ * on the order, so an in-flight job is never duplicated.
+ */
+const DELIVERY_RECONCILE_AFTER_MS = 2 * 60 * 1000
+const DELIVERY_RECONCILE_BATCH = 50
 
 const AUDIT_ENTITY = 'TronTransfer'
 const AUDIT_ACTOR = 'worker.chain-scan'
@@ -77,10 +108,19 @@ const invoiceInclude = {
 } satisfies Prisma.PaymentInclude
 
 type InvoiceRow = Prisma.PaymentGetPayload<{ include: typeof invoiceInclude }>
+type Log = ReturnType<typeof jobLogger>
 
 /** An open invoice as the matcher sees it, carrying its database row along. */
 interface Candidate extends OpenInvoice {
   row: InvoiceRow
+}
+
+/** Thrown inside a settlement transaction when the Payment row was settled by someone else meanwhile. */
+class StaleSettlementError extends Error {
+  constructor(paymentId: string) {
+    super(`payment ${paymentId} is no longer CONFIRMING; another sweep settled it`)
+    this.name = 'StaleSettlementError'
+  }
 }
 
 function orderIsClosed(order: InvoiceRow['order'], now: number): boolean {
@@ -122,10 +162,6 @@ async function loadCandidates(now: number): Promise<Candidate[]> {
     include: invoiceInclude
   })
   return rows.map((row) => toCandidate(row, now))
-}
-
-function isConfirmed(transfer: TronTrc20Transfer, minConfirmations: number, now: number): boolean {
-  return now - transfer.block_timestamp >= minConfirmations * TRON_BLOCK_MS
 }
 
 function transferPayload(
@@ -173,87 +209,85 @@ async function processChainScan(job: Job<Record<string, never>>): Promise<void> 
       } else {
         log.debug('chain-scan: no inbound USDT transfers in window')
       }
-      return
+    } else {
+      await processTransfers(transfers, receiveAddress, now, log)
     }
 
-    const txids = transfers.map((tr) => tr.transaction_id)
-    const [recorded, flagged] = await Promise.all([
-      prisma.payment.findMany({
-        where: { provider: PaymentProvider.TRON_TRC20, txHash: { in: txids } },
-        include: invoiceInclude
-      }),
-      prisma.auditLog.findMany({
-        where: { entity: AUDIT_ENTITY, entityId: { in: txids } },
-        select: { entityId: true }
-      })
-    ])
-    const recordedByTx = new Map(recorded.map((p) => [p.txHash as string, p]))
-    const flaggedTx = new Set(flagged.map((a) => a.entityId))
-    const candidates = await loadCandidates(now)
-
-    let settled = 0
-    let waiting = 0
-    let unmatched = 0
-    // Oldest first: if two transfers compete for one invoice the earlier one wins it.
-    for (const transfer of [...transfers].sort((a, b) => a.block_timestamp - b.block_timestamp)) {
-      const txid = transfer.transaction_id
-      if (flaggedTx.has(txid)) continue
-      const receivedUsdt6 = BigInt(transfer.value)
-      const confirmed = isConfirmed(transfer, env.TRON_MIN_CONFIRMATIONS, now)
-
-      try {
-        const known = recordedByTx.get(txid)
-        if (known) {
-          // Bound on an earlier scan while still confirming; settle once deep enough.
-          if (known.status !== PaymentStatus.CONFIRMING) continue
-          if (!confirmed) {
-            waiting += 1
-            continue
-          }
-          await settle(known, expectedFor(known, candidates), receivedUsdt6, transfer, now, log)
-          settled += 1
-          continue
-        }
-
-        const match = matchTransfer({ txid, amountUsdt6: receivedUsdt6 }, candidates)
-        if (match.kind === 'unmatched') {
-          await flagUnmatched(transfer, receivedUsdt6, match.reason, log)
-          flaggedTx.add(txid)
-          unmatched += 1
-          continue
-        }
-        if (match.kind === 'already-recorded') continue
-
-        const invoice = match.invoice
-        const bound = await bindTransfer(invoice, receiveAddress, transfer, receivedUsdt6)
-        // The invoice now carries this tx; a second transfer in the same batch must not claim it too.
-        invoice.txHash = bound.txHash
-        recordedByTx.set(txid, bound)
-        if (!confirmed) {
-          waiting += 1
-          log.info(
-            { paymentId: bound.id, txid },
-            'chain-scan: transfer bound, awaiting confirmations'
-          )
-          continue
-        }
-        await settle(bound, invoice.amountUsdt6, receivedUsdt6, transfer, now, log)
-        settled += 1
-      } catch (err) {
-        log.error({ err, txid }, 'chain-scan: failed to process transfer')
-      }
-    }
-
-    log.info(
-      { transfers: transfers.length, settled, waiting, unmatched },
-      'chain-scan sweep complete'
-    )
+    await reconcileUndeliveredOrders(now, log)
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     log.error({ err }, 'chain-scan sweep errored')
     await enqueueNotify({ kind: 'chain_scan_error', reason })
     throw err
   }
+}
+
+async function processTransfers(
+  transfers: TronTrc20Transfer[],
+  receiveAddress: string,
+  now: number,
+  log: Log
+): Promise<void> {
+  const txids = transfers.map((tr) => tr.transaction_id)
+  const [recorded, flagged] = await Promise.all([
+    prisma.payment.findMany({
+      where: { provider: PaymentProvider.TRON_TRC20, txHash: { in: txids } },
+      include: invoiceInclude
+    }),
+    prisma.auditLog.findMany({
+      where: { entity: AUDIT_ENTITY, entityId: { in: txids } },
+      select: { entityId: true }
+    })
+  ])
+  const recordedByTx = new Map(recorded.map((p) => [p.txHash as string, p]))
+  const flaggedTx = new Set(flagged.map((a) => a.entityId))
+  const candidates = await loadCandidates(now)
+
+  let settled = 0
+  let unmatched = 0
+  // Oldest first: if two transfers compete for one invoice the earlier one wins it.
+  for (const transfer of [...transfers].sort((a, b) => a.block_timestamp - b.block_timestamp)) {
+    const txid = transfer.transaction_id
+    if (flaggedTx.has(txid)) continue
+    const receivedUsdt6 = BigInt(transfer.value)
+
+    try {
+      const known = recordedByTx.get(txid)
+      if (known) {
+        // Bound on an earlier sweep that died before settling: finish the job.
+        if (known.status !== PaymentStatus.CONFIRMING) continue
+        await settle(known, expectedFor(known, candidates), receivedUsdt6, transfer, now, log)
+        settled += 1
+        continue
+      }
+
+      const match = matchTransfer({ txid, amountUsdt6: receivedUsdt6 }, candidates)
+      if (match.kind === 'unmatched') {
+        await flagUnmatched(transfer, receivedUsdt6, match.reason, log)
+        flaggedTx.add(txid)
+        unmatched += 1
+        continue
+      }
+      if (match.kind === 'already-recorded') continue
+
+      const invoice = match.invoice
+      const bound = await bindTransfer(invoice, receiveAddress, transfer, receivedUsdt6)
+      // The invoice now carries this tx; a second transfer in the same batch must not claim it too.
+      invoice.txHash = bound.txHash
+      recordedByTx.set(txid, bound)
+      if (bound.status !== PaymentStatus.CONFIRMING) continue // a parallel sweep already settled it
+      await settle(bound, invoice.amountUsdt6, receivedUsdt6, transfer, now, log)
+      settled += 1
+    } catch (err) {
+      if (err instanceof StaleSettlementError) {
+        log.info({ txid }, 'chain-scan: transfer settled by a parallel sweep, skipped')
+        continue
+      }
+      log.error({ err, txid }, 'chain-scan: failed to process transfer')
+    }
+  }
+
+  log.info({ transfers: transfers.length, settled, unmatched }, 'chain-scan sweep complete')
 }
 
 /**
@@ -271,6 +305,29 @@ async function expireStaleInvoices(now: number): Promise<void> {
     },
     data: { status: PaymentStatus.EXPIRED }
   })
+}
+
+/**
+ * Orders paid on any rail whose delivery job never made it onto the queue. The
+ * delivery worker re-checks the order status itself, so a false positive (a job
+ * that is merely slow) costs one no-op run; the jobId keeps it from doubling.
+ */
+async function reconcileUndeliveredOrders(now: number, log: Log): Promise<void> {
+  const stuck = await prisma.order.findMany({
+    where: {
+      status: OrderStatus.PAID,
+      paidAt: { lt: new Date(now - DELIVERY_RECONCILE_AFTER_MS) }
+    },
+    select: { id: true },
+    orderBy: { paidAt: 'asc' },
+    take: DELIVERY_RECONCILE_BATCH
+  })
+  if (stuck.length === 0) return
+  for (const { id } of stuck) await enqueueDelivery(id)
+  log.warn(
+    { orderIds: stuck.map((o) => o.id) },
+    'chain-scan: PAID orders without a delivery job re-enqueued'
+  )
 }
 
 /**
@@ -292,7 +349,8 @@ function expectedFor(row: InvoiceRow, candidates: Candidate[]): bigint {
  * Records the transfer on the invoice. A fresh invoice takes the tx itself; an
  * UNDERPAID invoice already carries its first tx, so a second transfer gets its
  * own Payment row on the same order — (provider, txHash) is unique and every
- * on-chain transfer deserves its own audit trail.
+ * on-chain transfer deserves its own audit trail. When a parallel sweep created
+ * that row a moment earlier the unique key fires and its row is reused.
  */
 async function bindTransfer(
   invoice: Candidate,
@@ -302,32 +360,44 @@ async function bindTransfer(
 ): Promise<InvoiceRow> {
   const rawPayload = transferPayload(transfer, receivedUsdt6)
   if (invoice.txHash === null) {
-    return prisma.payment.update({
-      where: { id: invoice.id },
+    await prisma.payment.updateMany({
+      where: { id: invoice.id, txHash: null },
       data: {
         txHash: transfer.transaction_id,
         address: receiveAddress,
         status: PaymentStatus.CONFIRMING,
         rawPayload
+      }
+    })
+    return prisma.payment.findUniqueOrThrow({ where: { id: invoice.id }, include: invoiceInclude })
+  }
+  try {
+    return await prisma.payment.create({
+      data: {
+        orderId: invoice.row.orderId,
+        userId: invoice.row.userId,
+        provider: PaymentProvider.TRON_TRC20,
+        amount: receivedUsdt6,
+        asset: 'USDT',
+        network: invoice.row.network,
+        address: receiveAddress,
+        txHash: transfer.transaction_id,
+        status: PaymentStatus.CONFIRMING,
+        rawPayload
       },
       include: invoiceInclude
     })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return prisma.payment.findUniqueOrThrow({
+        where: {
+          provider_txHash: { provider: PaymentProvider.TRON_TRC20, txHash: transfer.transaction_id }
+        },
+        include: invoiceInclude
+      })
+    }
+    throw err
   }
-  return prisma.payment.create({
-    data: {
-      orderId: invoice.row.orderId,
-      userId: invoice.row.userId,
-      provider: PaymentProvider.TRON_TRC20,
-      amount: receivedUsdt6,
-      asset: 'USDT',
-      network: invoice.row.network,
-      address: receiveAddress,
-      txHash: transfer.transaction_id,
-      status: PaymentStatus.CONFIRMING,
-      rawPayload
-    },
-    include: invoiceInclude
-  })
 }
 
 /** Nobody can claim this money: leave a durable trace (also the dedupe key) and wake an admin. */
@@ -335,7 +405,7 @@ async function flagUnmatched(
   transfer: TronTrc20Transfer,
   receivedUsdt6: bigint,
   reason: string,
-  log: ReturnType<typeof jobLogger>
+  log: Log
 ): Promise<void> {
   const amountDisplay = usdt6ToDisplay(receivedUsdt6, 4)
   await prisma.auditLog.create({
@@ -373,9 +443,7 @@ async function flagUnmatched(
   )
 }
 
-type Log = ReturnType<typeof jobLogger>
-
-/** Routes a confirmed, bound transfer to the one outcome it can have. */
+/** Routes a bound transfer to the one outcome it can have. */
 async function settle(
   row: InvoiceRow,
   expectedUsdt6: bigint,
@@ -387,8 +455,45 @@ async function settle(
   const txid = transfer.transaction_id
   if (!row.orderId || !row.order) return settleTopup(row, receivedUsdt6, txid, log)
   if (orderIsClosed(row.order, now)) return settleLate(row, receivedUsdt6, txid, log)
-  if (receivedUsdt6 < expectedUsdt6) return settleUnderpaid(row, expectedUsdt6, receivedUsdt6, log)
-  return settleOrderPaid(row, expectedUsdt6, receivedUsdt6, txid, log)
+  if (receivedUsdt6 >= expectedUsdt6) return settleOrderPaid(row, expectedUsdt6, receivedUsdt6, txid, log)
+
+  // Short on its own — but earlier short payments on this order were credited to the
+  // balance, and together they may cover the ask.
+  const priorCents = await priorUnderpaidCents(row.orderId)
+  const effectiveUsdt6 = receivedUsdt6 + BigInt(priorCents) * CENTS_TO_USDT6
+  if (effectiveUsdt6 >= expectedUsdt6) {
+    const completed = await settleOrderCompleted(row, expectedUsdt6, receivedUsdt6, txid, log)
+    if (completed) return
+  }
+  return settleUnderpaid(row, expectedUsdt6, receivedUsdt6, effectiveUsdt6, log)
+}
+
+/** Cents already credited to the balance by earlier short payments on this order. */
+async function priorUnderpaidCents(orderId: string): Promise<number> {
+  const rows = await prisma.payment.findMany({
+    where: { orderId, provider: PaymentProvider.TRON_TRC20, status: PaymentStatus.UNDERPAID },
+    select: { id: true }
+  })
+  if (rows.length === 0) return 0
+  const sum = await prisma.balanceTransaction.aggregate({
+    where: { orderId, type: LedgerType.TOPUP, paymentId: { in: rows.map((r) => r.id) } },
+    _sum: { amountCents: true }
+  })
+  return sum._sum.amountCents ?? 0
+}
+
+/** Flips this Payment CONFIRMING -> `status` inside `tx`, or throws if another sweep got there first. */
+async function claimPayment(
+  tx: Prisma.TransactionClient,
+  row: InvoiceRow,
+  status: PaymentStatus,
+  amountUsdt6: bigint
+): Promise<void> {
+  const claimed = await tx.payment.updateMany({
+    where: { id: row.id, status: PaymentStatus.CONFIRMING },
+    data: { status, amount: amountUsdt6 }
+  })
+  if (claimed.count === 0) throw new StaleSettlementError(row.id)
 }
 
 async function settleOrderPaid(
@@ -412,10 +517,7 @@ async function settleOrderPaid(
       data: { status: OrderStatus.PAID, paidAt: new Date(), externalId: txid }
     })
     if (claimed.count === 0) return 'closed' as const
-    await tx.payment.update({
-      where: { id: row.id },
-      data: { status: PaymentStatus.PAID, amount: receivedUsdt6 }
-    })
+    await claimPayment(tx, row, PaymentStatus.PAID, receivedUsdt6)
     if (surplusCents > 0) {
       await credit(tx, {
         userId: row.userId,
@@ -447,20 +549,102 @@ async function settleOrderPaid(
   )
 }
 
+/**
+ * This transfer plus the balance credits from earlier short payments cover the
+ * order: the order is paid, the remainder is taken back from the balance as the
+ * purchase, and the earlier UNDERPAID rows are closed. Returns false when the
+ * customer has meanwhile spent that balance — the caller then treats this
+ * transfer as one more short payment instead.
+ */
+async function settleOrderCompleted(
+  row: InvoiceRow,
+  expectedUsdt6: bigint,
+  receivedUsdt6: bigint,
+  txid: string,
+  log: Log
+): Promise<boolean> {
+  const orderId = row.orderId as string
+  const remainderUsdt6 = expectedUsdt6 - receivedUsdt6
+  const neededCents = Number((remainderUsdt6 + CENTS_TO_USDT6 - 1n) / CENTS_TO_USDT6)
+
+  let outcome: 'completed' | 'closed'
+  try {
+    outcome = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: OrderStatus.PENDING },
+        data: { status: OrderStatus.PAID, paidAt: new Date(), externalId: txid }
+      })
+      if (claimed.count === 0) return 'closed' as const
+      await claimPayment(tx, row, PaymentStatus.PAID, receivedUsdt6)
+      await debit(tx, {
+        userId: row.userId,
+        amountCents: neededCents,
+        type: LedgerType.PURCHASE,
+        orderId,
+        paymentId: row.id,
+        idempotencyKey: `tron-underpaid-reclaim:${row.id}`,
+        comment: `Earlier short payments on order ${orderId} applied to the purchase`
+      })
+      await tx.payment.updateMany({
+        where: { orderId, provider: PaymentProvider.TRON_TRC20, status: PaymentStatus.UNDERPAID },
+        data: { status: PaymentStatus.PAID }
+      })
+      return 'completed' as const
+    })
+  } catch (err) {
+    if (err instanceof InsufficientBalanceError) {
+      log.warn(
+        { orderId, paymentId: row.id, neededCents },
+        'TRON top-up would complete the order but its earlier credits were spent; treated as underpaid'
+      )
+      return false
+    }
+    throw err
+  }
+
+  if (outcome === 'closed') {
+    await settleLate(row, receivedUsdt6, txid, log)
+    return true
+  }
+
+  await emitPaymentReceived(row, receivedUsdt6, txid)
+  await enqueueDelivery(orderId)
+  await notifyUser(
+    row.user,
+    (locale) =>
+      t(locale).orderCompletedFromBalance(usdt6ToDisplay(BigInt(neededCents) * CENTS_TO_USDT6), 'USDT'),
+    log
+  )
+  log.info(
+    { orderId, paymentId: row.id, neededCents, receivedUsdt6: receivedUsdt6.toString() },
+    'TRON payment completed an underpaid order, order PAID'
+  )
+  return true
+}
+
+/**
+ * The exact amount that finishes the order: the remainder rounded up to a whole
+ * cent plus the invoice's own tag, so the next transfer is matched by tag and
+ * lands on this order rather than in the unmatched pile.
+ */
+function taggedRemainder(expectedUsdt6: bigint, effectiveUsdt6: bigint): bigint {
+  const shortfall = expectedUsdt6 - effectiveUsdt6
+  const wholeCents = ((shortfall + CENTS_TO_USDT6 - 1n) / CENTS_TO_USDT6) * CENTS_TO_USDT6
+  return wholeCents + BigInt(tronTagOfAmountUsdt6(expectedUsdt6)) * TRON_TAG_UNIT_USDT6
+}
+
 async function settleUnderpaid(
   row: InvoiceRow,
   expectedUsdt6: bigint,
   receivedUsdt6: bigint,
+  effectiveUsdt6: bigint,
   log: Log
 ): Promise<void> {
   const creditedCents = usdt6ToUsdCents(receivedUsdt6)
   await prisma.$transaction(async (tx) => {
     // `amount` stays the tagged ask: an UNDERPAID invoice still holds its tag so
-    // the customer can re-send the full amount and be recognised.
-    await tx.payment.update({
-      where: { id: row.id },
-      data: { status: PaymentStatus.UNDERPAID, amount: expectedUsdt6 }
-    })
+    // the customer's next transfer is recognised.
+    await claimPayment(tx, row, PaymentStatus.UNDERPAID, expectedUsdt6)
     if (creditedCents > 0) {
       await credit(tx, {
         userId: row.userId,
@@ -477,21 +661,31 @@ async function settleUnderpaid(
     paymentId: row.id,
     orderId: row.orderId,
     expected6: expectedUsdt6.toString(),
-    received6: receivedUsdt6.toString()
+    received6: receivedUsdt6.toString(),
+    effective6: effectiveUsdt6.toString()
   })
-  const shortfallUsdt6 = expectedUsdt6 - receivedUsdt6
+  const remainderUsdt6 = taggedRemainder(expectedUsdt6, effectiveUsdt6)
   await notifyUser(
     row.user,
-    (locale) => t(locale).orderUnderpaid(usdt6ToDisplay(shortfallUsdt6), 'USDT'),
+    (locale) => t(locale).orderUnderpaid(usdt6ToDisplay(remainderUsdt6, 4), 'USDT'),
     log
   )
   log.warn(
-    { orderId: row.orderId, paymentId: row.id, shortfallUsdt6: shortfallUsdt6.toString() },
+    {
+      orderId: row.orderId,
+      paymentId: row.id,
+      shortfallUsdt6: (expectedUsdt6 - effectiveUsdt6).toString(),
+      remainderUsdt6: remainderUsdt6.toString()
+    },
     'TRON payment underpaid'
   )
 }
 
-/** The order is gone (expired, or paid another way first): the money goes to the balance, never lost. */
+/**
+ * The order is gone: the money goes to the balance, never lost. Expired is the
+ * ordinary case; an order already paid on another rail means the customer paid
+ * twice, which is refunded the same way but also flagged for an operator.
+ */
 async function settleLate(
   row: InvoiceRow,
   receivedUsdt6: bigint,
@@ -500,10 +694,7 @@ async function settleLate(
 ): Promise<void> {
   const creditedCents = usdt6ToUsdCents(receivedUsdt6)
   await prisma.$transaction(async (tx) => {
-    await tx.payment.update({
-      where: { id: row.id },
-      data: { status: PaymentStatus.PAID, amount: receivedUsdt6 }
-    })
+    await claimPayment(tx, row, PaymentStatus.PAID, receivedUsdt6)
     if (creditedCents > 0) {
       await credit(tx, {
         userId: row.userId,
@@ -523,10 +714,36 @@ async function settleLate(
       t(locale).latePaymentCredited(usdt6ToDisplay(receivedUsdt6), 'USDT', row.orderId ?? ''),
     log
   )
-  log.warn(
-    { orderId: row.orderId, paymentId: row.id },
-    'TRON payment arrived for a closed order, credited to balance'
-  )
+
+  const orderId = row.orderId as string
+  const order = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true } })
+  const paidElsewhere =
+    order !== null &&
+    (order.status === OrderStatus.PAID ||
+      order.status === OrderStatus.DELIVERING ||
+      order.status === OrderStatus.DELIVERED)
+  if (!paidElsewhere) {
+    log.warn({ orderId, paymentId: row.id }, 'TRON payment arrived for a closed order, credited to balance')
+    return
+  }
+  const amountDisplay = usdt6ToDisplay(receivedUsdt6, 4)
+  await prisma.auditLog.create({
+    data: {
+      actorType: 'system',
+      actorId: AUDIT_ACTOR,
+      action: 'anomaly.flagged',
+      entity: AUDIT_ENTITY,
+      entityId: txid,
+      diff: {
+        severity: 'low',
+        category: 'payments',
+        summary: 'USDT transfer arrived for an order already paid on another rail; credited to balance',
+        evidence: { orderId, paymentId: row.id, txHash: txid, amountDisplay, orderStatus: order.status }
+      }
+    }
+  })
+  await enqueueNotify({ kind: 'tron_double_paid', orderId, txHash: txid, amountDisplay })
+  log.warn({ orderId, paymentId: row.id }, 'TRON payment for an order paid on another rail, credited to balance and flagged')
 }
 
 /** A top-up credits whatever arrived under the same ledger key the CryptoBot rail uses. */
@@ -538,10 +755,7 @@ async function settleTopup(
 ): Promise<void> {
   const creditedCents = usdt6ToUsdCents(receivedUsdt6)
   await prisma.$transaction(async (tx) => {
-    await tx.payment.update({
-      where: { id: row.id },
-      data: { status: PaymentStatus.PAID, amount: receivedUsdt6 }
-    })
+    await claimPayment(tx, row, PaymentStatus.PAID, receivedUsdt6)
     if (creditedCents > 0) {
       await credit(tx, {
         userId: row.userId,

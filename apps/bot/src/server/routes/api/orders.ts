@@ -143,9 +143,13 @@ export function registerOrderRoutes(app: FastifyInstance): void {
         }
 
         const paid = await payOrderFromBalance(order)
-        void creditReferralBonusIfEligible(paid).catch((err: unknown) =>
+        // Awaited: a detached promise dies silently on a redeploy mid-flight and nothing
+        // retries it. The credit is idempotent, so a failure here is logged, not fatal.
+        try {
+          await creditReferralBonusIfEligible(paid)
+        } catch (err) {
           logger.error({ err, orderId: paid.id }, 'failed to credit referral bonus')
-        )
+        }
 
         return { orderId: paid.id, status: paid.status, pricing }
       }

@@ -52,6 +52,9 @@ async function processNotify(job: Job<NotifyJobPayload>): Promise<void> {
         adminStrings.tronUnmatched(data.amountDisplay, data.txHash, data.from, data.reason)
       )
       break
+    case 'tron_double_paid':
+      await notifyAdmins(adminStrings.tronDoublePaid(data.orderId, data.amountDisplay, data.txHash))
+      break
     case 'chain_scan_error':
       await notifyAdmins(adminStrings.chainScanError(data.reason))
       break

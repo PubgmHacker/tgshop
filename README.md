@@ -16,7 +16,6 @@ apps/
 packages/
   db/         Prisma schema, migrations, seed, generated client (@tgshop/db)
   core/       Domain logic: money, pricing, crypto (payload encryption), ledger, errors (@tgshop/core)
-  payments/   Payment provider adapters: CRYPTOBOT, STARS + price oracle (@tgshop/payments); USDT-TRC20 is a static wallet watched by the worker
   ui/         Design tokens, Tailwind preset, shared React components (@tgshop/ui)
 docs/         This documentation
 scripts/      Ops scripts (backup, restore, webhook setup, key generation)
@@ -46,7 +45,7 @@ Redis Streams event bus.
 3. `/mybots` → your bot → **Payments** → this is where Telegram Stars support
    lives; Stars require no separate provider token, just enabling the bot for
    payments and using `currency: "XTR"` in `sendInvoice` (already wired in
-   `@tgshop/payments`'s Stars adapter).
+   the bot's Stars flow, `apps/bot/src/payments/stars.ts`).
 
 ### 3. Clone, install, configure env
 
@@ -112,10 +111,11 @@ docker compose up -d
    App** → name it after your shop.
 2. Copy the **API Token** into `CRYPTOBOT_API_TOKEN`.
 3. In the Crypto Pay app settings, set your **webhook URL** to
-   `https://api.<your-domain>/webhooks/cryptobot` and copy the associated
-   secret into `CRYPTOBOT_WEBHOOK_SECRET`. See `docs/PAYMENTS.md` for the
-   exact signature verification scheme, and `bruno/tgshop/webhook-simulators`
-   to test this locally without a public URL.
+   `https://api.<your-domain>/webhook/cryptobot`. There is no separate webhook
+   secret: CryptoBot signs each request with HMAC-SHA256 keyed by
+   `SHA256(CRYPTOBOT_API_TOKEN)`, so the API token alone is enough. See
+   `docs/PAYMENTS.md` for the exact signature verification scheme, and
+   `bruno/tgshop/webhook-simulators` to test this locally without a public URL.
 4. Leave `CRYPTOBOT_NETWORK=testnet` until you're ready to accept real funds.
 
 ### 6. Enable Telegram Stars
@@ -138,9 +138,10 @@ Stars amount charged is always the integer computed via
    your wallet and the worker only *reads* it.
 2. Get a free API key at [TronGrid](https://www.trongrid.io/) →
    `TRONGRID_API_KEY` (worker). Anonymous access is rate-limited hard.
-3. Leave `TRON_USDT_CONTRACT` at the mainnet USDT contract and
-   `TRON_MIN_CONFIRMATIONS=19` unless you know why not; `TRON_NETWORK` is
-   informational (buyers pay from real wallets, so mainnet).
+3. Leave `TRON_USDT_CONTRACT` at the mainnet USDT contract; `TRON_NETWORK` is
+   informational (buyers pay from real wallets, so mainnet). There is no
+   confirmation depth to tune: the worker asks TronGrid for solidified
+   transfers only, and a solidified TRON block is final.
 4. Every buyer is shown an exact amount with a unique sub-cent tag
    (`29.0057 USDT`) and must send it to the last decimal — the tag is how the
    worker tells invoices apart on one shared address. A rounded transfer is
@@ -221,9 +222,9 @@ points at the vendor's own asset on mirasim.ai.
 1. Add the new value to the `PaymentProvider` enum in
    `packages/db/prisma/schema.prisma` and run a Prisma migration
    (`pnpm db:migrate`).
-2. Implement an adapter in `@tgshop/payments` matching the existing adapter
-   shape (create invoice/address, verify webhook signature, map provider
-   status → `PaymentStatus`, map to `OrderStatus` transitions per
+2. Implement a provider module in `apps/bot/src/payments/` next to
+   `cryptobot.ts` and `stars.ts` (create invoice, verify webhook signature,
+   map provider status → `PaymentStatus`, map to `OrderStatus` transitions per
    `docs/PAYMENTS.md`'s state diagram).
 3. Add a webhook/ingestion route in `apps/bot` (for push-style providers like
    CryptoBot) or a polling job in `apps/worker` (for pull-style providers like
@@ -244,7 +245,7 @@ points at the vendor's own asset on mirasim.ai.
 | `pnpm dev` | Run all apps in watch mode via Turborepo |
 | `pnpm build` | Build all apps/packages |
 | `pnpm lint` / `pnpm typecheck` | Lint / typecheck the whole monorepo |
-| `pnpm test` | Unit + integration tests (`@tgshop/core`, `@tgshop/payments`, `@tgshop/worker`, `@tgshop/bot`) |
+| `pnpm test` | Unit + integration tests (`@tgshop/core`, `@tgshop/worker`, `@tgshop/bot`) |
 | `pnpm test:e2e` | End-to-end tests against a real Postgres (see `e2e/`) |
 | `pnpm db:migrate` / `db:push` / `db:seed` / `db:studio` / `db:generate` | Prisma workflows against `@tgshop/db` |
 | `./scripts/gen-keys.sh` | Generate `ENCRYPTION_KEY`/`JWT_SECRET`/`SESSION_SECRET`/`WEBHOOK_SECRET`/`SERVICE_TOKEN` |

@@ -3,7 +3,7 @@ import { TRON_TAG_MAX, tronTagOfAmountUsdt6, tronTaggedAmountUsdt6 } from '@tgsh
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unit tests for the single-address TRON rail: receive-address resolution and
-// the per-price sub-cent tag allocator. Dependency-free like the rest of the
+// the global sub-cent tag allocator (one namespace of 99 tags for every price). Dependency-free like the rest of the
 // bot suite — @tgshop/db, redis, env and the logger are mocks.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -45,9 +45,8 @@ vi.mock('@tgshop/db', async (importOriginal) => {
   }
 })
 
-const { allocateTronTag, getTronReceiveAddress, TronTagsExhaustedError, TRON_TAG_GRACE_MS } = await import(
-  '../payments/tron.js'
-)
+const { allocateTronTag, getTronReceiveAddress, TronTagsExhaustedError, TronTagReservationError, TRON_TAG_GRACE_MS } =
+  await import('../payments/tron.js')
 
 const WINDOW_MS = 20 * 60 * 1000
 
@@ -59,6 +58,7 @@ beforeEach(() => {
   redisMock.set.mockReset()
   redisMock.set.mockImplementation(async () => 'OK')
   logger.warn.mockClear()
+  logger.error.mockClear()
 })
 
 describe('getTronReceiveAddress', () => {
@@ -93,7 +93,7 @@ describe('allocateTronTag', () => {
     expect(tag).toBeLessThanOrEqual(TRON_TAG_MAX)
     expect(redisMock.set).toHaveBeenCalledTimes(1)
     expect(redisMock.set).toHaveBeenCalledWith(
-      `tron:tag:2900:${tag}`,
+      `tron:tag:${tag}`,
       '1',
       'PX',
       WINDOW_MS + TRON_TAG_GRACE_MS,
@@ -101,14 +101,26 @@ describe('allocateTronTag', () => {
     )
   })
 
-  it('only looks at open TRON invoices for the same price', async () => {
+  it('looks at every open TRON invoice regardless of price (tags are global)', async () => {
     await allocateTronTag(2900, WINDOW_MS)
 
     expect(store.lastWhere).toMatchObject({
       provider: 'TRON_TRC20',
-      status: { in: ['PENDING', 'CONFIRMING', 'UNDERPAID'] },
-      amount: { gt: 29_000_000n, lt: 29_010_000n }
+      status: { in: ['PENDING', 'CONFIRMING', 'UNDERPAID'] }
     })
+    expect(store.lastWhere).not.toHaveProperty('amount')
+  })
+
+  it('treats a tag held by an invoice of a different price as taken', async () => {
+    // Tags are matched by the sub-cent remainder alone, so an open $5.00
+    // invoice with tag 7 blocks tag 7 for a $29.00 checkout as well.
+    store.open = Array.from({ length: TRON_TAG_MAX }, (_, i) => i + 1)
+      .filter((tag) => tag !== 7)
+      .map((tag) => ({ amount: tronTaggedAmountUsdt6(tag % 2 ? 500 : 2900, tag) }))
+
+    const tag = await allocateTronTag(2900, WINDOW_MS)
+
+    expect(tag).toBe(7)
   })
 
   it('never hands out a tag an open invoice already holds', async () => {
@@ -123,7 +135,7 @@ describe('allocateTronTag', () => {
     expect(tronTagOfAmountUsdt6(tronTaggedAmountUsdt6(2900, tag))).toBe(42)
   })
 
-  it('fails loudly when every tag for the price is in use', async () => {
+  it('fails loudly when every tag is in use', async () => {
     store.open = Array.from({ length: TRON_TAG_MAX }, (_, i) => ({
       amount: tronTaggedAmountUsdt6(2900, i + 1)
     }))
@@ -141,18 +153,17 @@ describe('allocateTronTag', () => {
     const [firstKey] = redisMock.set.mock.calls[0] as unknown as [string]
     const [secondKey] = redisMock.set.mock.calls[1] as unknown as [string]
     expect(firstKey).not.toBe(secondKey)
-    expect(secondKey).toBe(`tron:tag:500:${tag}`)
+    expect(secondKey).toBe(`tron:tag:${tag}`)
   })
 
-  it('degrades to the database check when redis is down', async () => {
+  it('fails closed when redis is down instead of risking a duplicate tag', async () => {
     redisMock.set.mockImplementation(async () => {
       throw new Error('ECONNREFUSED')
     })
 
-    const tag = await allocateTronTag(500, WINDOW_MS)
-
-    expect(tag).toBeGreaterThanOrEqual(1)
-    expect(logger.warn).toHaveBeenCalledTimes(1)
+    await expect(allocateTronTag(500, WINDOW_MS)).rejects.toBeInstanceOf(TronTagReservationError)
+    expect(redisMock.set).toHaveBeenCalledTimes(1)
+    expect(logger.error).toHaveBeenCalledTimes(1)
   })
 
   it('rejects a non-positive amount', async () => {

@@ -9,6 +9,7 @@ import {
   SettingsValidationError,
   StockUnavailableError
 } from '@tgshop/core'
+import { TronTagReservationError, TronTagsExhaustedError } from '../payments/tron.js'
 import { t, type Locale } from '../i18n/index.js'
 import { logger } from './logger.js'
 
@@ -109,6 +110,17 @@ export function describeError(err: unknown, locale: Locale): { status: number; b
 
   if (err instanceof DeliveryFailedError) {
     return { status: 500, body: toApiErrorBody(err.code, locale, 'api.errors.delivery_failed') }
+  }
+
+  // The USDT rail has a finite pool of invoice tags and a fail-closed redis
+  // reservation. Both are transient: the customer should see "method
+  // unavailable, try another / retry shortly" (503), not a generic outage (500)
+  // — and the Mini App already renders PAYMENT_METHOD_UNAVAILABLE as such.
+  if (err instanceof TronTagsExhaustedError || err instanceof TronTagReservationError) {
+    return {
+      status: 503,
+      body: toApiErrorBody('PAYMENT_METHOD_UNAVAILABLE', locale, 'api.errors.payment_method_unavailable')
+    }
   }
 
   return { status: 500, body: toApiErrorBody('INTERNAL_ERROR', locale, 'api.errors.internal') }

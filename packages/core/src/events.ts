@@ -91,6 +91,8 @@ export interface EventPayloads {
     /** Expected/received in USDT 6-decimals, decimal strings (BigInt-safe). */
     expected6: string
     received6: string
+    /** Received plus balance credits from earlier short payments on the same order. */
+    effective6?: string
   }
   'payment.reconcile_mismatch': {
     provider: PaymentProvider

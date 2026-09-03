@@ -41,8 +41,7 @@ docs {
      `amount6` 29005700): the sub-cent tag is what identifies the invoice.
 
   `amount6` is USDT in 6-decimal integer units — 9990000 = 9.99 USDT, never a
-  float. `confirmations` is how deep the transfer is mined: set it below
-  TRON_MIN_CONFIRMATIONS (default 19) to watch the worker correctly refuse to
-  settle, then `POST {{trongrid_sim_base}}/_sim/advance {"blocks": 20}` to
-  bury it deeper and see it settle.
+  float. `confirmations` is informational: the worker asks TronGrid for
+  solidified transfers only (`only_confirmed=true`) and treats everything it
+  gets back as final, so a simulated transfer settles on the next sweep.
 }

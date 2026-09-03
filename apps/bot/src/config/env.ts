@@ -51,7 +51,6 @@ const envSchema = z.object({
   SERVICE_TOKEN: z.string().min(16, 'SERVICE_TOKEN must be at least 16 chars'),
 
   CRYPTOBOT_API_TOKEN: z.string().optional().default(''),
-  CRYPTOBOT_WEBHOOK_SECRET: z.string().optional().default(''),
   CRYPTOBOT_NETWORK: z.enum(['mainnet', 'testnet']).default('testnet'),
 
   STARS_USD_RATE: z.string().default('0.013'),
@@ -59,7 +58,6 @@ const envSchema = z.object({
   TRON_NETWORK: z.enum(['mainnet', 'nile', 'shasta']).default('nile'),
   TRONGRID_API_KEY: z.string().optional().default(''),
   TRON_USDT_CONTRACT: z.string().optional().default(''),
-  TRON_MIN_CONFIRMATIONS: z.coerce.number().int().positive().default(19),
   // Owner's own USDT-TRC20 wallet every customer pays into. TRON_SWEEP_TO_ADDRESS is
   // the legacy name (retired hot-wallet sweep target) and is honoured as a fallback.
   TRON_RECEIVE_ADDRESS: z.string().optional().default(''),

@@ -13,6 +13,9 @@ export type NotifyJobData =
   // A USDT transfer landed on the receive wallet that no open invoice can claim
   // (untagged, unknown or ambiguous amount): an operator credits it by hand.
   | { kind: 'tron_unmatched'; txHash: string; from: string; amountDisplay: string; reason: string }
+  // A USDT transfer settled an order that another rail had already paid: money went
+  // to the balance, but a human should know the customer paid twice.
+  | { kind: 'tron_double_paid'; orderId: string; txHash: string; amountDisplay: string }
   | { kind: 'chain_scan_error'; reason: string }
 
 export async function enqueueNotify(data: NotifyJobData): Promise<void> {

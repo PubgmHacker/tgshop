@@ -32,7 +32,6 @@ const envSchema = z.object({
   TRONGRID_API_BASE: z.string().default('https://api.trongrid.io'),
   TRONGRID_API_KEY: z.string().optional(),
   TRON_USDT_CONTRACT: z.string().default('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'),
-  TRON_MIN_CONFIRMATIONS: z.coerce.number().int().nonnegative().default(19),
   // The static USDT-TRC20 address every customer pays into. TRON_SWEEP_TO_ADDRESS
   // is the name the deployment already carries from the retired sweep design;
   // TRON_RECEIVE_ADDRESS wins when both are set.

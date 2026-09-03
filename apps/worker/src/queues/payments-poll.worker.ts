@@ -348,14 +348,17 @@ async function settlePaidInvoice(
   }
 
   const outcome = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({ where: { id: orderId } })
-    if (!order) return { settled: false, orderStatus: null } as const
-    if (order.status !== OrderStatus.PENDING) {
-      return { settled: false, orderStatus: order.status } as const
+    // Compare-and-set on the order row: a retried job racing the scheduled poll (or
+    // the webhook) must not both observe PENDING and both emit payment.received.
+    const claimed = await tx.order.updateMany({
+      where: { id: orderId, status: OrderStatus.PENDING },
+      data: { status: OrderStatus.PAID, paidAt: new Date() }
+    })
+    if (claimed.count === 0) {
+      const order = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } })
+      return { settled: false, orderStatus: order?.status ?? null } as const
     }
-
     await tx.payment.update({ where: { id: paymentId }, data: { status: PaymentStatus.PAID } })
-    await tx.order.update({ where: { id: orderId }, data: { status: OrderStatus.PAID, paidAt: new Date() } })
     return { settled: true, orderStatus: OrderStatus.PAID } as const
   })
 

@@ -13,7 +13,7 @@ vars {
 docs {
   `service_token` and `cryptobot_api_token` must match SERVICE_TOKEN and
   CRYPTOBOT_API_TOKEN in the bot's .env — the CryptoBot webhook signature is
-  derived from the API token, not from CRYPTOBOT_WEBHOOK_SECRET.
+  derived from the API token — there is no separate webhook secret.
 
   `jwt` is filled by running miniapp-api/authenticate.bru, which stores it
   automatically. Every /api/* route except /api/auth/telegram requires it.

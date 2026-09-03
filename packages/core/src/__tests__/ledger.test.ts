@@ -212,8 +212,13 @@ describe('idempotency', () => {
     expect(second).toEqual(first)
     expect(rows).toHaveLength(1)
     expect(api.balanceTransaction.create).toHaveBeenCalledTimes(1)
-    // The short-circuit happens before the lock: a replay costs one lookup.
-    expect(api.$executeRaw).toHaveBeenCalledTimes(1)
+    // The lock is taken BEFORE the idempotency lookup, on every call: two
+    // concurrent writers with the same key must serialize, or both would miss
+    // the record and both would insert. A replay therefore costs one lock too.
+    expect(api.$executeRaw).toHaveBeenCalledTimes(2)
+    const firstLock = api.$executeRaw.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+    const lookup = api.idempotencyRecord.findUnique.mock.invocationCallOrder[0] ?? -1
+    expect(firstLock).toBeLessThan(lookup)
   })
 
   it('short-circuits a repeated debit', async () => {

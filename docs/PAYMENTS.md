@@ -69,7 +69,7 @@ sequenceDiagram
     B->>DB: Payment(status=PENDING, providerInvoiceId=invoice_id)
     B-->>U: pay_url (opens CryptoBot mini app)
     U->>CB: pays invoice
-    CB->>B: POST /webhooks/cryptobot (update_type=invoice_paid, signed)
+    CB->>B: POST /webhook/cryptobot (update_type=invoice_paid, signed)
     B->>B: verify Crypto-Pay-API-Signature (HMAC-SHA256, see below)
     B->>DB: lookup Payment by (CRYPTOBOT, invoice_id) — idempotent
     B->>DB: Payment.status=PAID, Order.status=PAID
@@ -144,10 +144,15 @@ sequenceDiagram
     alt order PENDING, in window, amount >= tagged
         W->>DB: Order PAID (CAS on status), Payment PAID, surplus -> balance
         W->>Q: enqueue delivery
+    else order PENDING, short alone but earlier partials on balance cover it
+        W->>DB: Order PAID (CAS), Payment PAID, remainder debited from balance, earlier UNDERPAID rows -> PAID
+        W->>Q: enqueue delivery
     else order PENDING, amount short
-        W->>DB: Payment UNDERPAID (keeps its tag), received -> balance, notify
-    else order expired / already paid another way
+        W->>DB: Payment UNDERPAID (keeps its tag), received -> balance, tell user the exact tagged remainder
+    else order expired
         W->>DB: Payment PAID, full amount -> balance, notify
+    else order already paid on another rail
+        W->>DB: Payment PAID, full amount -> balance, notify + AuditLog anomaly + tron_double_paid admin alert
     else top-up (no order)
         W->>DB: Payment PAID, amount -> balance (ledger key topup:<paymentId>)
     else unmatched
@@ -156,10 +161,13 @@ sequenceDiagram
 ```
 
 **Confirmations.** TronGrid is queried with `only_confirmed=true`, so only
-transfers in solidified blocks are ever returned; on top of that the worker
-waits `TRON_MIN_CONFIRMATIONS × 3 s` from the transfer's block timestamp
-before settling. In between the invoice sits in `CONFIRMING` with the tx
-already bound, which is what the checkout page polls.
+transfers in solidified blocks are ever returned, and a solidified TRON block
+is final — there is no reorg to wait out. A matched transfer is therefore
+settled in the same sweep that found it. `CONFIRMING` is the moment between
+binding the tx to the invoice and the settlement transaction committing:
+the bind is its own commit so a crash mid-settlement leaves a resumable
+`CONFIRMING` row, which the next sweep finishes (`Payment.txHash` is what it
+resumes from; `(provider, txHash)` is unique, so a tx can never bind twice).
 
 **Unmatched transfers** — a round amount with no tag, a tag no open invoice
 holds (paid after the grace, typo), or two open invoices sharing a tag — are
@@ -169,10 +177,16 @@ sender, amount and reason — that row is also the dedupe so the alert fires
 once — and enqueues a `tron_unmatched` admin notification. The money is
 already in the owner's wallet; the operator credits the right user by hand.
 
-**Second transfers.** An `UNDERPAID` invoice keeps holding its tag, so a
-buyer who re-sends the full tagged amount is recognised; the new transfer gets
-its own `Payment` row on the same order (`(provider, txHash)` is unique) and
-settles the order, while the earlier partial already sits on the balance.
+**Second transfers.** An `UNDERPAID` invoice keeps holding its tag, and the
+user is told the exact remainder to send — the shortfall rounded up to a whole
+cent plus the invoice's own tag — so the follow-up is matched by tag. The new
+transfer gets its own `Payment` row on the same order (`(provider, txHash)` is
+unique). If it, together with the balance credits from the earlier partials,
+covers the ask, the order is paid: the remainder is debited back from the
+balance as the purchase (`LedgerType.PURCHASE`, key
+`tron-underpaid-reclaim:<paymentId>`) and the earlier `UNDERPAID` rows close
+as `PAID`. If the user has meanwhile spent those credits, the new transfer is
+just one more short payment and is credited the same way.
 
 Use `bruno/tgshop/webhook-simulators/tron-usdt-deposit.bru` (and the
 `-underpayment` variant) to exercise this without a real transfer. They drive
@@ -230,10 +244,11 @@ them).
 — the funds did arrive, just not enough). The received amount is credited to
 the user's balance immediately (`LedgerType.TOPUP`, key
 `tron-underpaid:<paymentId>`), so nothing is stranded, and the user is told
-the shortfall. They can pay the order from balance after topping up the
-difference by any rail, or re-send the full tagged amount — the invoice keeps
-its tag, so the second transfer settles the order. Dust is never sent back
-on-chain: consolidating it out rarely nets positive after fees.
+the exact tagged remainder to send. They can either send that remainder — the
+invoice keeps its tag, so the second transfer is recognised and, together with
+the credited partial, pays the order — or top up by any rail and pay the order
+from balance. Dust is never sent back on-chain: consolidating it out rarely
+nets positive after fees.
 
 ### Late payment (after Order.expiresAt)
 
@@ -247,7 +262,10 @@ stale pricing/stock assumptions. Per rail:
 - **TRON**: `chain-scan` detects the deposit against the expired order,
   credits the full received amount to the user's `BalanceTransaction`
   ledger instead of delivering, and notifies the user — funds are not lost,
-  and a fresh order can be placed from balance.
+  and a fresh order can be placed from balance. The same path handles an
+  order that another rail already paid (the user paid twice): the money goes
+  to the balance too, and the sweep additionally writes an `AuditLog` anomaly
+  and sends a `tron_double_paid` admin alert so an operator can offer a refund.
 - **CryptoBot**: `payments-poll` finds the provider-paid invoice attached to
   the closed order, marks the `Payment` `PAID` (the provider's truth), and
   flags a reconcile mismatch (`kind="paid_order_closed"`) — an `AuditLog`

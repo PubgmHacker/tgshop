@@ -28,7 +28,11 @@ export async function registerSecurityPlugins(app: FastifyInstance): Promise<voi
 
   await app.register(rateLimit, {
     max: 100,
-    timeWindow: '1 minute'
+    timeWindow: '1 minute',
+    // Telegram and CryptoBot deliver every update from a handful of egress IPs; a
+    // broadcast reply wave would trip a per-IP limit and make the bot look dead.
+    // Webhooks authenticate by secret path / HMAC instead, so they bypass the limiter.
+    allowList: (req) => req.url.startsWith('/webhook/')
   })
 
   // Preserve the raw request body for CryptoBot webhooks so HMAC signature

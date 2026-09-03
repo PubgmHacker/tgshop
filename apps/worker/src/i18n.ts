@@ -14,7 +14,8 @@ export function resolveLocale(languageCode: string | null | undefined): Locale {
 
 interface Strings {
   orderExpired: (orderId: string) => string
-  orderUnderpaid: (shortfallDisplay: string, asset: string) => string
+  orderUnderpaid: (remainderDisplay: string, asset: string) => string
+  orderCompletedFromBalance: (usedDisplay: string, asset: string) => string
   orderOverpaidCredited: (surplusDisplay: string, asset: string) => string
   latePaymentCredited: (amountDisplay: string, asset: string, orderId: string) => string
   topupCredited: (amountDisplay: string, asset: string) => string
@@ -29,8 +30,10 @@ interface Strings {
 
 const ru: Strings = {
   orderExpired: (orderId) => `⏰ Заказ ${orderId} отменён: время оплаты истекло.`,
-  orderUnderpaid: (shortfallDisplay, asset) =>
-    `⚠️ Оплата получена не полностью. Не хватает ${shortfallDisplay} ${asset}. Средства зачислены на баланс — доплатите или используйте баланс для новой покупки.`,
+  orderUnderpaid: (remainderDisplay, asset) =>
+    `⚠️ Оплата получена не полностью. Полученная сумма зачислена на ваш баланс. Чтобы завершить заказ, отправьте ровно ${remainderDisplay} ${asset} на тот же адрес — заказ будет оплачен автоматически.`,
+  orderCompletedFromBalance: (usedDisplay, asset) =>
+    `✅ Доплата получена, заказ оплачен полностью. С баланса списано ${usedDisplay} ${asset} — та часть, что пришла раньше.`,
   orderOverpaidCredited: (surplusDisplay, asset) =>
     `✅ Оплата получена с переплатой. Излишек ${surplusDisplay} ${asset} зачислен на ваш баланс.`,
   latePaymentCredited: (amountDisplay, asset, orderId) =>
@@ -54,8 +57,10 @@ const ru: Strings = {
 
 const en: Strings = {
   orderExpired: (orderId) => `⏰ Order ${orderId} was cancelled: payment window expired.`,
-  orderUnderpaid: (shortfallDisplay, asset) =>
-    `⚠️ Payment received but incomplete. Missing ${shortfallDisplay} ${asset}. Funds were credited to your balance — top up the difference or use your balance for a new purchase.`,
+  orderUnderpaid: (remainderDisplay, asset) =>
+    `⚠️ Payment received but incomplete. The amount received was credited to your balance. To finish the order, send exactly ${remainderDisplay} ${asset} to the same address — it will be paid automatically.`,
+  orderCompletedFromBalance: (usedDisplay, asset) =>
+    `✅ Top-up received, the order is now fully paid. ${usedDisplay} ${asset} — the part that arrived earlier — was taken from your balance.`,
   orderOverpaidCredited: (surplusDisplay, asset) =>
     `✅ Payment received with overpayment. The surplus of ${surplusDisplay} ${asset} was credited to your balance.`,
   latePaymentCredited: (amountDisplay, asset, orderId) =>
@@ -92,5 +97,7 @@ export const adminStrings = {
     `🐢 MANUAL FALLBACK SLA: order ${orderId} has been pending manual delivery for ${ageMinutes} min.`,
   tronUnmatched: (amountDisplay: string, txHash: string, from: string, reason: string) =>
     `💸 UNMATCHED USDT: ${amountDisplay} USDT arrived on the receive wallet from ${from} (tx ${txHash}) but matches no open invoice (${reason}). Credit the customer manually.`,
+  tronDoublePaid: (orderId: string, amountDisplay: string, txHash: string) =>
+    `♻️ DOUBLE PAYMENT: ${amountDisplay} USDT arrived (tx ${txHash}) for order ${orderId}, which was already paid on another rail. Credited to the customer's balance; check whether they expect a refund.`,
   chainScanError: (reason: string) => `🔴 chain-scan job errored: ${reason}`
 }

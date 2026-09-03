@@ -72,7 +72,7 @@ docs {
   Before sending:
   1. Set `cryptobot_api_token` in the `local` environment to the SAME value
      the bot has in CRYPTOBOT_API_TOKEN. The key is derived from the API
-     token, NOT from CRYPTOBOT_WEBHOOK_SECRET.
+     token — there is no separate webhook secret.
   2. Replace `payload.payload` (CryptoBot's own name for the client-supplied
      string) with a real Order.id from your local database — the handler
      looks the order up by that value.
