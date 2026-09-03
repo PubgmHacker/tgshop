@@ -64,6 +64,9 @@ export function repoRootEnvPath(): string {
 export function loadRepoEnv(): void {
   const envPath = repoRootEnvPath()
   if (!existsSync(envPath)) {
+    // CI injects DATABASE_URL/ENCRYPTION_KEY through the job environment and has no
+    // .env file; only a checkout with neither source configured is a hard error.
+    if (process.env.DATABASE_URL && process.env.ENCRYPTION_KEY) return
     throw new Error(
       `@tgshop/e2e: no .env found at ${envPath}. These tests need a real DATABASE_URL and ENCRYPTION_KEY.`
     )
