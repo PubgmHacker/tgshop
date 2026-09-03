@@ -11,7 +11,6 @@ FROM base AS deps
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/db/package.json packages/db/package.json
 COPY packages/core/package.json packages/core/package.json
-COPY packages/payments/package.json packages/payments/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY apps/bot/package.json apps/bot/package.json
 RUN pnpm install --frozen-lockfile --filter @tgshop/bot... || pnpm install --filter @tgshop/bot...
@@ -21,7 +20,6 @@ FROM deps AS build
 COPY tsconfig.base.json ./
 COPY packages/db packages/db
 COPY packages/core packages/core
-COPY packages/payments packages/payments
 COPY packages/ui packages/ui
 COPY apps/bot apps/bot
 RUN pnpm --filter @tgshop/db exec prisma generate
@@ -32,7 +30,6 @@ FROM base AS deps-prod
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/db/package.json packages/db/package.json
 COPY packages/core/package.json packages/core/package.json
-COPY packages/payments/package.json packages/payments/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY apps/bot/package.json apps/bot/package.json
 RUN pnpm install --frozen-lockfile --prod --filter @tgshop/bot... || pnpm install --prod --filter @tgshop/bot...
@@ -56,7 +53,6 @@ COPY --from=deps-prod /repo/apps/bot/node_modules ./apps/bot/node_modules
 COPY --from=build /repo/packages/db/dist ./packages/db/dist
 COPY --from=build /repo/packages/db/prisma ./packages/db/prisma
 COPY --from=build /repo/packages/core/dist ./packages/core/dist
-COPY --from=build /repo/packages/payments/dist ./packages/payments/dist
 COPY --from=build /repo/apps/bot/dist ./apps/bot/dist
 COPY --from=build /repo/apps/bot/package.json ./apps/bot/package.json
 

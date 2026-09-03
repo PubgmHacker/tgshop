@@ -8,7 +8,6 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY apps/admin/package.json apps/admin/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/core/package.json packages/core/package.json
-COPY packages/payments/package.json packages/payments/package.json
 COPY packages/ui/package.json packages/ui/package.json
 RUN pnpm install --frozen-lockfile --filter @tgshop/admin...
 

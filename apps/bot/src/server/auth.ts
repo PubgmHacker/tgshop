@@ -53,7 +53,7 @@ export function validateTelegramInitData(initData: string, botToken: string): Va
   const computedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex')
 
   // Constant-time, like every other HMAC check in the repo (see
-  // packages/payments/src/cryptobot.ts and apps/admin/src/lib/telegram-auth.ts).
+  // apps/bot/src/payments/cryptobot.ts and apps/admin/src/lib/telegram-auth.ts).
   // `hash` is attacker-controlled, so a short-circuiting `!==` leaks how many
   // leading hex digits were right, which is enough to forge a hash byte by byte
   // and mint a JWT for any tgId. Length is compared first because

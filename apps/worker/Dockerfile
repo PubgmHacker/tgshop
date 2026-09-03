@@ -8,14 +8,12 @@ WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/db/package.json packages/db/package.json
 COPY packages/core/package.json packages/core/package.json
-COPY packages/payments/package.json packages/payments/package.json
 COPY apps/worker/package.json apps/worker/package.json
 
 RUN pnpm install --frozen-lockfile
 
 COPY packages/db packages/db
 COPY packages/core packages/core
-COPY packages/payments packages/payments
 COPY apps/worker apps/worker
 COPY tsconfig.base.json tsconfig.base.json
 
@@ -31,7 +29,6 @@ ENV NODE_ENV=production
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/db/package.json packages/db/package.json
 COPY packages/core/package.json packages/core/package.json
-COPY packages/payments/package.json packages/payments/package.json
 COPY apps/worker/package.json apps/worker/package.json
 
 RUN pnpm install --frozen-lockfile --prod
@@ -43,7 +40,6 @@ COPY --from=builder /repo/packages/db/prisma packages/db/prisma
 # regenerate the client in this tree instead of copying it across stages.
 RUN cd packages/db && ./node_modules/.bin/prisma generate
 COPY --from=builder /repo/packages/core/dist packages/core/dist
-COPY --from=builder /repo/packages/payments/dist packages/payments/dist
 COPY --from=builder /repo/apps/worker/dist apps/worker/dist
 
 RUN addgroup -S tgshop && adduser -S tgshop -G tgshop

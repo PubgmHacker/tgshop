@@ -65,12 +65,13 @@ flowchart LR
     serialized per-user via `pg_advisory_xact_lock`, idempotent via
     `IdempotencyRecord`.
   - `errors.ts` — typed `DomainError` subclasses used across the stack.
-- **`@tgshop/payments`** — one adapter per hosted `PaymentProvider`
-  (CRYPTOBOT, STARS): invoice creation, webhook/polling verification, and
-  provider-status → `PaymentStatus`/`OrderStatus` mapping, plus the USD price
-  oracle. USDT-TRC20 is not an adapter — the bot tags each invoice amount and
-  the worker's chain-scan job watches the owner's static wallet (see
-  `docs/PAYMENTS.md`).
+- **Payment providers** live in the bot, `apps/bot/src/payments/` — one module
+  per hosted `PaymentProvider` (`cryptobot.ts`, `stars.ts`): invoice creation,
+  webhook signature verification and provider-status → `PaymentStatus`/
+  `OrderStatus` mapping; the worker's `payments-poll` job is the polling
+  fallback. USDT-TRC20 is not an adapter — the bot tags each invoice amount
+  (`tron.ts`) and the worker's chain-scan job watches the owner's static wallet
+  (see `docs/PAYMENTS.md`).
 - **`@tgshop/ui`** — design tokens (single file, `packages/ui/src/tokens`),
   a Tailwind preset, and shared React components (`Button`, `Card`, `Badge`,
   `Skeleton`, `Money`) consumed by `miniapp`, `landing`, and `admin`.
