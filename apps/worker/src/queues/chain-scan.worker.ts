@@ -360,7 +360,7 @@ async function bindTransfer(
 ): Promise<InvoiceRow> {
   const rawPayload = transferPayload(transfer, receivedUsdt6)
   if (invoice.txHash === null) {
-    await prisma.payment.updateMany({
+    const bound = await prisma.payment.updateMany({
       where: { id: invoice.id, txHash: null },
       data: {
         txHash: transfer.transaction_id,
@@ -369,6 +369,10 @@ async function bindTransfer(
         rawPayload
       }
     })
+    // A parallel sweep bound another transfer to this invoice first. Our
+    // transfer stays unrecorded and is re-matched on the next sweep against the
+    // invoice's new state; settling it here would mix two transfers on one row.
+    if (bound.count === 0) throw new StaleSettlementError(invoice.id)
     return prisma.payment.findUniqueOrThrow({ where: { id: invoice.id }, include: invoiceInclude })
   }
   try {
@@ -464,6 +468,8 @@ async function settle(
   if (effectiveUsdt6 >= expectedUsdt6) {
     const completed = await settleOrderCompleted(row, expectedUsdt6, receivedUsdt6, txid, log)
     if (completed) return
+    // The earlier credits were spent: what is applied to the order is this transfer alone.
+    return settleUnderpaid(row, expectedUsdt6, receivedUsdt6, receivedUsdt6, log)
   }
   return settleUnderpaid(row, expectedUsdt6, receivedUsdt6, effectiveUsdt6, log)
 }
