@@ -8,13 +8,6 @@ export interface FaqItem {
   answer: string
 }
 
-export interface ReviewItem {
-  name: string
-  handle: string
-  text: string
-  rating: number
-}
-
 export interface StepItem {
   title: string
   description: string
@@ -96,12 +89,6 @@ export interface LandingCopy {
     subtitle: string
     items: WhyUsItem[]
   }
-  reviews: {
-    eyebrow: string
-    title: string
-    subtitle: string
-    items: ReviewItem[]
-  }
   faq: {
     eyebrow: string
     title: string
@@ -129,7 +116,7 @@ const ruCopy: LandingCopy = {
   meta: {
     title: 'AI Access Rage — подписки на нейросети в Telegram',
     description:
-      'Mirasim, ChatGPT, Claude, Midjourney и другие AI-инструменты: оплата картой, USDT TRC-20 или Stars, выдача за секунды, 24/7.',
+      'Mirasim, ChatGPT, Claude, Midjourney и другие AI-инструменты: оплата криптовалютой через CryptoBot или Telegram Stars, выдача за секунды, 24/7.',
     ogTitle: 'AI Access Rage — подписки на нейросети',
     ogDescription:
       'Выбирайте модель, оплачивайте любым способом и получайте доступ мгновенно. Работает прямо в Telegram.'
@@ -140,7 +127,6 @@ const ruCopy: LandingCopy = {
       { label: 'Как это работает', href: '#how-it-works' },
       { label: 'Каталог', href: '#showcase' },
       { label: 'Почему мы', href: '#why-us' },
-      { label: 'Отзывы', href: '#reviews' },
       { label: 'Вопросы', href: '#faq' }
     ],
     cta: 'Открыть в Telegram'
@@ -150,7 +136,7 @@ const ruCopy: LandingCopy = {
     headline: 'Покупки за 30 секунд,',
     headlineAccent: 'доступ сразу',
     subheadline:
-      'Mirasim, ChatGPT, Claude, Midjourney — оплата CryptoBot, Telegram Stars или USDT TRC-20. Никаких сайтов, всё в чате бота.',
+      'Mirasim, ChatGPT, Claude, Midjourney — оплата через CryptoBot или Telegram Stars. Никаких сайтов, всё в чате бота.',
     ctaPrimary: 'Открыть в Telegram',
     ctaSecondary: 'Смотреть каталог',
     stat1Value: '24/7',
@@ -162,7 +148,7 @@ const ruCopy: LandingCopy = {
   },
   trust: {
     label: 'Принимаем оплату',
-    items: ['CryptoBot', 'Telegram Stars', 'USDT TRC-20']
+    items: ['CryptoBot', 'Telegram Stars', 'Баланс аккаунта']
   },
   howItWorks: {
     eyebrow: 'Как это работает',
@@ -176,7 +162,7 @@ const ruCopy: LandingCopy = {
       {
         title: 'Оплачиваете любым способом',
         description:
-          'CryptoBot, Telegram Stars или USDT TRC-20 — оплата подтверждается автоматически.'
+          'CryptoBot или Telegram Stars — оплата подтверждается автоматически.'
       },
       {
         title: 'Получаете мгновенно',
@@ -219,31 +205,6 @@ const ruCopy: LandingCopy = {
       }
     ]
   },
-  reviews: {
-    eyebrow: 'Отзывы',
-    title: 'Что говорят покупатели',
-    subtitle: 'Реальные впечатления от скорости и удобства покупки.',
-    items: [
-      {
-        name: 'Алексей',
-        handle: '@alexey_dev',
-        text: 'Оплатил Stars и через 10 секунд уже пользовался подпиской. Очень удобно, что всё в Telegram.',
-        rating: 5
-      },
-      {
-        name: 'Марина',
-        handle: '@marina_k',
-        text: 'Понравилось, что можно платить USDT — никаких проблем с картами. Поддержка ответила быстро.',
-        rating: 5
-      },
-      {
-        name: 'Данияр',
-        handle: '@daniyar.b',
-        text: 'Купил подряд три тарифа для команды, всё пришло мгновенно на каждый заказ отдельно.',
-        rating: 5
-      }
-    ]
-  },
   faq: {
     eyebrow: 'Вопросы',
     title: 'Часто задаваемые вопросы',
@@ -252,12 +213,12 @@ const ruCopy: LandingCopy = {
       {
         question: 'Как быстро я получу товар после оплаты?',
         answer:
-          'В большинстве случаев доставка происходит автоматически в течение нескольких секунд после подтверждения оплаты. Для оплат в USDT доставка происходит после нужного числа подтверждений в сети TRON.'
+          'В большинстве случаев доставка происходит автоматически в течение нескольких секунд после подтверждения оплаты.'
       },
       {
         question: 'Какие способы оплаты доступны?',
         answer:
-          'Мы принимаем оплату через CryptoBot, Telegram Stars и напрямую USDT в сети TRON (TRC-20).'
+          'Мы принимаем оплату через CryptoBot (в том числе USDT), Telegram Stars или с баланса аккаунта.'
       },
       {
         question: 'Что делать, если товар не работает?',
@@ -287,8 +248,7 @@ const ruCopy: LandingCopy = {
         title: 'Продукт',
         links: [
           { label: 'Как это работает', href: '#how-it-works' },
-          { label: 'Каталог', href: '#showcase' },
-          { label: 'Отзывы', href: '#reviews' }
+          { label: 'Каталог', href: '#showcase' }
         ]
       },
       {
@@ -353,7 +313,7 @@ const enCopy: LandingCopy = {
   meta: {
     title: 'AI Access Rage — neural-net subscriptions in Telegram',
     description:
-      'Mirasim, ChatGPT, Claude, Midjourney and other AI tools: pay with card, USDT TRC-20 or Stars, delivered in seconds, 24/7.',
+      'Mirasim, ChatGPT, Claude, Midjourney and other AI tools: pay with crypto via CryptoBot or Telegram Stars, delivered in seconds, 24/7.',
     ogTitle: 'AI Access Rage — neural-net subscriptions',
     ogDescription:
       'Pick a model, pay any way you like, get access instantly. Works entirely inside Telegram.'
@@ -364,7 +324,6 @@ const enCopy: LandingCopy = {
       { label: 'How it works', href: '#how-it-works' },
       { label: 'Catalog', href: '#showcase' },
       { label: 'Why us', href: '#why-us' },
-      { label: 'Reviews', href: '#reviews' },
       { label: 'FAQ', href: '#faq' }
     ],
     cta: 'Open in Telegram'
@@ -374,7 +333,7 @@ const enCopy: LandingCopy = {
     headline: 'Checkout in 30 seconds,',
     headlineAccent: 'access instantly',
     subheadline:
-      'Mirasim, ChatGPT, Claude, Midjourney — pay with CryptoBot, Telegram Stars or USDT TRC-20. No websites, everything inside the bot chat.',
+      'Mirasim, ChatGPT, Claude, Midjourney — pay with CryptoBot or Telegram Stars. No websites, everything inside the bot chat.',
     ctaPrimary: 'Open in Telegram',
     ctaSecondary: 'Browse catalog',
     stat1Value: '24/7',
@@ -386,7 +345,7 @@ const enCopy: LandingCopy = {
   },
   trust: {
     label: 'We accept',
-    items: ['CryptoBot', 'Telegram Stars', 'USDT TRC-20']
+    items: ['CryptoBot', 'Telegram Stars', 'Account balance']
   },
   howItWorks: {
     eyebrow: 'How it works',
@@ -400,7 +359,7 @@ const enCopy: LandingCopy = {
       {
         title: 'Pay any way you like',
         description:
-          'CryptoBot, Telegram Stars or USDT TRC-20 — payment is confirmed automatically.'
+          'CryptoBot or Telegram Stars — payment is confirmed automatically.'
       },
       {
         title: 'Receive instantly',
@@ -443,31 +402,6 @@ const enCopy: LandingCopy = {
       }
     ]
   },
-  reviews: {
-    eyebrow: 'Reviews',
-    title: 'What customers say',
-    subtitle: 'Real feedback about speed and convenience.',
-    items: [
-      {
-        name: 'Alex',
-        handle: '@alexey_dev',
-        text: 'Paid with Stars and was using the subscription 10 seconds later. Love that everything is in Telegram.',
-        rating: 5
-      },
-      {
-        name: 'Marina',
-        handle: '@marina_k',
-        text: 'Loved being able to pay in USDT — no card hassle at all. Support replied fast too.',
-        rating: 5
-      },
-      {
-        name: 'Daniyar',
-        handle: '@daniyar.b',
-        text: 'Bought three plans in a row for my team, each one arrived instantly and separately.',
-        rating: 5
-      }
-    ]
-  },
   faq: {
     eyebrow: 'FAQ',
     title: 'Frequently asked questions',
@@ -476,11 +410,11 @@ const enCopy: LandingCopy = {
       {
         question: 'How fast will I get my product after paying?',
         answer:
-          'In most cases delivery happens automatically within seconds of payment confirmation. USDT payments are delivered once the required number of TRON network confirmations is reached.'
+          'In most cases delivery happens automatically within seconds of payment confirmation.'
       },
       {
         question: 'What payment methods are available?',
-        answer: 'We accept CryptoBot, Telegram Stars, and direct USDT on the TRON network (TRC-20).'
+        answer: 'We accept CryptoBot (USDT included), Telegram Stars, or your account balance.'
       },
       {
         question: "What if my product doesn't work?",
@@ -510,8 +444,7 @@ const enCopy: LandingCopy = {
         title: 'Product',
         links: [
           { label: 'How it works', href: '#how-it-works' },
-          { label: 'Catalog', href: '#showcase' },
-          { label: 'Reviews', href: '#reviews' }
+          { label: 'Catalog', href: '#showcase' }
         ]
       },
       {

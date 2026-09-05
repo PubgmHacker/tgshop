@@ -8,7 +8,6 @@ import { TrustBar } from '../../components/sections/TrustBar';
 import { HowItWorks } from '../../components/sections/HowItWorks';
 import { Showcase } from '../../components/sections/Showcase';
 import { WhyUs } from '../../components/sections/WhyUs';
-import { Reviews } from '../../components/sections/Reviews';
 import { Faq } from '../../components/sections/Faq';
 import { FinalCta } from '../../components/sections/FinalCta';
 import { Footer } from '../../components/sections/Footer';
@@ -51,7 +50,6 @@ export default async function EnglishHomePage() {
       <HowItWorks copy={copy} />
       <Showcase copy={copy} locale={locale} products={products} isFallback={isFallback} />
       <WhyUs copy={copy} />
-      <Reviews copy={copy} />
       <Faq copy={copy} />
       <FinalCta copy={copy} botLink={botLink} />
       <Footer copy={copy} />
