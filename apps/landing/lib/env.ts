@@ -1,4 +1,5 @@
 export const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'your_shop_bot';
+export const SUPPORT_URL = process.env.NEXT_PUBLIC_SUPPORT_URL ?? 'https://t.me/tgshop_support';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 

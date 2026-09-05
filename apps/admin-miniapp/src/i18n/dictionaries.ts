@@ -29,7 +29,7 @@ export const dictionaries = {
     'tabs.home': 'Сводка',
     'tabs.orders': 'Заказы',
     'tabs.catalog': 'Каталог',
-    'tabs.users': 'Юзеры',
+    'tabs.users': 'Пользователи',
     'tabs.more': 'Ещё',
 
     'auth.forbidden.title': 'Только для администраторов',

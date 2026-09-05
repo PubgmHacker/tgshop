@@ -59,7 +59,7 @@ async function authenticate(): Promise<void> {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ initData })
       })
-    : process.env.NODE_ENV === 'development'
+    : process.env.NODE_ENV === 'development' && API_URL
       ? await fetch(`${API_URL}/api/auth/dev`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },

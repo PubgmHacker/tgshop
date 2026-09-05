@@ -8,7 +8,8 @@ import '@/styles/globals.css'
 
 export const metadata: Metadata = {
   title: `${BRAND_NAME} — ${BRAND_TAGLINE}`,
-  description: `${BRAND_NAME} — панель управления магазином`
+  description: `${BRAND_NAME} — панель управления магазином`,
+  icons: { icon: '/brand/logo.png', apple: '/brand/logo.png' }
 }
 
 // Same reasoning as the customer miniapp: the WebView must never revive a

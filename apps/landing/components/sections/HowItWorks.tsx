@@ -8,8 +8,7 @@ export function HowItWorks({ copy }: { copy: LandingCopy }) {
     <section id="how-it-works" className="py-20 sm:py-28">
       <Container>
         <RevealOnScroll className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent-to">{copy.howItWorks.eyebrow}</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">{copy.howItWorks.title}</h2>
+          <h2 className="text-3xl font-bold text-white sm:text-4xl">{copy.howItWorks.title}</h2>
           <p className="mt-4 text-muted">{copy.howItWorks.subtitle}</p>
         </RevealOnScroll>
 

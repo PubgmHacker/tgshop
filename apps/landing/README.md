@@ -42,7 +42,8 @@ changing any call sites, since section components only import from `components/u
 - `lib/catalog.ts` — fetches `${NEXT_PUBLIC_API_URL}/public/catalog` with `next: { revalidate: 300 }`;
   on any network error, non-200, or schema-invalid response it falls back to the static demo catalog from
   `lib/i18n.ts` so the page renders correctly even if the backend API is down. The showcase section shows a
-  small "demo pricing" notice whenever the fallback is used.
+  small notice whenever the live catalog is unavailable and the real fallback
+  catalog is shown.
 - `lib/format.ts` — presentation-only price formatting from integer cents (never used for money math).
 - `lib/env.ts` — typed reads of `NEXT_PUBLIC_*` env vars (bot username, API URL, landing URL, analytics).
 

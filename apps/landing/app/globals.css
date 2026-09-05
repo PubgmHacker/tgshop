@@ -27,3 +27,13 @@ body {
   background-color: #05070d;
   color: #f5f6fa;
 }
+
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid #a8ff5a;
+  outline-offset: 3px;
+}
+
+::selection {
+  background: rgb(168 255 90 / 0.25);
+  color: #fff;
+}

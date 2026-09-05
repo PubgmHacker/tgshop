@@ -49,31 +49,22 @@ export interface LandingCopy {
     cta: string
   }
   hero: {
-    eyebrow: string
     headline: string
     headlineAccent: string
     subheadline: string
     ctaPrimary: string
     ctaSecondary: string
-    stat1Value: string
-    stat1Label: string
-    stat2Value: string
-    stat2Label: string
-    stat3Value: string
-    stat3Label: string
   }
   trust: {
     label: string
     items: string[]
   }
   howItWorks: {
-    eyebrow: string
     title: string
     subtitle: string
     steps: StepItem[]
   }
   showcase: {
-    eyebrow: string
     title: string
     subtitle: string
     fallbackNotice: string
@@ -84,13 +75,11 @@ export interface LandingCopy {
     currency: string
   }
   whyUs: {
-    eyebrow: string
     title: string
     subtitle: string
     items: WhyUsItem[]
   }
   faq: {
-    eyebrow: string
     title: string
     subtitle: string
     items: FaqItem[]
@@ -109,17 +98,16 @@ export interface LandingCopy {
     legalLinks: { label: string; href: string }[]
     copyright: string
   }
-  demoProducts: DemoProduct[]
+  fallbackProducts: DemoProduct[]
 }
 
 const ruCopy: LandingCopy = {
   meta: {
-    title: 'AI Access Rage — подписки на нейросети в Telegram',
+    title: 'AI Access Rage — AI-инструменты в Telegram',
     description:
-      'Mirasim, ChatGPT, Claude, Midjourney и другие AI-инструменты: оплата криптовалютой через CryptoBot или Telegram Stars, выдача за секунды, 24/7.',
-    ogTitle: 'AI Access Rage — подписки на нейросети',
-    ogDescription:
-      'Выбирайте модель, оплачивайте любым способом и получайте доступ мгновенно. Работает прямо в Telegram.'
+      'Mirasim и другие AI-инструменты в Telegram: выберите доступный тариф, оплатите CryptoBot, Telegram Stars или с баланса аккаунта.',
+    ogTitle: 'AI Access Rage — AI-инструменты в Telegram',
+    ogDescription: 'Выберите доступный тариф и оформите заказ прямо в Telegram.'
   },
   nav: {
     brand: 'AI Access Rage',
@@ -132,49 +120,39 @@ const ruCopy: LandingCopy = {
     cta: 'Открыть в Telegram'
   },
   hero: {
-    eyebrow: 'Подписки на нейросети в Telegram',
-    headline: 'Покупки за 30 секунд,',
-    headlineAccent: 'доступ сразу',
+    headline: 'Доступ к AI-инструментам',
+    headlineAccent: 'внутри Telegram',
     subheadline:
-      'Mirasim, ChatGPT, Claude, Midjourney — оплата через CryptoBot или Telegram Stars. Никаких сайтов, всё в чате бота.',
+      'Выберите доступный тариф, оплатите удобным способом и получите инструкции по заказу в чате бота.',
     ctaPrimary: 'Открыть в Telegram',
     ctaSecondary: 'Смотреть каталог',
-    stat1Value: '24/7',
-    stat1Label: 'автоматическая доставка',
-    stat2Value: '<30с',
-    stat2Label: 'среднее время выдачи',
-    stat3Value: '3',
-    stat3Label: 'способа оплаты'
   },
   trust: {
-    label: 'Принимаем оплату',
+    label: 'Доступные способы оплаты',
     items: ['CryptoBot', 'Telegram Stars', 'Баланс аккаунта']
   },
   howItWorks: {
-    eyebrow: 'Как это работает',
-    title: 'Три шага до получения товара',
-    subtitle: 'Никаких форм регистрации и ожидания — всё происходит внутри Telegram.',
+    title: 'Покупка проходит в три шага',
+    subtitle: 'Каталог, оплата и заказ находятся внутри Telegram.',
     steps: [
       {
         title: 'Выбираете товар',
         description: 'Откройте бота, выберите категорию и подходящий тариф из каталога.'
       },
       {
-        title: 'Оплачиваете любым способом',
-        description:
-          'CryptoBot или Telegram Stars — оплата подтверждается автоматически.'
+        title: 'Оплачиваете',
+        description: 'Выберите CryptoBot, Telegram Stars или баланс аккаунта.'
       },
       {
-        title: 'Получаете мгновенно',
-        description: 'Бот присылает товар сразу после оплаты — без ожидания менеджера.'
+        title: 'Получаете данные заказа',
+        description: 'После подтверждения оплаты бот показывает статус и инструкции по выдаче.'
       }
     ]
   },
   showcase: {
-    eyebrow: 'Каталог',
-    title: 'Популярные модели',
-    subtitle: 'Актуальные цены подтягиваются из магазина в реальном времени.',
-    fallbackNotice: 'Показаны демонстрационные цены — актуальный каталог смотрите в боте.',
+    title: 'Доступный каталог',
+    subtitle: 'Товары и тарифы, которые можно проверить перед оформлением заказа.',
+    fallbackNotice: 'Основной каталог сейчас недоступен. Проверьте актуальные наличие и цену в боте.',
     priceFrom: 'от',
     perMonth: '/мес',
     lifetime: 'навсегда',
@@ -182,67 +160,64 @@ const ruCopy: LandingCopy = {
     currency: '$'
   },
   whyUs: {
-    eyebrow: 'Почему мы',
-    title: 'Автоматизация, которой можно доверять',
-    subtitle: 'Мы построили систему так, чтобы вы получали товар быстрее, чем успеете закрыть чат.',
+    title: 'Понятный процесс покупки',
+    subtitle: 'Способ оплаты, статус заказа и дальнейшие действия собраны в одном месте.',
     items: [
       {
-        title: 'Мгновенная доставка',
-        description:
-          'Товар выдаётся автоматически сразу после подтверждения оплаты, без выходных и праздников.'
+        title: 'Выбор тарифа',
+        description: 'У каждого товара показаны доступные планы и цена.'
       },
       {
-        title: 'Работаем 24/7',
-        description: 'Бот и платежи работают без перерывов — покупайте в любое время суток.'
+        title: 'Статус оплаты',
+        description: 'После оплаты заказ остаётся доступен в истории.'
       },
       {
-        title: 'Гарантия и замена',
-        description: 'Если товар не работает, мы заменим его или вернём деньги на баланс.'
+        title: 'Ручная выдача',
+        description: 'Если товар требует проверки оператором, это указано заранее.'
       },
       {
-        title: 'Поддержка на связи',
-        description: 'Живая поддержка отвечает в течение часа по любым вопросам с заказом.'
+        title: 'Поддержка',
+        description: 'Если возникнет вопрос по заказу, напишите через бота.'
       }
     ]
   },
   faq: {
-    eyebrow: 'Вопросы',
     title: 'Часто задаваемые вопросы',
-    subtitle: 'Если не нашли ответ — напишите в поддержку прямо из бота.',
+    subtitle: 'Если не нашли ответ — напишите в поддержку через бота.',
     items: [
       {
-        question: 'Как быстро я получу товар после оплаты?',
+        question: 'Когда я получу доступ?',
         answer:
-          'В большинстве случаев доставка происходит автоматически в течение нескольких секунд после подтверждения оплаты.'
+          'Это зависит от товара и способа выдачи. Статус и инструкции появятся в заказе; для ручной выдачи потребуется проверка оператора.'
       },
       {
         question: 'Какие способы оплаты доступны?',
         answer:
-          'Мы принимаем оплату через CryptoBot (в том числе USDT), Telegram Stars или с баланса аккаунта.'
+          'Мы принимаем оплату через CryptoBot, Telegram Stars или с баланса аккаунта. Доступные способы показываются при оформлении.'
       },
       {
         question: 'Что делать, если товар не работает?',
         answer:
-          'Напишите в поддержку через бота — мы проверим заказ и либо заменим товар, либо вернём средства на ваш баланс.'
+          'Напишите в поддержку через бота. Мы проверим заказ и подскажем дальнейшие действия по правилам конкретного товара.'
       },
       {
         question: 'Нужна ли регистрация на сайте?',
         answer: 'Нет, всё происходит внутри Telegram — достаточно открыть бота и выбрать товар.'
       },
       {
-        question: 'Можно ли оформить подписку на несколько месяцев сразу?',
-        answer: 'Да, у каждой модели есть тарифы на 1 и 3 месяца.'
+        question: 'Где посмотреть заказ?',
+        answer: 'Статус и детали заказа доступны в разделе заказов миниаппа после оформления.'
       }
     ]
   },
   finalCta: {
-    title: 'Готовы получить свой товар за секунды?',
+    title: 'Откройте каталог в Telegram',
     subtitle:
-      'Откройте бота в Telegram и выберите то, что нужно — оплата и доставка займут меньше минуты.',
+      'Проверьте товар, выберите тариф и оформите заказ без переходов между сервисами.',
     cta: 'Открыть в Telegram'
   },
   footer: {
-    tagline: 'Подписки на нейросети с мгновенной выдачей прямо в Telegram.',
+    tagline: 'AI-инструменты и заказы внутри Telegram.',
     columns: [
       {
         title: 'Продукт',
@@ -255,7 +230,7 @@ const ruCopy: LandingCopy = {
         title: 'Поддержка',
         links: [
           { label: 'Вопросы', href: '#faq' },
-          { label: 'Написать в поддержку', href: '#' }
+          { label: 'Написать в поддержку', href: '__support__' }
         ]
       }
     ],
@@ -266,7 +241,7 @@ const ruCopy: LandingCopy = {
     ],
     copyright: 'Все права защищены.'
   },
-  demoProducts: [
+  fallbackProducts: [
     {
       id: 'mirasim',
       slug: 'mirasim',
@@ -275,48 +250,17 @@ const ruCopy: LandingCopy = {
       categoryTitle: 'Код',
       imageUrl: '/brands/mirasim.png',
       plans: [{ id: 'mirasim-pro-1m', title: '1 месяц', priceCents: 2900, durationDays: 30 }]
-    },
-    {
-      id: 'demo-chatgpt',
-      title: 'ChatGPT Plus',
-      description: 'GPT-4o, приоритетный доступ, DALL·E.',
-      categoryTitle: 'Чат',
-      plans: [
-        { id: 'p1', title: '1 месяц', priceCents: 499, durationDays: 30 },
-        { id: 'p2', title: '3 месяца', priceCents: 1299, durationDays: 90, badge: 'Хит' }
-      ]
-    },
-    {
-      id: 'demo-midjourney',
-      title: 'Midjourney',
-      description: 'Генерация изображений в Discord.',
-      categoryTitle: 'Картинки',
-      plans: [
-        { id: 'p3', title: '1 месяц', priceCents: 499, durationDays: 30 },
-        { id: 'p4', title: '3 месяца', priceCents: 1299, durationDays: 90, badge: 'Выгодно' }
-      ]
-    },
-    {
-      id: 'demo-cursor',
-      title: 'Cursor Pro',
-      description: 'Агентный редактор с доступом к моделям.',
-      categoryTitle: 'Код',
-      plans: [
-        { id: 'p5', title: '1 месяц', priceCents: 499, durationDays: 30 },
-        { id: 'p6', title: '3 месяца', priceCents: 1299, durationDays: 90, badge: 'Топ' }
-      ]
     }
   ]
 }
 
 const enCopy: LandingCopy = {
   meta: {
-    title: 'AI Access Rage — neural-net subscriptions in Telegram',
+    title: 'AI Access Rage — AI tools in Telegram',
     description:
-      'Mirasim, ChatGPT, Claude, Midjourney and other AI tools: pay with crypto via CryptoBot or Telegram Stars, delivered in seconds, 24/7.',
-    ogTitle: 'AI Access Rage — neural-net subscriptions',
-    ogDescription:
-      'Pick a model, pay any way you like, get access instantly. Works entirely inside Telegram.'
+      'Mirasim and other AI tools in Telegram: choose an available plan and pay with CryptoBot, Telegram Stars or account balance.',
+    ogTitle: 'AI Access Rage — AI tools in Telegram',
+    ogDescription: 'Choose an available plan and place an order directly in Telegram.'
   },
   nav: {
     brand: 'AI Access Rage',
@@ -329,49 +273,39 @@ const enCopy: LandingCopy = {
     cta: 'Open in Telegram'
   },
   hero: {
-    eyebrow: 'Neural-net subscriptions in Telegram',
-    headline: 'Checkout in 30 seconds,',
-    headlineAccent: 'access instantly',
+    headline: 'AI tools',
+    headlineAccent: 'inside Telegram',
     subheadline:
-      'Mirasim, ChatGPT, Claude, Midjourney — pay with CryptoBot or Telegram Stars. No websites, everything inside the bot chat.',
+      'Choose an available plan, pay with a supported method, and get order instructions in the bot chat.',
     ctaPrimary: 'Open in Telegram',
     ctaSecondary: 'Browse catalog',
-    stat1Value: '24/7',
-    stat1Label: 'automated delivery',
-    stat2Value: '<30s',
-    stat2Label: 'average delivery time',
-    stat3Value: '3',
-    stat3Label: 'payment methods'
   },
   trust: {
-    label: 'We accept',
+    label: 'Available payment methods',
     items: ['CryptoBot', 'Telegram Stars', 'Account balance']
   },
   howItWorks: {
-    eyebrow: 'How it works',
-    title: 'Three steps to get your product',
-    subtitle: 'No signup forms, no waiting — everything happens inside Telegram.',
+    title: 'A clear three-step purchase',
+    subtitle: 'The catalog, payment and order status stay inside Telegram.',
     steps: [
       {
         title: 'Choose a product',
         description: 'Open the bot, pick a category and the plan that fits from the catalog.'
       },
       {
-        title: 'Pay any way you like',
-        description:
-          'CryptoBot or Telegram Stars — payment is confirmed automatically.'
+        title: 'Pay',
+        description: 'Use CryptoBot, Telegram Stars or your account balance.'
       },
       {
-        title: 'Receive instantly',
-        description: 'The bot delivers your product right after payment — no waiting for a manager.'
+        title: 'See your order details',
+        description: 'After payment confirmation, the bot shows the status and delivery instructions.'
       }
     ]
   },
   showcase: {
-    eyebrow: 'Catalog',
-    title: 'Popular models',
-    subtitle: 'Live prices are pulled straight from the store.',
-    fallbackNotice: 'Showing demo pricing — see the live catalog inside the bot.',
+    title: 'Available products',
+    subtitle: 'Review the products and plans before opening an order.',
+    fallbackNotice: 'The live catalog is currently unavailable. Check the current availability and price in the bot.',
     priceFrom: 'from',
     perMonth: '/mo',
     lifetime: 'lifetime',
@@ -379,66 +313,63 @@ const enCopy: LandingCopy = {
     currency: '$'
   },
   whyUs: {
-    eyebrow: 'Why us',
-    title: 'Automation you can trust',
-    subtitle: 'We built the system so you get your product faster than you can close the chat.',
+    title: 'A clear purchase process',
+    subtitle: 'Payment method, order status and next steps stay in one place.',
     items: [
       {
-        title: 'Instant delivery',
-        description:
-          'Products are delivered automatically right after payment is confirmed, no days off.'
+        title: 'Choose a plan',
+        description: 'Each product shows its available plans and price.'
       },
       {
-        title: '24/7 automation',
-        description: 'The bot and payments run around the clock — buy at any time of day or night.'
+        title: 'Track payment',
+        description: 'After payment, the order remains available in your history.'
       },
       {
-        title: 'Warranty & replacement',
-        description: "If a product doesn't work, we'll replace it or refund it to your balance."
+        title: 'Manual fulfilment is marked',
+        description: 'If a product needs an operator review, the flow says so in advance.'
       },
       {
-        title: 'Support on standby',
-        description: 'Live support replies within an hour for any order-related questions.'
+        title: 'Support',
+        description: 'If you have a question about an order, contact us through the bot.'
       }
     ]
   },
   faq: {
-    eyebrow: 'FAQ',
     title: 'Frequently asked questions',
-    subtitle: "Can't find an answer? Message support right from the bot.",
+    subtitle: 'If you cannot find an answer, contact support through the bot.',
     items: [
       {
-        question: 'How fast will I get my product after paying?',
+        question: 'When will I receive access?',
         answer:
-          'In most cases delivery happens automatically within seconds of payment confirmation.'
+          'It depends on the product and fulfilment method. The order shows its status and instructions; manual fulfilment requires an operator review.'
       },
       {
         question: 'What payment methods are available?',
-        answer: 'We accept CryptoBot (USDT included), Telegram Stars, or your account balance.'
+        answer: 'We accept CryptoBot, Telegram Stars or account balance. The available methods are shown during checkout.'
       },
       {
         question: "What if my product doesn't work?",
         answer:
-          "Message support through the bot — we'll check the order and either replace the product or refund it to your balance."
+          'Contact support through the bot. We will check the order and explain the next steps under the product rules.'
       },
       {
         question: 'Do I need to sign up on a website?',
         answer: 'No, everything happens inside Telegram — just open the bot and pick a product.'
       },
       {
-        question: 'Can I subscribe for several months at once?',
-        answer: 'Yes — each model has 1-month and 3-month plans.'
+        question: 'Where can I see my order?',
+        answer: 'The miniapp orders section shows the status and details after checkout.'
       }
     ]
   },
   finalCta: {
-    title: 'Ready to get your product in seconds?',
+    title: 'Open the catalog in Telegram',
     subtitle:
-      'Open the bot in Telegram and pick what you need — payment and delivery take less than a minute.',
+      'Review the product, choose a plan and place an order without switching between services.',
     cta: 'Open in Telegram'
   },
   footer: {
-    tagline: 'Neural-net subscriptions with instant delivery, right inside Telegram.',
+    tagline: 'AI tools and orders inside Telegram.',
     columns: [
       {
         title: 'Product',
@@ -451,7 +382,7 @@ const enCopy: LandingCopy = {
         title: 'Support',
         links: [
           { label: 'FAQ', href: '#faq' },
-          { label: 'Contact support', href: '#' }
+          { label: 'Contact support', href: '__support__' }
         ]
       }
     ],
@@ -462,45 +393,15 @@ const enCopy: LandingCopy = {
     ],
     copyright: 'All rights reserved.'
   },
-  demoProducts: [
+  fallbackProducts: [
     {
       id: 'mirasim',
       slug: 'mirasim',
       title: 'Mirasim',
-      description: 'One agent IDE for agentic coding and eval. Manual access setup.',
+      description: 'An IDE for agentic coding and eval. Access is set up manually by an operator.',
       categoryTitle: 'Code',
       imageUrl: '/brands/mirasim.png',
       plans: [{ id: 'mirasim-pro-1m', title: '1 month', priceCents: 2900, durationDays: 30 }]
-    },
-    {
-      id: 'demo-chatgpt',
-      title: 'ChatGPT Plus',
-      description: 'GPT-4o, priority access, DALL·E.',
-      categoryTitle: 'Chat',
-      plans: [
-        { id: 'p1', title: '1 month', priceCents: 499, durationDays: 30 },
-        { id: 'p2', title: '3 months', priceCents: 1299, durationDays: 90, badge: 'Popular' }
-      ]
-    },
-    {
-      id: 'demo-midjourney',
-      title: 'Midjourney',
-      description: 'Image generation in Discord.',
-      categoryTitle: 'Images',
-      plans: [
-        { id: 'p3', title: '1 month', priceCents: 499, durationDays: 30 },
-        { id: 'p4', title: '3 months', priceCents: 1299, durationDays: 90, badge: 'Best value' }
-      ]
-    },
-    {
-      id: 'demo-cursor',
-      title: 'Cursor Pro',
-      description: 'Agentic editor with model access.',
-      categoryTitle: 'Code',
-      plans: [
-        { id: 'p5', title: '1 month', priceCents: 499, durationDays: 30 },
-        { id: 'p6', title: '3 months', priceCents: 1299, durationDays: 90, badge: 'Top pick' }
-      ]
     }
   ]
 }

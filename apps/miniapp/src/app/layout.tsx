@@ -8,7 +8,8 @@ import '@/styles/globals.css'
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
-  description: `${BRAND_NAME} — подписки на нейросети`
+  description: `${BRAND_NAME} — подписки на нейросети`,
+  icons: { icon: '/brand/logo.png', apple: '/brand/logo.png' }
 }
 
 // The storefront HTML is the document Telegram's WebView keeps in its cache,

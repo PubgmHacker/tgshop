@@ -36,12 +36,11 @@ export interface CatalogResult {
  * Fetches the public product catalog for the showcase section.
  * Uses ISR via `next: { revalidate: 300 }`. On any failure (network error,
  * non-200 response, or invalid payload) it gracefully falls back to the
- * static demo catalog bundled in the locale copy, so the page never breaks
- * or blocks on the API being down.
+ * small, clearly-labelled fallback catalog bundled in the locale copy.
  */
 export async function getCatalog(copy: LandingCopy): Promise<CatalogResult> {
   if (!API_URL) {
-    return { products: copy.demoProducts, isFallback: true }
+    return { products: copy.fallbackProducts, isFallback: true }
   }
 
   try {
@@ -51,18 +50,18 @@ export async function getCatalog(copy: LandingCopy): Promise<CatalogResult> {
     })
 
     if (!res.ok) {
-      return { products: copy.demoProducts, isFallback: true }
+      return { products: copy.fallbackProducts, isFallback: true }
     }
 
     const json = await res.json()
     const parsed = catalogSchema.safeParse(json)
 
     if (!parsed.success || parsed.data.products.length === 0) {
-      return { products: copy.demoProducts, isFallback: true }
+      return { products: copy.fallbackProducts, isFallback: true }
     }
 
     return { products: parsed.data.products, isFallback: false }
   } catch {
-    return { products: copy.demoProducts, isFallback: true }
+    return { products: copy.fallbackProducts, isFallback: true }
   }
 }

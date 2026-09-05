@@ -37,12 +37,14 @@ export function Accordion({ items }: { items: AccordionItemData[] }) {
             >
               <span>{item.question}</span>
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-line text-sm transition-transform duration-200 ${
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-line transition-transform duration-200 ${
                   isOpen ? 'rotate-45' : ''
                 }`}
                 aria-hidden
               >
-                +
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75">
+                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                </svg>
               </span>
             </button>
             <AnimatePresence initial={false}>

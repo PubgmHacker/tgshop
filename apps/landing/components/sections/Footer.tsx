@@ -1,5 +1,6 @@
 import { Container } from '../ui/Container';
 import type { LandingCopy } from '../../lib/i18n';
+import { SUPPORT_URL } from '../../lib/env';
 
 export function Footer({ copy }: { copy: LandingCopy }) {
   const year = new Date().getFullYear();
@@ -19,7 +20,10 @@ export function Footer({ copy }: { copy: LandingCopy }) {
               <ul className="mt-4 space-y-3">
                 {column.links.map((link) => (
                   <li key={link.href + link.label}>
-                    <a href={link.href} className="text-sm text-muted transition-colors hover:text-white">
+                    <a
+                      href={link.href === '__support__' ? SUPPORT_URL : link.href}
+                      className="text-sm text-muted transition-colors hover:text-white"
+                    >
                       {link.label}
                     </a>
                   </li>

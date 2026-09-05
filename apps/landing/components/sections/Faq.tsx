@@ -8,8 +8,7 @@ export function Faq({ copy }: { copy: LandingCopy }) {
     <section id="faq" className="py-20 sm:py-28">
       <Container className="max-w-3xl">
         <RevealOnScroll className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent-to">{copy.faq.eyebrow}</p>
-          <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">{copy.faq.title}</h2>
+          <h2 className="text-3xl font-bold text-white sm:text-4xl">{copy.faq.title}</h2>
           <p className="mt-4 text-muted">{copy.faq.subtitle}</p>
         </RevealOnScroll>
 
