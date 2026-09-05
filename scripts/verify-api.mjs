@@ -1,10 +1,39 @@
 // Boots the Fastify app in-process (no network, no Telegram) and exercises the
 // API surface with fastify.inject(), so route registration and the auth guards
 // can be verified without a real BOT_TOKEN.
-import { buildServer } from '../apps/bot/dist/server/app.js'
-import { createBot } from '../apps/bot/dist/bot/index.js'
-import { issueMiniAppJwt } from '../apps/bot/dist/server/auth.js'
-import { prisma } from '../packages/db/dist/index.js'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+// Keep this verifier runnable from a fresh checkout. Node does not load .env
+// files by default, while the bot's config is intentionally fail-fast at
+// import time. Only fill variables that are not already present, so CI and an
+// explicitly exported environment remain authoritative.
+function loadDotEnv() {
+  const file = resolve(process.cwd(), '.env')
+  let raw
+  try {
+    raw = readFileSync(file, 'utf8')
+  } catch {
+    return
+  }
+
+  for (const line of raw.split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/)
+    if (!match || process.env[match[1]] !== undefined) continue
+    const value = match[2].trim()
+    process.env[match[1]] =
+      (value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))
+        ? value.slice(1, -1)
+        : value.replace(/\s+#.*$/, '')
+  }
+}
+
+loadDotEnv()
+
+const { buildServer } = await import('../apps/bot/dist/server/app.js')
+const { createBot } = await import('../apps/bot/dist/bot/index.js')
+const { issueMiniAppJwt } = await import('../apps/bot/dist/server/auth.js')
+const { prisma } = await import('../packages/db/dist/index.js')
 
 const bot = createBot()
 const app = await buildServer(bot)
@@ -52,6 +81,8 @@ const outsiderJwt = {
 // [method, url, headers, payload, expected]
 const checks = [
   ['GET', '/health', {}, undefined, 200],
+  ['GET', '/metrics', {}, undefined, 401],
+  ['GET', '/metrics', auth, undefined, 200],
   ['GET', '/api/public/catalog', {}, undefined, 200],
   ['GET', '/api/catalog', {}, undefined, 401],
   ['GET', '/api/me', {}, undefined, 401],

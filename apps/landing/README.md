@@ -37,10 +37,10 @@ changing any call sites, since section components only import from `components/u
 - `components/seo/JsonLd.tsx` — Organization + FAQPage JSON-LD.
 - `components/Analytics.tsx` — env-gated Plausible/Umami loader (renders nothing unless
   `NEXT_PUBLIC_ANALYTICS_PROVIDER` + `NEXT_PUBLIC_ANALYTICS_SCRIPT_URL` are set).
-- `lib/i18n.ts` — full RU + EN copy for every section, plus the static demo catalog used as an ISR
+- `lib/i18n.ts` — full RU + EN copy for every section, plus the small static fallback catalog used by ISR
   fallback.
 - `lib/catalog.ts` — fetches `${NEXT_PUBLIC_API_URL}/public/catalog` with `next: { revalidate: 300 }`;
-  on any network error, non-200, or schema-invalid response it falls back to the static demo catalog from
+  on any network error, non-200, or schema-invalid response it falls back to the static fallback catalog from
   `lib/i18n.ts` so the page renders correctly even if the backend API is down. The showcase section shows a
   small notice whenever the live catalog is unavailable and the real fallback
   catalog is shown.
@@ -51,7 +51,7 @@ changing any call sites, since section components only import from `components/u
 
 - `NEXT_PUBLIC_BOT_USERNAME` — used to build `https://t.me/<BOT_USERNAME>?start=web` deep links.
 - `NEXT_PUBLIC_API_URL` — base URL for the public catalog endpoint (`/public/catalog`). If unset, the
-  page skips the network call entirely and always renders the demo catalog.
+  page skips the network call entirely and always renders the fallback catalog.
 - `NEXT_PUBLIC_LANDING_URL` — canonical site URL for OpenGraph/Twitter/sitemap/robots.
 - `NEXT_PUBLIC_ANALYTICS_PROVIDER` — `plausible` | `umami`, unset disables analytics.
 - `NEXT_PUBLIC_ANALYTICS_DOMAIN`, `NEXT_PUBLIC_ANALYTICS_SCRIPT_URL` — analytics script config.
@@ -65,7 +65,7 @@ shared env if desired. All are optional and have safe fallbacks.
   because the showcase section performs a real server-side ISR fetch (`revalidate: 300`) against the store
   API, which static export cannot support. The rest of the page is still built to be "static-export
   friendly": every section is a plain server component with no required runtime state, so `output: 'export'`
-  could be re-enabled by swapping `getCatalog` for a build-time-only fetch or the static demo data if a
+  could be re-enabled by swapping `getCatalog` for a build-time-only fetch or the static fallback data if a
   pure static deploy is ever needed.
 - Favicons/OG image are provided as source **SVG only** (`public/favicon.svg`, `public/og-image.svg`,
   `app/icon.svg`). Rasterized PNG sizes (16x16/32x32/180x180 etc.) were not generated because this phase
@@ -75,7 +75,7 @@ shared env if desired. All are optional and have safe fallbacks.
 - The `/en/` route duplicates the section composition of `/` with `locale: 'en'` and swapped copy; if more
   pages are added later, prefer moving this composition into a shared `<LandingPage locale={...} />`
   section component once there's a second full page to justify the abstraction.
-- Money in the demo catalog and `formatPriceCents` is always integer cents, matching the monorepo money
-  convention; it is presentation-only demo/fallback data and is never sent to the payments backend.
+- Money in the fallback catalog and `formatPriceCents` is always integer cents, matching the monorepo money
+  convention; it is presentation-only fallback data and is never sent to the payments backend.
 - Dockerfile assumes a Next.js `standalone` build output and pnpm workspace filtering; it is written to sit
   in the monorepo root build context (`docker build -f apps/landing/Dockerfile .`).

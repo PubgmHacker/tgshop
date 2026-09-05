@@ -1,5 +1,7 @@
+import { timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import client from 'prom-client'
+import { env } from '../../config/env.js'
 
 export const metricsRegistry = new client.Registry()
 client.collectDefaultMetrics({ register: metricsRegistry })
@@ -21,7 +23,12 @@ export async function registerMetricsPlugin(app: FastifyInstance): Promise<void>
     done()
   })
 
-  app.get('/metrics', async (_req, reply) => {
+  app.get('/metrics', async (req, reply) => {
+    const expected = Buffer.from(`Bearer ${env.SERVICE_TOKEN}`)
+    const received = req.headers.authorization ? Buffer.from(req.headers.authorization) : Buffer.alloc(0)
+    if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+      return reply.code(401).header('www-authenticate', 'Bearer').send({ error: 'unauthorized' })
+    }
     reply.header('Content-Type', metricsRegistry.contentType)
     return metricsRegistry.metrics()
   })

@@ -65,7 +65,6 @@ export async function buildServer(bot: Bot<BotContext>): Promise<FastifyInstance
     // the real caller rather than the proxy's own address.
     trustProxy: true,
     bodyLimit: 1_048_576,
-    disableRequestLogging: false
   })
 
   // Order matters: security first (it installs the raw-body JSON parser and the

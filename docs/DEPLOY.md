@@ -87,6 +87,9 @@ no `last_error_message`.
 ## 6. Verify
 
 - `curl -I https://api.<domain>/health` — should not connection-refuse (Fastify is up).
+- `curl -H "Authorization: Bearer $SERVICE_TOKEN" https://api.<domain>/metrics` —
+  should return Prometheus metrics; the endpoint requires the service token and
+  must not be exposed anonymously.
 - Open `https://miniapp.<domain>` — should load the Mini App shell (best
   tested from inside Telegram via the bot's menu button, since Telegram
   WebApp APIs are unavailable in a plain browser).
