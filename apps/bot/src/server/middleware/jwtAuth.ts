@@ -1,5 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import { verifyMiniAppJwt, InitDataError } from '../auth.js'
+import { verifyMiniAppJwt } from '../auth.js'
+import { toApiErrorBody } from '../../lib/httpErrors.js'
+import { resolveLocale } from '../../i18n/index.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -10,8 +12,9 @@ declare module 'fastify' {
 /** Requires a valid `Authorization: Bearer <jwt>` issued by /api/auth/telegram. Never trust client-supplied userId. */
 export async function requireJwtAuth(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const header = req.headers.authorization
+  const locale = resolveLocale(req.headers['accept-language'])
   if (!header?.startsWith('Bearer ')) {
-    await reply.code(401).send({ error: 'unauthorized', message: 'missing bearer token' })
+    await reply.code(401).send(toApiErrorBody('UNAUTHORIZED', locale, 'api.errors.unauthorized'))
     return
   }
   const token = header.slice('Bearer '.length)
@@ -19,7 +22,8 @@ export async function requireJwtAuth(req: FastifyRequest, reply: FastifyReply): 
     const payload = verifyMiniAppJwt(token)
     req.auth = { userId: payload.sub, tgId: payload.tgId }
   } catch (err) {
-    const message = err instanceof InitDataError ? err.message : 'invalid token'
-    await reply.code(401).send({ error: 'unauthorized', message })
+    // Parser details belong in server logs, not in an authentication oracle.
+    void err
+    await reply.code(401).send(toApiErrorBody('UNAUTHORIZED', locale, 'api.errors.unauthorized'))
   }
 }

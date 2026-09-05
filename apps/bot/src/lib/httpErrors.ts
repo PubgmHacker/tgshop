@@ -80,6 +80,16 @@ export function describeError(err: unknown, locale: Locale): { status: number; b
     return { status: 400, body: toApiErrorBody('VALIDATION_ERROR', locale, 'api.errors.validation') }
   }
 
+  // Fastify raises parser errors before a route's try/catch can run. Keep
+  // malformed JSON and oversized bodies as client errors in the same envelope
+  // as route validation failures instead of misreporting them as 500s.
+  if (isFastifyClientError(err)) {
+    return {
+      status: err.code === 'FST_ERR_CTP_BODY_TOO_LARGE' ? 413 : 400,
+      body: toApiErrorBody('VALIDATION_ERROR', locale, 'api.errors.validation')
+    }
+  }
+
   // core's setSetting throws this for a value that fails the key's schema; it is
   // the caller's bad input, not an outage, so it must surface as a 400.
   if (err instanceof SettingsValidationError) {
@@ -124,6 +134,12 @@ export function describeError(err: unknown, locale: Locale): { status: number; b
   }
 
   return { status: 500, body: toApiErrorBody('INTERNAL_ERROR', locale, 'api.errors.internal') }
+}
+
+function isFastifyClientError(err: unknown): err is { code: string } {
+  if (!err || typeof err !== 'object') return false
+  const code = (err as { code?: unknown }).code
+  return code === 'FST_ERR_CTP_INVALID_JSON' || code === 'FST_ERR_CTP_BODY_TOO_LARGE'
 }
 
 /** Sends a mapped error response, logging 5xx causes with full context. */

@@ -1,6 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  webpack(config) {
+    // BullMQ exposes an optional Valkey backend from its barrel export. The
+    // admin uses ioredis, so make that optional branch explicit to Next's
+    // bundler instead of emitting a misleading missing-module warning.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@valkey/valkey-glide': false
+    }
+    return config
+  },
   output: 'standalone',
   experimental: {
     serverActions: {

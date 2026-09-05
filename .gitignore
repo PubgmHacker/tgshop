@@ -19,6 +19,7 @@ dist
 !.env.example
 
 .turbo
+.playwright-cli/
 **/.turbo
 
 coverage
