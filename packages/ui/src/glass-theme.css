@@ -1,39 +1,41 @@
-/* Shared dark treatment for both Mini Apps. Light-glass surfaces keep their original material. */
+/* Cosmic glass for both Mini Apps. The light material is independent of these dark tokens. */
 :root[data-theme='dark'] {
-  --bg: #121720;
-  --bg-soft: #1a2230;
-  --card: #222c3a;
-  --card-strong: #2d394b;
-  --line: rgba(207, 224, 248, 0.18);
-  --line-strong: rgba(219, 235, 255, 0.34);
-  --ink: #f5f8ff;
-  --muted: #ced8e8;
-  --faint: #bfcbdf;
-  --cta: #f2f7ff;
-  --cta-ink: #111a28;
-  --danger: #ff969b;
-  --success: #64dfa4;
-  --warning: #f1d480;
-  --glass-fill: rgba(173, 195, 228, 0.14);
-  --glass-stroke: rgba(211, 232, 255, 0.42);
-  --glass-hi: rgba(227, 243, 255, 0.66);
-  --glass-sheen: rgba(232, 246, 255, 0.88);
+  --bg: #070a16;
+  --bg-soft: #101629;
+  --card: #151d34;
+  --card-strong: #222b46;
+  --line: rgba(188, 201, 247, 0.18);
+  --line-strong: rgba(197, 214, 255, 0.42);
+  --ink: #f3f5ff;
+  --muted: #c6d0e9;
+  --faint: #b6c4e2;
+  --cta: #e7efff;
+  --cta-ink: #11182c;
+  --focus-ring: #b6e7ff;
+  --danger: #ffa2b1;
+  --success: #79e9b5;
+  --warning: #f6d591;
+  --glass-fill: rgba(25, 32, 59, 0.7);
+  --glass-stroke: rgba(184, 198, 244, 0.32);
+  --glass-hi: rgba(224, 220, 255, 0.58);
+  --glass-sheen: rgba(183, 222, 255, 0.88);
   --glass-depth:
-    inset 0 1.5px 0 rgba(224, 241, 255, 0.6),
-    inset 0 10px 22px rgba(161, 193, 235, 0.08),
-    inset 1px 0 0 rgba(221, 237, 255, 0.2),
-    inset 0 -8px 18px rgba(5, 12, 26, 0.32),
-    inset 0 -1px 0 rgba(159, 190, 233, 0.2),
-    0 10px 26px rgba(2, 6, 15, 0.28);
+    inset 0 1.5px 0 rgba(224, 217, 255, 0.46),
+    inset 0 9px 22px rgba(143, 136, 239, 0.1),
+    inset 1px 0 0 rgba(190, 187, 255, 0.17),
+    inset 0 -7px 18px rgba(3, 7, 21, 0.34),
+    inset 0 -1px 0 rgba(151, 214, 241, 0.22),
+    0 12px 28px rgba(1, 4, 15, 0.38);
   --glass-nested:
-    inset 0 1.5px 0 rgba(230, 245, 255, 0.5),
-    inset 1px 0 0 rgba(214, 233, 255, 0.18),
-    inset 0 -3px 8px rgba(5, 13, 28, 0.25);
+    inset 0 1px 0 rgba(223, 230, 255, 0.44),
+    inset 1px 0 0 rgba(199, 186, 250, 0.18),
+    inset 0 -3px 8px rgba(2, 9, 27, 0.32);
   --glass-tile:
-    inset 0 1.5px 0 rgba(224, 242, 255, 0.56),
-    inset 1px 0 0 rgba(214, 233, 255, 0.2),
-    inset 0 -5px 14px rgba(5, 12, 26, 0.28),
-    0 8px 20px rgba(2, 6, 15, 0.24);
+    inset 0 1.5px 0 rgba(220, 219, 255, 0.4),
+    inset 1px 0 0 rgba(206, 202, 255, 0.16),
+    inset 0 -1px 0 rgba(124, 207, 233, 0.16),
+    inset 0 -5px 14px rgba(4, 9, 28, 0.3),
+    0 8px 20px rgba(1, 4, 17, 0.32);
 }
 
 /* Status text must remain readable on the light glass and its blue-gray backdrop. */
@@ -44,55 +46,107 @@
 }
 
 :root[data-theme='dark']::before {
-  background: radial-gradient(ellipse 95% 55% at 50% -10%, rgba(171, 201, 242, 0.2), transparent 70%);
+  background: none;
+}
+
+/* One fixed atmospheric layer, behind the app and excluded from interaction.
+   Stars are a small static vector tile; only the nebula's transform moves. */
+:root[data-theme='dark'] .stage {
+  overflow: hidden;
+  background: #070a16;
+}
+
+:root[data-theme='dark'] .stage::before {
+  content: '';
+  position: absolute;
+  inset: -5%;
+  background:
+    radial-gradient(ellipse 54% 38% at 95% 12%, rgba(103, 69, 167, 0.42), transparent 76%),
+    radial-gradient(ellipse 52% 37% at 7% 55%, rgba(53, 65, 152, 0.32), transparent 76%),
+    radial-gradient(ellipse 65% 40% at 92% 82%, rgba(29, 111, 136, 0.24), transparent 78%),
+    radial-gradient(ellipse 32% 75% at 52% 43%, rgba(31, 25, 71, 0.38), transparent 85%);
+  animation: cosmos-drift 36s ease-in-out infinite alternate;
+}
+
+:root[data-theme='dark'] .stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('./cosmos-stars.svg') center top / 600px 900px repeat;
+  opacity: 0.65;
+}
+
+@keyframes cosmos-drift {
+  from { transform: translate3d(-1.5%, -1%, 0) scale(1.02); }
+  to { transform: translate3d(1.5%, 1%, 0) scale(1.06); }
 }
 
 :root[data-theme='dark'] .glass,
 :root[data-theme='dark'] .panel {
-  background: linear-gradient(160deg, rgba(155, 181, 220, 0.24), rgba(45, 62, 88, 0.36));
+  background: linear-gradient(145deg, rgba(58, 50, 94, 0.65), rgba(17, 26, 49, 0.78) 58%, rgba(24, 53, 69, 0.57));
 }
 
 :root[data-theme='dark'] .tile {
-  background: linear-gradient(180deg, rgba(165, 192, 232, 0.19), rgba(82, 107, 143, 0.12));
+  background: linear-gradient(150deg, rgba(54, 55, 94, 0.65), rgba(20, 30, 54, 0.78));
 }
 
 :root[data-theme='dark'] .glass-nav {
-  background: linear-gradient(180deg, rgba(63, 78, 102, 0.92), rgba(27, 36, 52, 0.96));
+  background: linear-gradient(160deg, rgba(34, 37, 65, 0.94), rgba(11, 20, 39, 0.97));
 }
 
 :root[data-theme='dark'] .tile::before {
-  background: linear-gradient(165deg, rgba(219, 240, 255, 0.23), transparent 42%);
+  background: linear-gradient(155deg, rgba(188, 171, 242, 0.14), transparent 45%);
 }
 
 :root[data-theme='dark'] .glass-live::before,
 :root[data-theme='dark'] .btn-ghost::before {
-  background: linear-gradient(180deg, rgba(222, 243, 255, 0.21), transparent 42%);
+  background: linear-gradient(155deg, rgba(209, 201, 255, 0.14), transparent 44%);
+}
+
+:root[data-theme='dark'] .welcome-panel {
+  background: linear-gradient(140deg, rgba(62, 48, 100, 0.67), rgba(16, 26, 50, 0.84) 60%, rgba(24, 66, 82, 0.57));
+}
+
+:root[data-theme='dark'] .welcome-panel::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url('./cosmos-stars.svg') right top / 520px 780px;
+  opacity: 0.22;
+  -webkit-mask-image: linear-gradient(105deg, transparent 35%, #000 90%);
+  mask-image: linear-gradient(105deg, transparent 35%, #000 90%);
 }
 
 /* Taper the reflection instead of exposing the moving rectangle's edges. */
 :root[data-theme='dark'] .glass-sheen::after {
-  opacity: 0.24;
+  opacity: 0.2;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
 }
 
 :root[data-theme='dark'] .chip {
-  background: rgba(32, 47, 68, 0.72);
+  background: rgba(18, 27, 51, 0.88);
 }
 
 :root[data-theme='dark'] .btn-primary {
-  background: linear-gradient(180deg, rgba(246, 252, 255, 0.96), rgba(196, 215, 242, 0.84));
-  border-color: rgba(236, 248, 255, 0.82);
-  color: #111a28;
+  background: linear-gradient(145deg, #f0f5ff, #c5d5fc);
+  border-color: rgba(222, 240, 255, 0.84);
+  color: #11182c;
 }
 
 :root[data-theme='dark'] .btn-ghost {
-  background: linear-gradient(180deg, rgba(159, 186, 225, 0.17), rgba(87, 113, 151, 0.1));
+  background: linear-gradient(140deg, rgba(72, 66, 115, 0.5), rgba(33, 59, 84, 0.52));
 }
 
 :root[data-theme='dark'] .tab-active {
-  background: linear-gradient(180deg, #f5faff, #cbdcf3);
-  color: #111a28;
+  background: linear-gradient(145deg, #f0f5ff, #c5d5fc);
+  color: #11182c;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme='dark'] .stage::before { animation: none; }
 }
 
 html[data-theme-switching] *,

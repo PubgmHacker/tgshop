@@ -7,6 +7,7 @@ import { useBackButton } from '@/hooks/useBackButton'
 import { useHomeData, useMeData } from '@/hooks/useApi'
 import { CollectionGrid } from '@/components/CollectionGrid'
 import { HomeHero } from '@/components/HomeHero'
+import { FeaturedOffer } from '@/components/FeaturedOffer'
 import { ModelRail } from '@/components/ModelRail'
 import { ErrorState } from '@/components/States'
 
@@ -18,6 +19,7 @@ export default function HomePage(): JSX.Element {
   useBackButton(false)
 
   const categories = home.data?.categories ?? []
+  const featured = home.data?.bestsellers.find(product => product.promotion?.featured && product.inStock)
   const counts = useMemo(() => {
     const next: Record<string, number> = {}
     for (const category of home.data?.categories ?? []) {
@@ -55,8 +57,7 @@ export default function HomePage(): JSX.Element {
           retryLabel={t('common.retry')}
         />
       ) : (
-        <HomeHero balanceCents={me.data?.balanceCents ?? null} isLoading={me.isLoading}
-          featured={home.data?.bestsellers.find(product => product.promotion?.featured && product.inStock)} />
+        <HomeHero balanceCents={me.data?.balanceCents ?? null} isLoading={me.isLoading} />
       )}
 
       {home.isError ? (
@@ -67,7 +68,8 @@ export default function HomePage(): JSX.Element {
         />
       ) : (
         <>
-          <ModelRail products={home.data?.bestsellers ?? []} isLoading={home.isLoading} />
+          {featured ? <FeaturedOffer product={featured} /> : null}
+          <ModelRail products={(home.data?.bestsellers ?? []).filter(product => product.id !== featured?.id)} isLoading={home.isLoading} />
 
           <CollectionGrid categories={categories} counts={counts} isLoading={home.isLoading} />
         </>
