@@ -1,6 +1,7 @@
 'use client'
 
 import type { z } from 'zod'
+import { fetchJsonWithTimeout } from '@tgshop/ui/request'
 import { AuthResponseSchema } from '@/types/api'
 import { clearAuthSession, getAccessToken, setAuthSession } from './authStore'
 import { readInitDataFromLocation } from './launchParams'
@@ -8,13 +9,6 @@ import { readInitDataFromLocation } from './launchParams'
 // Production is same-origin: next.config.js rewrites relay /api/* to the bot
 // server-side, so the WebView never has to reach a second host.
 const API_URL = process.env.NODE_ENV === 'production' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? '')
-
-const REQUEST_TIMEOUT_MS = 15_000
-
-function requestTimeoutSignal(ms: number): AbortSignal | undefined {
-  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') return undefined
-  return AbortSignal.timeout(ms)
-}
 
 export class ApiClientError extends Error {
   public readonly status: number
@@ -53,30 +47,28 @@ function resolveInitData(): string | null {
 
 async function authenticate(): Promise<void> {
   const initData = resolveInitData()
-  const res = initData
-    ? await fetch(`${API_URL}/api/auth/telegram`, {
+  const result = initData
+    ? await fetchJsonWithTimeout(`${API_URL}/api/auth/telegram`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ initData }),
-        signal: requestTimeoutSignal(REQUEST_TIMEOUT_MS)
+        body: JSON.stringify({ initData })
       })
     : process.env.NODE_ENV === 'development' && API_URL
-      ? await fetch(`${API_URL}/api/auth/dev`, {
+      ? await fetchJsonWithTimeout(`${API_URL}/api/auth/dev`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: '{}',
-          signal: requestTimeoutSignal(REQUEST_TIMEOUT_MS)
+          body: '{}'
         })
       : null
 
-  if (!res) {
+  if (!result) {
     throw new ApiClientError(401, 'NO_INIT_DATA', 'Telegram initData is not available')
   }
+  const { response: res, body } = result
   if (!res.ok) {
     throw new ApiClientError(res.status, 'AUTH_FAILED', 'Authentication failed')
   }
-  const json = await res.json()
-  const parsed = AuthResponseSchema.parse(json)
+  const parsed = AuthResponseSchema.parse(body)
   setAuthSession(parsed.accessToken, parsed.expiresAt)
 }
 
@@ -105,36 +97,28 @@ async function request<T>(path: string, schema: z.ZodType<T>, options: RequestOp
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (token) headers.authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const { response: res, body } = await fetchJsonWithTimeout(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    // A stalled mobile connection otherwise leaves the screen loading forever;
-    // callers treat the resulting TimeoutError as a network failure.
-    signal: requestTimeoutSignal(REQUEST_TIMEOUT_MS)
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
   })
 
   if (res.status === 401 && !options.skipAuth) {
     clearAuthSession()
     await ensureAuth()
-    return request(path, schema, { ...options, skipAuth: true }).then(async (result) => result)
+    return request(path, schema, { ...options, skipAuth: true })
   }
 
   if (!res.ok) {
     let code = 'UNKNOWN'
     let message = `Request failed with status ${res.status}`
-    try {
-      const errJson = await res.json()
-      code = errJson?.error?.code ?? code
-      message = errJson?.error?.message ?? message
-    } catch {
-      // response body was not JSON; keep defaults
-    }
+    const details = (body as { error?: { code?: unknown; message?: unknown } } | null | undefined)?.error
+    if (typeof details?.code === 'string') code = details.code
+    if (typeof details?.message === 'string') message = details.message
     throw new ApiClientError(res.status, code, message)
   }
 
-  const json = await res.json()
-  return schema.parse(json)
+  return schema.parse(body)
 }
 
 export const api = {

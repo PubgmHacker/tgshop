@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma, StockStatus } from '@tgshop/db'
+import { isPoolBacked } from '@tgshop/core'
 import { encryptStockPayload } from '../../../../domain/orders.js'
 import { conflict, notFound, sendError } from '../../../../lib/httpErrors.js'
 import { requestLocale } from '../context.js'
@@ -37,7 +38,7 @@ export function registerAdminStockRoutes(app: FastifyInstance): void {
           id: true,
           title: true,
           lowStockThreshold: true,
-          product: { select: { id: true, title: true, deliveryType: true } }
+          product: { select: { id: true, title: true, deliveryType: true, externalConfig: true } }
         }
       })
       if (!plan) throw notFound('api.errors.plan_not_found')
@@ -66,7 +67,8 @@ export function registerAdminStockRoutes(app: FastifyInstance): void {
           lowStockThreshold: plan.lowStockThreshold,
           productId: plan.product.id,
           productTitle: plan.product.title,
-          deliveryType: plan.product.deliveryType
+          deliveryType: plan.product.deliveryType,
+          usesStock: isPoolBacked(plan.product.deliveryType, plan.product.externalConfig)
         },
         counts,
         recent: recent.map((item) => ({

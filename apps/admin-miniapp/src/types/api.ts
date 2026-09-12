@@ -228,6 +228,7 @@ export const AdminProductSchema = z.object({
   description: z.string(),
   imageUrl: z.string().nullable(),
   deliveryType: DeliveryTypeSchema,
+  usesStock: z.boolean().optional(),
   externalConfig: z.unknown().nullable(),
   sortOrder: z.number().int(),
   isActive: z.boolean(),
@@ -262,6 +263,7 @@ export const DeletedResponseSchema = z.object({ id: z.string(), deleted: z.boole
 
 export const StockDetailResponseSchema = z.object({
   plan: z.object({
+    usesStock: z.boolean().optional(),
     id: z.string(),
     title: z.string(),
     lowStockThreshold: z.number().int(),

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { AdminRole } from '@tgshop/db'
+import { AdminRole, DeliveryType } from '@tgshop/db'
 import { createFixture, prisma, type TestFixture } from './setup.js'
 
 const session = vi.hoisted(() => ({ role: 'SUPPORT', adminId: 'e2e-catalog-audit' }))
@@ -51,5 +51,20 @@ describe('admin catalog supplier credentials', () => {
     session.role = AdminRole.ADMIN
     await upsertProductAction({ ...fixture.product, externalConfig: null })
     expect((await prisma.product.findUniqueOrThrow({ where: { id: fixture.product.id } })).externalConfig).toBeNull()
+  })
+
+  it.each([
+    [DeliveryType.STOCK_POOL, {}, true],
+    [DeliveryType.MANUAL_FALLBACK, {}, false],
+    [DeliveryType.EXTERNAL_API, config, false],
+    [DeliveryType.UNIQUE_CODE, { codeTemplate: 'CODE-{RANDOM8}' }, false],
+    [DeliveryType.UNIQUE_CODE, {}, true]
+  ] as const)('reports inventory use accurately for %s', async (deliveryType, externalConfig, expected) => {
+    const item = await createFixture({ deliveryType, externalConfig, stockCount: 0 })
+    try {
+      const plans = await listPlansAction(item.product.id)
+      expect(plans[0]?.usesStock).toBe(expected)
+      expect(plans[0]?.product).not.toHaveProperty('externalConfig')
+    } finally { await item.cleanup() }
   })
 })

@@ -32,7 +32,7 @@ export const dictionaries = {
 
     'card.balance': 'Баланс',
 
-    'home.search': 'Найти модель',
+    'home.search': 'Поиск в каталоге',
     'home.greet.morning': 'Доброе утро',
     'home.greet.afternoon': 'Добрый день',
     'home.greet.evening': 'Добрый вечер',
@@ -65,11 +65,11 @@ export const dictionaries = {
     'home.models': 'Доступно сейчас',
 
     'catalog.title': 'Каталог',
-    'catalog.pick': 'Выбери модель',
-    'catalog.allServices': 'Все модели',
+    'catalog.pick': 'Каталог',
+    'catalog.allServices': 'Все товары',
     'catalog.positions': '{count} поз.',
     'catalog.subtitle': 'Доступные AI-инструменты и тарифы',
-    'catalog.search': 'Поиск по модели…',
+    'catalog.search': 'Поиск в каталоге…',
     'catalog.filter.all': 'Все',
     'catalog.filter.inStock': 'В наличии',
     'catalog.empty': 'Ничего не найдено',
@@ -236,7 +236,7 @@ export const dictionaries = {
 
     'card.balance': 'Balance',
 
-    'home.search': 'Find a model',
+    'home.search': 'Search the catalog',
     'home.greet.morning': 'Good morning',
     'home.greet.afternoon': 'Good afternoon',
     'home.greet.evening': 'Good evening',
@@ -269,11 +269,11 @@ export const dictionaries = {
     'home.models': 'Available now',
 
     'catalog.title': 'Catalog',
-    'catalog.pick': 'Choose a model',
-    'catalog.allServices': 'All models',
+    'catalog.pick': 'Catalog',
+    'catalog.allServices': 'All products',
     'catalog.positions': '{count} items',
     'catalog.subtitle': 'Available AI tools and plans',
-    'catalog.search': 'Search by model…',
+    'catalog.search': 'Search the catalog…',
     'catalog.filter.all': 'All',
     'catalog.filter.inStock': 'In stock',
     'catalog.empty': 'Nothing found',

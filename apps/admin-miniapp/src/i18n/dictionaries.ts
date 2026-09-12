@@ -140,7 +140,8 @@ export const dictionaries = {
     'product.plans.empty': 'Тарифов пока нет',
     'plan.sheet.create': 'Новый тариф',
     'plan.sheet.edit': 'Тариф',
-    'plan.stock': 'Сток',
+    'plan.stock': 'Склад',
+    'plan.stockNotUsed': 'Для этого способа выдачи склад не используется',
     'plan.lifetime': 'Навсегда',
     'plan.days': '{days} дн.',
 
@@ -164,7 +165,7 @@ export const dictionaries = {
     'form.deleteConfirm':
       'Удалить безвозвратно? Если объект уже используется в заказах, сервер откажет — тогда просто выключите его.',
 
-    'stock.title': 'Сток',
+    'stock.title': 'Склад',
     'stock.available': 'В наличии',
     'stock.reserved': 'Резерв',
     'stock.sold': 'Продано',
@@ -437,6 +438,7 @@ export const dictionaries = {
     'plan.sheet.create': 'New plan',
     'plan.sheet.edit': 'Plan',
     'plan.stock': 'Stock',
+    'plan.stockNotUsed': 'This delivery method does not use stock',
     'plan.lifetime': 'Lifetime',
     'plan.days': '{days} d.',
 

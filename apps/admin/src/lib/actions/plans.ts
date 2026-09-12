@@ -2,20 +2,26 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma, AdminRole, type Prisma } from '@tgshop/db'
+import { isPoolBacked } from '@tgshop/core'
 import { requireRole } from '../rbac'
 import { writeAuditLog } from '../audit'
 import { planUpsertSchema, type PlanUpsertInput } from '../schemas'
 
 export async function listPlansAction(productId?: string) {
   await requireRole(AdminRole.SUPPORT)
-  return prisma.plan.findMany({
+  const plans = await prisma.plan.findMany({
     where: productId ? { productId } : undefined,
     orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
     include: {
-      product: { select: { id: true, title: true, deliveryType: true } },
+      product: { select: { id: true, title: true, deliveryType: true, externalConfig: true } },
       _count: { select: { stockItems: { where: { status: 'AVAILABLE' } } } }
     }
   })
+  return plans.map(({ product, ...plan }) => ({
+    ...plan,
+    usesStock: isPoolBacked(product.deliveryType, product.externalConfig),
+    product: { id: product.id, title: product.title, deliveryType: product.deliveryType }
+  }))
 }
 
 export async function upsertPlanAction(input: PlanUpsertInput) {

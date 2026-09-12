@@ -25,11 +25,13 @@ export interface PlanRow {
   isActive: boolean
   sortOrder: number
   availableStock: number
+  usesStock: boolean
 }
 
 export interface ProductOption {
   id: string
   title: string
+  usesStock: boolean
 }
 
 export function PlansClient({
@@ -121,7 +123,8 @@ export function PlansClient({
         lowStockThreshold: saved.lowStockThreshold,
         isActive: saved.isActive,
         sortOrder: saved.sortOrder,
-        availableStock: plans.find((p) => p.id === saved.id)?.availableStock ?? 0
+        availableStock: plans.find((p) => p.id === saved.id)?.availableStock ?? 0,
+        usesStock: products.find((p) => p.id === saved.productId)?.usesStock ?? false
       }
       setPlans((prev) => {
         if (editingId) return prev.map((p) => (p.id === row.id ? row : p))
@@ -296,9 +299,9 @@ export function PlansClient({
               <TableCell className="tabular-nums">{plan.priceStars === null ? '—' : plan.priceStars}</TableCell>
               <TableCell className="tabular-nums">{plan.discountPercent}%</TableCell>
               <TableCell className="tabular-nums">
-                <Badge variant={plan.availableStock <= plan.lowStockThreshold ? 'destructive' : 'success'}>
+                {plan.usesStock ? <Badge variant={plan.availableStock <= plan.lowStockThreshold ? 'destructive' : 'success'}>
                   {plan.availableStock}
-                </Badge>
+                </Badge> : <span className="text-xs text-muted-foreground">Склад не используется</span>}
               </TableCell>
               <TableCell>
                 <Badge variant={plan.isActive ? 'success' : 'secondary'}>{plan.isActive ? 'Активен' : 'Отключён'}</Badge>

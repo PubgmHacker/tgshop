@@ -1,4 +1,5 @@
 import { AdminRole } from '@tgshop/db'
+import { isPoolBacked } from '@tgshop/core'
 import { listPlansAction } from '../../../lib/actions/plans'
 import { listProductsAction } from '../../../lib/actions/products'
 import { hasRole, requireSession } from '../../../lib/rbac'
@@ -31,7 +32,8 @@ export default async function PlansPage({
     lowStockThreshold: plan.lowStockThreshold,
     isActive: plan.isActive,
     sortOrder: plan.sortOrder,
-    availableStock: plan._count.stockItems
+    availableStock: plan._count.stockItems,
+    usesStock: plan.usesStock
   }))
 
   return (
@@ -41,7 +43,7 @@ export default async function PlansPage({
       <PlansClient
         key={productId ?? 'all'}
         initialPlans={rows}
-        products={products.map((product) => ({ id: product.id, title: product.title }))}
+        products={products.map((product) => ({ id: product.id, title: product.title, usesStock: isPoolBacked(product.deliveryType, product.externalConfig) }))}
         selectedProductId={productId ?? ''}
         canEdit={hasRole(session.role, AdminRole.ADMIN)}
         canDelete={hasRole(session.role, AdminRole.OWNER)}

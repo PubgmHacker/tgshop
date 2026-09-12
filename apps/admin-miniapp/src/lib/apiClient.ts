@@ -1,6 +1,7 @@
 'use client'
 
 import type { z } from 'zod'
+import { fetchJsonWithTimeout } from '@tgshop/ui/request'
 import { AuthResponseSchema } from '@/types/api'
 import { clearAuthSession, getAccessToken, setAuthSession } from './authStore'
 import { readInitDataFromLocation } from './launchParams'
@@ -46,28 +47,28 @@ function resolveInitData(): string | null {
 
 async function authenticate(): Promise<void> {
   const initData = resolveInitData()
-  const res = initData
-    ? await fetch(`${API_URL}/api/auth/telegram`, {
+  const result = initData
+    ? await fetchJsonWithTimeout(`${API_URL}/api/auth/telegram`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ initData })
       })
     : process.env.NODE_ENV === 'development' && API_URL
-      ? await fetch(`${API_URL}/api/auth/dev`, {
+      ? await fetchJsonWithTimeout(`${API_URL}/api/auth/dev`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: '{}'
         })
       : null
 
-  if (!res) {
+  if (!result) {
     throw new ApiClientError(401, 'NO_INIT_DATA', 'Telegram initData is not available')
   }
+  const { response: res, body } = result
   if (!res.ok) {
     throw new ApiClientError(res.status, 'AUTH_FAILED', 'Authentication failed')
   }
-  const json = await res.json()
-  const parsed = AuthResponseSchema.parse(json)
+  const parsed = AuthResponseSchema.parse(body)
   setAuthSession(parsed.accessToken, parsed.expiresAt)
 }
 
@@ -96,7 +97,7 @@ async function request<T>(path: string, schema: z.ZodType<T>, options: RequestOp
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (token) headers.authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const { response: res, body } = await fetchJsonWithTimeout(`${API_URL}${path}`, {
     method: options.method ?? 'GET',
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined
@@ -105,24 +106,19 @@ async function request<T>(path: string, schema: z.ZodType<T>, options: RequestOp
   if (res.status === 401 && !options.skipAuth) {
     clearAuthSession()
     await ensureAuth()
-    return request(path, schema, { ...options, skipAuth: true }).then(async (result) => result)
+    return request(path, schema, { ...options, skipAuth: true })
   }
 
   if (!res.ok) {
     let code = 'UNKNOWN'
     let message = `Request failed with status ${res.status}`
-    try {
-      const errJson = await res.json()
-      code = errJson?.error?.code ?? code
-      message = errJson?.error?.message ?? message
-    } catch {
-      // response body was not JSON; keep defaults
-    }
+    const details = (body as { error?: { code?: unknown; message?: unknown } } | null | undefined)?.error
+    if (typeof details?.code === 'string') code = details.code
+    if (typeof details?.message === 'string') message = details.message
     throw new ApiClientError(res.status, code, message)
   }
 
-  const json = await res.json()
-  return schema.parse(json)
+  return schema.parse(body)
 }
 
 export const api = {

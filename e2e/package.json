@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tgshop/core": "workspace:*",
+    "@tgshop/ui": "workspace:*",
     "@tgshop/db": "workspace:*"
   },
   "devDependencies": {

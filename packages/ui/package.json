@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": ["**/*.css"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -15,7 +15,10 @@
       "types": "./dist/tailwind-preset.d.ts",
       "default": "./dist/tailwind-preset.js"
     },
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./theme": { "types": "./dist/theme.d.ts", "default": "./dist/theme.js" },
+    "./request": { "types": "./dist/request.d.ts", "default": "./dist/request.js" },
+    "./glass-theme.css": "./src/glass-theme.css"
   },
   "scripts": {
     "build": "tsc -b",
