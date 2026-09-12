@@ -107,6 +107,9 @@ importers:
       '@tgshop/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@tgshop/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: 15.5.24
         version: 15.5.24(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -269,6 +272,9 @@ importers:
       '@tgshop/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@tgshop/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: 15.5.24
         version: 15.5.24(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -367,6 +373,9 @@ importers:
       '@tgshop/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@tgshop/ui':
+        specifier: workspace:*
+        version: link:../packages/ui
     devDependencies:
       '@types/node':
         specifier: ^22.10.2

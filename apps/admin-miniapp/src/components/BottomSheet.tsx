@@ -34,6 +34,10 @@ export function BottomSheet({
     restoreFocusRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
     document.body.style.overflow = 'hidden'
+    const background = Array.from(document.body.children)
+      .filter((node): node is HTMLElement => node instanceof HTMLElement && !node.contains(dialogRef.current))
+      .map((node) => ({ node, inert: node.inert }))
+    for (const { node } of background) node.inert = true
 
     const focusables = (): HTMLElement[] =>
       Array.from(
@@ -69,6 +73,7 @@ export function BottomSheet({
       window.clearTimeout(focusTimer)
       window.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previousOverflow
+      for (const { node, inert } of background) node.inert = inert
       restoreFocusRef.current?.focus()
       restoreFocusRef.current = null
     }
@@ -103,7 +108,7 @@ export function BottomSheet({
             type="button"
             onClick={onClose}
             aria-label={t('common.close')}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-card-strong text-muted"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-card-strong text-muted"
           >
             <Icon name="close" size={17} />
           </button>

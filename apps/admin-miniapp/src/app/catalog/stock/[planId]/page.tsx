@@ -1,6 +1,7 @@
 'use client'
 
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useI18n } from '@/i18n/I18nProvider'
@@ -90,7 +91,7 @@ export default function StockPage(): JSX.Element {
         onRetry={() => void stockQuery.refetch()}
         skeleton={<StockSkeleton />}
       >
-        {({ plan, counts, recent }) => (
+        {({ plan, counts, recent }) => (plan.usesStock ?? (plan.deliveryType === 'STOCK_POOL' || plan.deliveryType === 'UNIQUE_CODE')) ? (
           <>
             <section className="relative mx-4 overflow-hidden rounded-[22px]">
               <div className="glass relative rounded-[22px] p-4">
@@ -194,6 +195,12 @@ export default function StockPage(): JSX.Element {
               )}
             </section>
           </>
+        ) : (
+          <section className="mx-4 flex flex-col gap-3 rounded-card border border-line bg-card p-5">
+            <h1 className="text-lg font-semibold text-ink">{plan.productTitle}</h1>
+            <p className="text-sm text-muted">{t('plan.stockNotUsed')}</p>
+            <Link href={`/catalog/product/${plan.productId}`} className="btn-primary min-h-11 rounded-full px-4 text-sm font-semibold">{t('common.back')}</Link>
+          </section>
         )}
       </QueryGate>
     </main>

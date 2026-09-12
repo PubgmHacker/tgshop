@@ -29,7 +29,8 @@ export default async function StockPage({ searchParams: searchParamsPromise }: {
     counts.set(row.planId, entry)
   }
 
-  const summaries: PlanStockSummary[] = plans.map((plan) => {
+  const selectedPlanId = plans.some((plan) => plan.id === planId && plan.usesStock) ? planId : undefined
+  const summaries: PlanStockSummary[] = plans.filter((plan) => plan.usesStock).map((plan) => {
     const entry = counts.get(plan.id) ?? { available: 0, reserved: 0, sold: 0 }
     return {
       planId: plan.id,
@@ -42,7 +43,7 @@ export default async function StockPage({ searchParams: searchParamsPromise }: {
     }
   })
 
-  const rows: StockItemRow[] = items.map((item) => ({
+  const rows: StockItemRow[] = (selectedPlanId ? items : []).map((item) => ({
     id: item.id,
     status: item.status,
     createdAt: item.createdAt.toISOString(),
@@ -53,12 +54,13 @@ export default async function StockPage({ searchParams: searchParamsPromise }: {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">{t('stock.title')}</h1>
+      {planId && !selectedPlanId && <p className="text-sm text-muted-foreground">Для этого тарифа склад не используется или тариф недоступен. Выберите тариф с выдачей со склада.</p>}
       {/* key remounts the client when the plan filter changes so its row state matches the server data */}
       <StockClient
-        key={planId ?? 'none'}
+        key={selectedPlanId ?? 'none'}
         summaries={summaries}
         items={rows}
-        selectedPlanId={planId ?? ''}
+        selectedPlanId={selectedPlanId ?? ''}
         canImport={hasRole(session.role, AdminRole.ADMIN)}
         canDelete={hasRole(session.role, AdminRole.OWNER)}
       />

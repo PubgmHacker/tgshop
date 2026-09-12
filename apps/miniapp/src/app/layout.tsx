@@ -5,6 +5,8 @@ import { AppHeader } from '@/components/AppHeader'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { BRAND_NAME } from '@/lib/tokens'
 import '@/styles/globals.css'
+import '@tgshop/ui/glass-theme.css'
+import { DEFAULT_THEME, THEME_INIT_SCRIPT } from '@tgshop/ui/theme'
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
@@ -25,7 +27,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <html lang="ru" data-theme="dark">
+    <html lang="ru" data-theme={DEFAULT_THEME} suppressHydrationWarning>
+      <head>
+        {/* Only the root theme attribute changes before hydration; page content stays deterministic. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body data-release={(process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7)}>
         <div className="stage" aria-hidden />
         <Providers>

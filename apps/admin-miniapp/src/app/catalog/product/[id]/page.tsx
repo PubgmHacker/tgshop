@@ -308,7 +308,7 @@ export default function ProductDetailPage(): JSX.Element {
                           </div>
                           <span className="tnum shrink-0 text-sm font-bold text-ink">{formatCents(plan.priceCents)}</span>
                         </button>
-                        <Link
+                        {(product.usesStock ?? (product.deliveryType === 'STOCK_POOL' || product.deliveryType === 'UNIQUE_CODE')) ? <Link
                           href={`/catalog/stock/${plan.id}`}
                           className="tile flex items-center justify-between rounded-tile px-3 py-2"
                         >
@@ -323,7 +323,7 @@ export default function ProductDetailPage(): JSX.Element {
                           >
                             {plan.stock.available} · {plan.stock.reserved} · {plan.stock.sold}
                           </span>
-                        </Link>
+                        </Link> : <p className="text-xs text-muted">{t('plan.stockNotUsed')}</p>}
                       </div>
                     ))}
                   </div>
