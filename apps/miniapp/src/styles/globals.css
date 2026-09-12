@@ -4,7 +4,7 @@
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Storefront: light by default, one liquid-glass material,
-   white CTAs. Color lives in official logos only — never as a wash.
+   shared cosmic dark theme in @tgshop/ui/glass-theme.css.
    ──────────────────────────────────────────────────────────────────────────── */
 
 :root[data-theme='dark'] {
