@@ -123,7 +123,7 @@ export default function SettingsPage(): JSX.Element {
         <SettingRow
           icon="support"
           title={t('settings.support')}
-          subtitle={config.data ? `@${config.data.supportUrl.split('/').pop() ?? ''}` : t('settings.support.desc')}
+          subtitle={config.data?.supportUrl.startsWith('https://t.me/') ? `@${config.data.supportUrl.split('/').pop() ?? ''}` : t('settings.support.desc')}
           trailing={<Icon name="chevron-right" size={16} className="text-faint" />}
           onClick={() => {
             triggerHaptic('light')

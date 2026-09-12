@@ -6,6 +6,7 @@ import { env } from '../../../config/env.js'
 import { sendError } from '../../../lib/httpErrors.js'
 import { requestLocale } from './context.js'
 import { getPaymentAvailability } from '../../../domain/payment-availability.js'
+import { resolveSupportUrl } from '../../../lib/support-url.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/config — static-ish client configuration for the Mini App's
@@ -22,7 +23,7 @@ export function registerConfigRoutes(app: FastifyInstance): void {
       const availability = getPaymentAvailability()
       return {
         botUsername: env.BOT_USERNAME,
-        supportUrl,
+        supportUrl: resolveSupportUrl(supportUrl, env.LANDING_URL),
         paymentMethods: availability.orderProviders,
         topupMethods: availability.topupProviders,
         minTopupCents
