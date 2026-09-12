@@ -55,7 +55,8 @@ export default function HomePage(): JSX.Element {
           retryLabel={t('common.retry')}
         />
       ) : (
-        <HomeHero balanceCents={me.data?.balanceCents ?? null} isLoading={me.isLoading} />
+        <HomeHero balanceCents={me.data?.balanceCents ?? null} isLoading={me.isLoading}
+          featured={home.data?.bestsellers.find(product => product.promotion?.featured && product.inStock)} />
       )}
 
       {home.isError ? (

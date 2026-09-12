@@ -1,5 +1,5 @@
 import { AdminRole } from '@tgshop/db'
-import { listBroadcastsAction, segmentCountsAction } from '../../../lib/actions/broadcasts'
+import { listBroadcastsAction, segmentCountsAction, mirasimBroadcastTemplateAction } from '../../../lib/actions/broadcasts'
 import { BROADCAST_SEGMENTS } from '../../../lib/schemas'
 import { hasRole, requireSession } from '../../../lib/rbac'
 import { BroadcastsClient, type BroadcastRow, type BroadcastStats, type SegmentOption } from './broadcasts-client'
@@ -19,13 +19,16 @@ function toStats(value: unknown): BroadcastStats | null {
     const raw = record[key]
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : 0
   }
-  return { total: read('total'), sent: read('sent'), blocked: read('Заблокирован'), failed: read('failed') }
+  return { total: read('total'), sent: read('sent'), blocked: read('blocked'), failed: read('failed') }
 }
 
 export default async function BroadcastsPage() {
   const session = await requireSession()
 
-  const [posts, counts] = await Promise.all([listBroadcastsAction(), segmentCountsAction()])
+  const canCompose = hasRole(session.role, AdminRole.ADMIN)
+  const [posts, counts, mirasimTemplate] = await Promise.all([
+    listBroadcastsAction(), segmentCountsAction(), canCompose ? mirasimBroadcastTemplateAction() : null
+  ])
 
   const countBySegment = new Map(counts.map((entry) => [entry.segment, entry]))
   const segments: SegmentOption[] = BROADCAST_SEGMENTS.map((definition) => {
@@ -55,8 +58,9 @@ export default async function BroadcastsPage() {
       <h1 className="text-2xl font-semibold">{t('broadcasts.title')}</h1>
       <BroadcastsClient
         posts={rows}
+        mirasimTemplate={mirasimTemplate}
         segments={segments}
-        canCompose={hasRole(session.role, AdminRole.ADMIN)}
+        canCompose={canCompose}
         canDelete={hasRole(session.role, AdminRole.OWNER)}
       />
     </div>

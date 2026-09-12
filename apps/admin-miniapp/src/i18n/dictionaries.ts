@@ -10,6 +10,8 @@ export const DEFAULT_LOCALE: Locale = 'ru'
 export const dictionaries = {
   ru: {
     'common.loading': 'Загрузка…',
+    'broadcasts.mirasimTemplate': 'Подготовить анонс Mirasim',
+    'broadcasts.mirasimHint': 'Новинка, выбор магазина и доступ к Pro по приглашениям. Текст можно изменить перед отправкой.',
     'common.retry': 'Повторить',
     'common.error.generic': 'Что-то пошло не так',
     'common.error.auth': 'Откройте панель через команду /admin в Telegram-боте.',
@@ -305,6 +307,8 @@ export const dictionaries = {
   },
   en: {
     'common.loading': 'Loading…',
+    'broadcasts.mirasimTemplate': 'Prepare Mirasim announcement',
+    'broadcasts.mirasimHint': 'New in store, our featured pick and invite-only Pro access. Review and edit the message before sending.',
     'common.retry': 'Retry',
     'common.error.generic': 'Something went wrong',
     'common.error.auth': 'Open the panel using /admin in the Telegram bot.',

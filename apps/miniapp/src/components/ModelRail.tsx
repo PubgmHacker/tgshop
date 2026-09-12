@@ -17,7 +17,8 @@ export function ModelRail({
   const tiles = products.filter((product) => product.inStock).map((product) => ({
     slug: product.slug,
     title: product.title,
-    href: `/product/${encodeURIComponent(product.slug)}`
+    href: `/product/${encodeURIComponent(product.slug)}`,
+    isNew: product.promotion?.isNew
   }))
 
   if (!isLoading && tiles.length === 0) return null
@@ -47,6 +48,7 @@ export function ModelRail({
                 <span className="max-w-full truncate text-[13px] font-bold tracking-[-0.02em] text-ink">
                   {item.title}
                 </span>
+                {item.isNew ? <span className="text-[10px] font-semibold text-muted">{t('promotion.new')}</span> : null}
               </Link>
             ))}
           </div>

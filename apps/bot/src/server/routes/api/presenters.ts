@@ -1,5 +1,5 @@
 import type { Category, Order, Payment, Plan, Product, Subscription } from '@tgshop/db'
-import { decrypt, applyPercentDiscount } from '@tgshop/core'
+import { decrypt, applyPercentDiscount, productPromotion, type ProductPromotion } from '@tgshop/core'
 import { planAvailability } from '../../../domain/stock.js'
 import { tronDetailsFromPayment, type TronPaymentDetails } from '../../../domain/payments.js'
 
@@ -30,6 +30,7 @@ export interface PlanDto {
 }
 
 export interface ProductSummaryDto {
+  promotion: ProductPromotion | null
   id: string
   title: string
   slug: string
@@ -41,6 +42,7 @@ export interface ProductSummaryDto {
 }
 
 export interface ProductDetailDto {
+  promotion: ProductPromotion | null
   id: string
   title: string
   slug: string
@@ -139,6 +141,7 @@ export function toProductSummaryDto(
     imageUrl: product.imageUrl,
     categorySlug,
     minPriceCents: effectivePrices.length > 0 ? Math.min(...effectivePrices) : 0,
+    promotion: productPromotion(product.slug),
     maxDiscountPercent: plans.length > 0 ? Math.max(...plans.map((p) => p.discountPercent)) : 0,
     inStock: planDtos.some((plan) => plan.inStock)
   }
@@ -151,6 +154,7 @@ export function toProductDetailDto(
   availability: ReadonlyMap<string, number>
 ): ProductDetailDto {
   return {
+    promotion: productPromotion(product.slug),
     id: product.id,
     title: product.title,
     slug: product.slug,

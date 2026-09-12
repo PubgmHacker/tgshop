@@ -1,5 +1,5 @@
 import type { Bot } from 'grammy'
-import { applyPercentDiscount } from '@tgshop/core'
+import { applyPercentDiscount, FEATURED_PRODUCT_SLUG, productPromotion } from '@tgshop/core'
 import type { BotContext } from '../context.js'
 import { t } from '../../i18n/index.js'
 import { formatUsd } from '../../lib/format.js'
@@ -16,12 +16,12 @@ import { isPoolBacked } from '../../domain/stock.js'
 
 export async function showCategories(ctx: BotContext): Promise<void> {
   const locale = ctx.session.locale
-  const categories = await listActiveCategories()
+  const [categories, featured] = await Promise.all([listActiveCategories(), getProductBySlug(FEATURED_PRODUCT_SLUG)])
   if (categories.length === 0) {
     await ctx.reply(t(locale, 'catalog.empty'))
     return
   }
-  await ctx.reply(t(locale, 'catalog.title'), { reply_markup: categoriesKeyboard(categories) })
+  await ctx.reply(t(locale, 'catalog.title'), { reply_markup: categoriesKeyboard(categories, featured?.category.isActive && featured.plans.length ? featured : undefined, locale) })
 }
 
 export async function showProducts(ctx: BotContext, categorySlug: string): Promise<void> {
@@ -52,7 +52,9 @@ export async function showProductPlans(ctx: BotContext, productSlug: string): Pr
     await ctx.reply(t(locale, 'catalog.plans_empty'))
     return
   }
-  await ctx.reply(t(locale, 'catalog.plans_title', { product: product.title }), {
+  const promotion = productPromotion(product.slug)
+  const title = t(locale, 'catalog.plans_title', { product: product.title })
+  await ctx.reply(promotion ? `${title}\n\n${t(locale, 'catalog.featured_note')}\n${promotion.summary[locale]}\n${promotion.accessNote[locale]}` : title, {
     reply_markup: plansKeyboard(locale, productSlug, product.plans)
   })
 }

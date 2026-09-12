@@ -1,11 +1,13 @@
 import { InlineKeyboard } from 'grammy'
 import type { Category, Product, Plan } from '@tgshop/db'
+import { prioritizeProducts, productPromotion } from '@tgshop/core'
 import { formatUsd } from '../../lib/format.js'
 import { t, type Locale } from '../../i18n/index.js'
 import { getPaymentAvailability, type PaymentAvailability } from '../../domain/payment-availability.js'
 
-export function categoriesKeyboard(categories: Category[]): InlineKeyboard {
+export function categoriesKeyboard(categories: Category[], featured?: { slug: string; title: string }, locale: Locale = 'ru'): InlineKeyboard {
   const kb = new InlineKeyboard()
+  if (featured) kb.text(t(locale, 'catalog.featured_button', { title: featured.title }), `prod:${featured.slug}`).row()
   for (const category of categories) {
     kb.text(`${category.emoji ?? ''} ${category.title}`.trim(), `cat:${category.slug}`).row()
   }
@@ -14,8 +16,8 @@ export function categoriesKeyboard(categories: Category[]): InlineKeyboard {
 
 export function productsKeyboard(locale: Locale, categorySlug: string, products: Product[]): InlineKeyboard {
   const kb = new InlineKeyboard()
-  for (const product of products) {
-    kb.text(product.title, `prod:${product.slug}`).row()
+  for (const product of prioritizeProducts(products)) {
+    kb.text(productPromotion(product.slug) ? t(locale, 'catalog.featured_button', { title: product.title }) : product.title, `prod:${product.slug}`).row()
   }
   kb.text(t(locale, 'common.back'), 'cat:__back')
   return kb

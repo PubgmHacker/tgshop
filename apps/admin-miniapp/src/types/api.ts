@@ -351,6 +351,7 @@ export type AdminBroadcast = z.infer<typeof AdminBroadcastSchema>
 
 export const BroadcastListResponseSchema = z.object({
   posts: z.array(AdminBroadcastSchema),
+  templates: z.array(z.object({ id: z.string(), title: z.string(), text: z.string() })).default([]),
   segments: z.array(
     z.object({
       value: BroadcastSegmentSchema,
