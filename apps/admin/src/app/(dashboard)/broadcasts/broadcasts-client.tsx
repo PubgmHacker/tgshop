@@ -71,11 +71,13 @@ function statusVariant(status: PostStatus): BadgeTone {
 
 export function BroadcastsClient({
   posts,
+  mirasimTemplate,
   segments,
   canCompose,
   canDelete
 }: {
   posts: BroadcastRow[]
+  mirasimTemplate: { text: string } | null
   segments: SegmentOption[]
   canCompose: boolean
   canDelete: boolean
@@ -209,6 +211,14 @@ export function BroadcastsClient({
             <CardTitle>{editingId ? 'Изменить рассылку' : t('broadcasts.compose')}</CardTitle>
           </CardHeader>
           <CardContent>
+            {mirasimTemplate && !editingId && !text.trim() ? (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+                <p className="text-sm">Mirasim Pro: новинка, выбор магазина и доступ по приглашениям.</p>
+                <Button type="button" variant="outline" disabled={pending} onClick={() => { setText(mirasimTemplate.text); setSegment('all') }}>
+                  Подготовить анонс Mirasim
+                </Button>
+              </div>
+            ) : null}
             <form onSubmit={onSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
                 <Label htmlFor="text">Текст сообщения</Label>

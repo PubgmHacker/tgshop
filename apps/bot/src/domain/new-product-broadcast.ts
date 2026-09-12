@@ -1,4 +1,5 @@
 import { PostSource, type BroadcastPost } from '@tgshop/db'
+import { FEATURED_PRODUCT_SLUG, mirasimAnnouncement, mirasimProductLink } from '@tgshop/core'
 import { createPost } from './content.js'
 import { env } from '../config/env.js'
 
@@ -19,7 +20,9 @@ interface NewProductDetails {
  */
 export async function createNewProductBroadcastDraft(product: NewProductDetails): Promise<BroadcastPost> {
   const description = product.description.trim()
-  const text = [
+  const text = product.slug === FEATURED_PRODUCT_SLUG
+    ? mirasimAnnouncement(mirasimProductLink(env.MINIAPP_URL, env.BOT_USERNAME))
+    : [
     '🆕 Новый товар в магазине',
     '',
     product.title.trim(),

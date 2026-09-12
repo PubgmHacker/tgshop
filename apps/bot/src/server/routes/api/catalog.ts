@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '@tgshop/db'
+import { compareProductPriority, prioritizeProducts } from '@tgshop/core'
 import { getFullCatalog, getCategoryBySlug, getProductBySlug, listActiveCategories } from '../../../domain/catalog.js'
 import { countAvailableForPlans } from '../../../domain/stock.js'
 import { notFound, sendError } from '../../../lib/httpErrors.js'
@@ -80,11 +81,10 @@ export function registerCatalogRoutes(app: FastifyInstance): void {
         }
       }
 
-      // In-stock first, then cheapest — a stable, useful default until real
-      // sales-volume ranking is wired in from /internal/top-products.
+      // Merchandising priority first, then availability and price.
       bestsellers.sort((a, b) => {
-        if (a.slug === 'mirasim' && b.slug !== 'mirasim') return -1
-        if (b.slug === 'mirasim' && a.slug !== 'mirasim') return 1
+        const priority = compareProductPriority(a, b)
+        if (priority) return priority
         if (a.inStock !== b.inStock) return a.inStock ? -1 : 1
         return a.minPriceCents - b.minPriceCents
       })
@@ -132,7 +132,7 @@ export function registerCatalogRoutes(app: FastifyInstance): void {
 
       return {
         category: toCategoryDto(category),
-        products: products.map((product) => toProductSummaryDto(product, category.slug, product.plans, availability))
+        products: prioritizeProducts(products).map((product) => toProductSummaryDto(product, category.slug, product.plans, availability))
       }
     } catch (err) {
       await sendError(reply, err, requestLocale(req))

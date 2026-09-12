@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { prisma, DeliveryType, Prisma, StockStatus } from '@tgshop/db'
-import { getSetting, isPoolBacked } from '@tgshop/core'
+import { getSetting, isPoolBacked, prioritizeCatalog } from '@tgshop/core'
 import { badRequest, conflict, notFound, sendError } from '../../../../lib/httpErrors.js'
 import { requestLocale } from '../context.js'
 import { prismaErrorCode, writeAdminAudit } from './shared.js'
@@ -171,7 +171,7 @@ export function registerAdminCatalogRoutes(app: FastifyInstance): void {
       }
 
       return {
-        categories: categories.map((category) => ({
+        categories: prioritizeCatalog(categories).map((category) => ({
           id: category.id,
           title: category.title,
           slug: category.slug,

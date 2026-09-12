@@ -10,6 +10,7 @@ import { useCatalogData } from '@/hooks/useApi'
 import { Icon } from '@/components/Icons'
 import { ServiceTile } from '@/components/ServiceTile'
 import { ErrorState } from '@/components/States'
+import type { ProductPromotion } from '@/types/api'
 
 export default function CatalogPage(): JSX.Element {
   const { t } = useI18n()
@@ -29,6 +30,7 @@ export default function CatalogPage(): JSX.Element {
       slug: string
       title: string
       meta: string
+      promotion?: ProductPromotion | null
     }[] = []
 
     for (const category of data.categories) {
@@ -40,6 +42,7 @@ export default function CatalogPage(): JSX.Element {
           href: `/product/${product.slug}`,
           slug: product.slug,
           title: product.title,
+          promotion: product.promotion,
           meta: product.plans.some((plan) => plan.inStock)
             ? t('product.inStock')
             : t('catalog.badge.out')
@@ -47,7 +50,7 @@ export default function CatalogPage(): JSX.Element {
       }
     }
 
-    return rows
+    return rows.sort((a, b) => Number(Boolean(b.promotion?.featured)) - Number(Boolean(a.promotion?.featured)))
   }, [data, query, initialCat, t])
 
   return (
@@ -112,6 +115,7 @@ export default function CatalogPage(): JSX.Element {
               slug={tile.slug}
               title={tile.title}
               meta={tile.meta}
+              promotion={tile.promotion}
             />
           ))}
         </div>

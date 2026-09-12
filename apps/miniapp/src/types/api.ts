@@ -51,7 +51,15 @@ export const PlanSchema = z.object({
 })
 export type Plan = z.infer<typeof PlanSchema>
 
+export const ProductPromotionSchema = z.object({
+  featured: z.boolean(), isNew: z.boolean(), limited: z.boolean(),
+  summary: z.object({ ru: z.string(), en: z.string() }),
+  accessNote: z.object({ ru: z.string(), en: z.string() })
+})
+export type ProductPromotion = z.infer<typeof ProductPromotionSchema>
+
 export const ProductSummarySchema = z.object({
+  promotion: ProductPromotionSchema.nullish(),
   id: z.string(),
   title: z.string(),
   slug: z.string(),
@@ -64,6 +72,7 @@ export const ProductSummarySchema = z.object({
 export type ProductSummary = z.infer<typeof ProductSummarySchema>
 
 export const ProductDetailSchema = z.object({
+  promotion: ProductPromotionSchema.nullish(),
   id: z.string(),
   title: z.string(),
   slug: z.string(),

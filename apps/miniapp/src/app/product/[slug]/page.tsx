@@ -9,6 +9,7 @@ import { useProductData } from '@/hooks/useApi'
 import { Icon } from '@/components/Icons'
 import { ErrorState } from '@/components/States'
 import { BrandMark } from '@/components/BrandMark'
+import { ProductBadges } from '@/components/ProductBadges'
 import { discountedCents, formatCents } from '@/lib/format'
 import { triggerHaptic } from '@/lib/TelegramProvider'
 import type { Plan } from '@/types/api'
@@ -18,7 +19,7 @@ export default function ProductPage(): JSX.Element {
   const params = useParams<{ slug: string }>()
   const slug = params.slug
   const router = useRouter()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { data, isLoading, isError, refetch } = useProductData(slug)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
@@ -70,6 +71,14 @@ export default function ProductPage(): JSX.Element {
           <h1 className="text-[24px] font-bold leading-tight tracking-[-0.03em] text-ink">{data.title}</h1>
         </span>
       </header>
+
+      {data.promotion ? (
+        <section className="flex flex-col gap-3">
+          <ProductBadges promotion={data.promotion} />
+          <p className="text-[15px] font-medium leading-relaxed text-ink">{data.promotion.summary[locale]}</p>
+          <p className="text-sm leading-relaxed text-muted">{data.promotion.accessNote[locale]}</p>
+        </section>
+      ) : null}
 
       {data.deliveryType === 'MANUAL_FALLBACK' ? (
         <p className="text-sm text-muted">{t('product.manualDelivery')}</p>

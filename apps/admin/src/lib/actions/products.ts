@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma, AdminRole, Prisma } from '@tgshop/db'
+import { prioritizeProducts } from '@tgshop/core'
 import { hasRole, requireRole } from '../rbac'
 import { writeAuditLog } from '../audit'
 import { productUpsertSchema, type ProductUpsertInput } from '../schemas'
@@ -13,7 +14,7 @@ export async function listProductsAction(categoryId?: string) {
     orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
     include: { category: true, _count: { select: { plans: true } } }
   })
-  return products.map((product) => ({
+  return prioritizeProducts(products).map((product) => ({
     ...product,
     externalConfig: hasRole(session.role, AdminRole.ADMIN) ? product.externalConfig : null
   }))

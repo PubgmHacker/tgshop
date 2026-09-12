@@ -82,8 +82,8 @@ export default function BroadcastsPage(): JSX.Element {
   const [notice, setNotice] = useState<string | null>(null)
 
   const broadcastsQuery = useQuery({
-    queryKey: ['admin', 'broadcasts'],
-    queryFn: () => api.get('/api/admin/broadcasts', BroadcastListResponseSchema),
+    queryKey: ['admin', 'broadcasts', locale],
+    queryFn: () => api.get(`/api/admin/broadcasts?locale=${locale}`, BroadcastListResponseSchema),
     enabled: isReady,
     refetchInterval: 15_000
   })
@@ -242,6 +242,17 @@ export default function BroadcastsPage(): JSX.Element {
       </div>
 
       {notice ? <p className="mx-4 rounded-tile bg-success/10 px-3.5 py-3 text-sm text-success">{notice}</p> : null}
+
+      {broadcastsQuery.data?.templates?.map(template => (
+        <section key={template.id} className="glass mx-4 flex flex-col gap-3 rounded-card p-4">
+          <h2 className="text-base font-bold text-ink">{template.title}</h2>
+          <p className="text-sm text-muted">{t('broadcasts.mirasimHint')}</p>
+          <button type="button" disabled={busy} className="btn-primary min-h-11 rounded-full px-4 py-3 text-sm font-semibold disabled:opacity-50"
+            onClick={() => { setNotice(null); setFormError(null); setDraft({ ...emptyDraft, text: template.text }) }}>
+            {t('broadcasts.mirasimTemplate')}
+          </button>
+        </section>
+      ))}
 
       <QueryGate
         data={broadcastsQuery.data}

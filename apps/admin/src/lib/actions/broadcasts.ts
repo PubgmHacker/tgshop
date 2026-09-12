@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma, AdminRole, PostSource, PostStatus, type Prisma } from '@tgshop/db'
-import { countSegment } from '@tgshop/core'
+import { countSegment, FEATURED_PRODUCT_SLUG, mirasimAnnouncement, mirasimProductLink } from '@tgshop/core'
 import { requireRole } from '../rbac'
 import { writeAuditLog } from '../audit'
 import { getBroadcastQueue, broadcastJobId, BROADCAST_JOB_NAME } from '../queue'
@@ -20,6 +20,15 @@ export interface SegmentCount {
   segment: BroadcastSegment
   count: number
   workerSupported: boolean
+}
+
+export async function mirasimBroadcastTemplateAction(): Promise<{ text: string } | null> {
+  await requireRole(AdminRole.ADMIN)
+  const product = await prisma.product.findFirst({ where: { slug: FEATURED_PRODUCT_SLUG, isActive: true, category: { isActive: true } }, select: { id: true } })
+  const miniappUrl = process.env.MINIAPP_URL ?? ''
+  const username = process.env.BOT_USERNAME?.trim().replace(/^@/, '') ?? ''
+  if (!product || (!miniappUrl && !/^[a-zA-Z0-9_]{5,32}$/.test(username))) return null
+  return { text: mirasimAnnouncement(mirasimProductLink(miniappUrl, process.env.BOT_USERNAME)) }
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { getFullCatalog } from '../../../domain/catalog.js'
 import { countAvailableForPlans } from '../../../domain/stock.js'
-import { isPoolBacked, applyPercentDiscount } from '@tgshop/core'
+import { isPoolBacked, applyPercentDiscount, compareProductPriority, productPromotion } from '@tgshop/core'
 import { sendError } from '../../../lib/httpErrors.js'
 import { requestLocale } from './context.js'
 
@@ -59,17 +59,14 @@ async function handlePublicCatalog(req: FastifyRequest, reply: FastifyReply): Pr
             description: product.description,
             categoryTitle: category.title,
             imageUrl: product.imageUrl,
+            promotion: productPromotion(product.slug),
             plans: publicPlans
           }
         ]
       })
     )
 
-    products.sort((a, b) => {
-      if (a.slug === 'mirasim' && b.slug !== 'mirasim') return -1
-      if (b.slug === 'mirasim' && a.slug !== 'mirasim') return 1
-      return 0
-    })
+    products.sort(compareProductPriority)
 
     reply.header('cache-control', 'public, max-age=60, stale-while-revalidate=300')
     return { products }

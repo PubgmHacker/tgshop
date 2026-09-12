@@ -47,6 +47,7 @@ export default function CategoryPage(): JSX.Element {
               href={`/product/${product.slug}`}
               slug={product.slug}
               title={product.title}
+              promotion={product.promotion}
               meta={product.inStock ? `${t('catalog.from')} ${formatCents(product.minPriceCents)}` : t('catalog.badge.out')}
             />
           ))}

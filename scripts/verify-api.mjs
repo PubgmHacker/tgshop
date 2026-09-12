@@ -170,6 +170,27 @@ for (const [method, url, headers, payload, expected] of checks) {
   )
 }
 
+// Validate the seeded featured offer across every public/customer/admin projection.
+const merchandisingChecks = [
+  ['/api/home', outsiderJwt, body => body.bestsellers],
+  ['/api/catalog', outsiderJwt, body => body.categories.flatMap(category => category.products)],
+  ['/api/categories/code', outsiderJwt, body => body.products],
+  ['/api/public/catalog', {}, body => body.products],
+  ['/api/admin/catalog', adminJwt, body => body.categories.flatMap(category => category.products)]
+]
+for (const [url, headers, productsFrom] of merchandisingChecks) {
+  const response = await app.inject({ method: 'GET', url, headers })
+  const products = response.statusCode === 200 ? productsFrom(response.json()) : []
+  const ok = products[0]?.slug === 'mirasim'
+  if (!ok) failures++
+  console.log(`${ok ? 'PASS' : 'FAIL'} Mirasim first in ${url}`)
+}
+const announcementResponse = await app.inject({ method: 'GET', url: '/api/admin/broadcasts', headers: adminJwt })
+const template = announcementResponse.json().templates?.find(item => item.id === 'mirasim-launch')
+const templateOk = announcementResponse.statusCode === 200 && template?.text.includes('product_mirasim') && template?.text.includes('по приглашениям')
+if (!templateOk) failures++
+console.log(`${templateOk ? 'PASS' : 'FAIL'} reviewable Mirasim announcement template`)
+
 // The anomaly check above writes one AuditLog row; remove it so repeated runs
 // do not accumulate smoke-test entries in the dev database.
 const cleaned = await prisma.auditLog.deleteMany({

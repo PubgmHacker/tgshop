@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma, PostSource, PostStatus, Prisma, type BroadcastPost } from '@tgshop/db'
-import { countSegment, parseSegment, SEGMENTS } from '@tgshop/core'
+import { countSegment, parseSegment, SEGMENTS, FEATURED_PRODUCT_SLUG, mirasimAnnouncement, mirasimProductLink } from '@tgshop/core'
+import { env } from '../../../../config/env.js'
 import {
   createPost,
   isKnownSegment,
@@ -41,7 +42,8 @@ const writeBodySchema = z.object({
 })
 
 const listQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(50)
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  locale: z.enum(['ru', 'en']).default('ru')
 })
 
 function toPostDto(post: BroadcastPost): Record<string, unknown> {
@@ -92,19 +94,25 @@ export function registerAdminBroadcastRoutes(app: FastifyInstance): void {
   app.get('/api/admin/broadcasts', async (req, reply) => {
     try {
       const query = listQuerySchema.parse(req.query)
-      const [posts, segments] = await Promise.all([
+      const [posts, segments, featured] = await Promise.all([
         prisma.broadcastPost.findMany({ orderBy: { createdAt: 'desc' }, take: query.limit }),
         Promise.all(
           SEGMENTS.map(async (segment) => ({
             value: segment,
             count: await countSegment(prisma, segment)
           }))
-        )
+        ),
+        prisma.product.findFirst({ where: { slug: FEATURED_PRODUCT_SLUG, isActive: true, category: { isActive: true } }, select: { id: true } })
       ])
 
       return {
         posts: posts.map(toPostDto),
-        segments
+        segments,
+        templates: featured ? [{
+          id: 'mirasim-launch',
+          title: 'Mirasim Pro',
+          text: mirasimAnnouncement(mirasimProductLink(env.MINIAPP_URL, env.BOT_USERNAME), query.locale)
+        }] : []
       }
     } catch (err) {
       await sendError(reply, err, requestLocale(req))

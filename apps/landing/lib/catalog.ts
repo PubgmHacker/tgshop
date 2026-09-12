@@ -14,6 +14,11 @@ const planSchema = z.object({
 })
 
 const productSchema = z.object({
+  promotion: z.object({
+    featured: z.boolean(), isNew: z.boolean(), limited: z.boolean(),
+    summary: z.object({ ru: z.string(), en: z.string() }),
+    accessNote: z.object({ ru: z.string(), en: z.string() })
+  }).nullish(),
   id: z.string(),
   slug: z.string().optional(),
   title: z.string(),

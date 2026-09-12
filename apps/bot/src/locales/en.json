@@ -26,6 +26,8 @@
     "promo_applied": "🏷 Promo code \"{code}\" is ready to use at checkout."
   },
   "catalog": {
+    "featured_button": "{title} · New · Invite-only Pro",
+    "featured_note": "New · Our pick · Limited Pro access",
     "title": "🛍 Choose a category:",
     "empty": "Catalog is currently empty.",
     "products_title": "Products in \"{category}\":",

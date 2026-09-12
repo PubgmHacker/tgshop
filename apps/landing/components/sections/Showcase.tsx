@@ -72,9 +72,17 @@ export function Showcase({
                   </div>
 
                   <h3 className="mt-4 text-lg font-semibold text-white">{product.title}</h3>
+                  {product.promotion ? (
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-white">
+                      {product.promotion.isNew ? <span className="rounded-full bg-white/10 px-3 py-1">{locale === 'ru' ? 'Новинка' : 'New'}</span> : null}
+                      {product.promotion.featured ? <span className="rounded-full bg-white px-3 py-1 text-bg">{locale === 'ru' ? 'Выбор магазина' : 'Our pick'}</span> : null}
+                      {product.promotion.limited ? <span className="rounded-full bg-white/10 px-3 py-1">{locale === 'ru' ? 'Лимитированный Pro' : 'Limited Pro access'}</span> : null}
+                    </div>
+                  ) : null}
                   <p className="mt-2 flex-1 text-sm leading-relaxed text-muted">
-                    {product.description}
+                    {product.promotion ? product.promotion.summary[locale] : product.description}
                   </p>
+                  {product.promotion ? <p className="mt-3 text-sm leading-relaxed text-muted">{product.promotion.accessNote[locale]}</p> : null}
 
                   <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-line pt-5">
                     <div>

@@ -9,6 +9,11 @@ export const DEFAULT_LOCALE: Locale = 'ru'
 export const dictionaries = {
   ru: {
     'common.loading': 'Загрузка…',
+    'promotion.new': 'Новинка',
+    'promotion.featured': 'Выбор магазина',
+    'promotion.limited': 'Лимитированный Pro',
+    'promotion.inviteAccess': 'Облачный Pro — по приглашениям.',
+    'promotion.viewPlans': 'Тарифы от {price}',
     'common.retry': 'Повторить',
     'common.openBot': 'Открыть бота',
     'common.error.generic': 'Что-то пошло не так',
@@ -214,6 +219,11 @@ export const dictionaries = {
   },
   en: {
     'common.loading': 'Loading…',
+    'promotion.new': 'New',
+    'promotion.featured': 'Our pick',
+    'promotion.limited': 'Limited Pro access',
+    'promotion.inviteAccess': 'Cloud Pro is invite-only.',
+    'promotion.viewPlans': 'Plans from {price}',
     'common.retry': 'Retry',
     'common.openBot': 'Open bot',
     'common.error.generic': 'Something went wrong',

@@ -27,6 +27,13 @@ export interface LandingPlan {
 }
 
 export interface LandingProduct {
+  promotion?: {
+    featured: boolean
+    isNew: boolean
+    limited: boolean
+    summary: { ru: string; en: string }
+    accessNote: { ru: string; en: string }
+  } | null
   id: string
   slug?: string
   title: string

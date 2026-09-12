@@ -1,4 +1,5 @@
 import { prisma } from '@tgshop/db'
+import { prioritizeCatalog, prioritizeProducts } from '@tgshop/core'
 
 /** Read-only catalog queries used by both the bot menus and the Mini App API. */
 
@@ -14,10 +15,11 @@ export async function getCategoryBySlug(slug: string) {
 }
 
 export async function listActiveProducts(categoryId: string) {
-  return prisma.product.findMany({
+  const products = await prisma.product.findMany({
     where: { categoryId, isActive: true },
     orderBy: { sortOrder: 'asc' }
   })
+  return prioritizeProducts(products)
 }
 
 export async function getProductBySlug(slug: string) {
@@ -50,5 +52,5 @@ export async function getFullCatalog() {
       }
     }
   })
-  return categories
+  return prioritizeCatalog(categories)
 }
