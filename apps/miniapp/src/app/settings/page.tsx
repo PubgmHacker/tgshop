@@ -26,7 +26,7 @@ function SettingRow({
     <Wrapper
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-card border border-line bg-card p-4 text-left ${
+      className={`flex w-full flex-wrap items-center gap-3 rounded-card border border-line bg-card p-4 text-left ${
         onClick ? 'transition-colors active:bg-card-strong' : ''
       }`}
     >
@@ -37,7 +37,7 @@ function SettingRow({
         <span className="text-sm font-semibold text-ink">{title}</span>
         <span className="text-xs text-faint">{subtitle}</span>
       </span>
-      <span className="shrink-0">{trailing}</span>
+      <span className="w-full shrink-0">{trailing}</span>
     </Wrapper>
   )
 }
@@ -57,11 +57,12 @@ function Segmented<T extends string>({
         <button
           key={option.value}
           type="button"
+          aria-pressed={value === option.value}
           onClick={() => {
             triggerHaptic('light')
             onChange(option.value)
           }}
-          className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${
+          className={`min-h-11 flex-1 rounded-full px-3 py-2 text-[13px] font-semibold transition-colors ${
             value === option.value ? 'bg-cta text-cta-ink' : 'text-faint'
           }`}
         >

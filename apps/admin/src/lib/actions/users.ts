@@ -15,7 +15,7 @@ import {
 } from '../schemas'
 
 export async function searchUsersAction(input: UserSearchInput) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   const data = userSearchSchema.parse(input)
 
   const query = data.query.trim()
@@ -48,13 +48,13 @@ function isNumeric(value: string): boolean {
 }
 
 export async function getUserDetailAction(userId: string) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   const [user, orders, balanceCents] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.order.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: { plan: { include: { product: true } } },
+      include: { plan: { include: { product: { select: { id: true, title: true, deliveryType: true } } } } },
       take: 100
     }),
     prisma.balanceTransaction.aggregate({ where: { userId }, _sum: { amountCents: true } })
@@ -69,7 +69,7 @@ export async function getUserDetailAction(userId: string) {
 
 /** Append-only ledger history for one user, newest first. Read-only, so SUPPORT may see it. */
 export async function listUserLedgerAction(userId: string, take = 200) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.balanceTransaction.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
@@ -79,7 +79,7 @@ export async function listUserLedgerAction(userId: string, take = 200) {
 
 /** Adjusts a user's balance via the append-only ledger — never a direct write to a balance column. */
 export async function adjustBalanceAction(input: BalanceAdjustInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = balanceAdjustSchema.parse(input)
 
   const idempotencyKey = `admin-adjust:${session.adminId}:${data.userId}:${Date.now()}:${data.amountCents}`
@@ -116,7 +116,7 @@ export async function adjustBalanceAction(input: BalanceAdjustInput) {
 }
 
 export async function setUserBanAction(input: UserBanInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = userBanSchema.parse(input)
 
   const user = await prisma.user.update({ where: { id: data.userId }, data: { isBlocked: data.isBlocked } })

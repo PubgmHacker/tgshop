@@ -20,11 +20,11 @@ export default function HomePage(): JSX.Element {
   const categories = home.data?.categories ?? []
   const counts = useMemo(() => {
     const next: Record<string, number> = {}
-    for (const product of home.data?.bestsellers ?? []) {
-      next[product.categorySlug] = (next[product.categorySlug] ?? 0) + 1
+    for (const category of home.data?.categories ?? []) {
+      if (category.productCount !== undefined) next[category.slug] = category.productCount
     }
     return next
-  }, [home.data?.bestsellers])
+  }, [home.data?.categories])
 
   return (
     <div className="page-enter flex min-w-0 flex-1 flex-col gap-5 overflow-x-hidden px-4 pt-2">
@@ -40,7 +40,7 @@ export default function HomePage(): JSX.Element {
 
       {home.isError ? (
         <ErrorState
-          title={t('common.error.generic')}
+          title={t(errorMessageKey(home.error))}
           onRetry={() => void home.refetch()}
           retryLabel={t('common.retry')}
         />

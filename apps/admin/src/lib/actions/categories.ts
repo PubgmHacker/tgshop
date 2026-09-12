@@ -7,7 +7,7 @@ import { writeAuditLog } from '../audit'
 import { categoryUpsertSchema, type CategoryUpsertInput } from '../schemas'
 
 export async function listCategoriesAction() {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.category.findMany({
     orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
     include: { _count: { select: { products: true } } }
@@ -15,7 +15,7 @@ export async function listCategoriesAction() {
 }
 
 export async function upsertCategoryAction(input: CategoryUpsertInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = categoryUpsertSchema.parse(input)
 
   const fields = {
@@ -43,7 +43,7 @@ export async function upsertCategoryAction(input: CategoryUpsertInput) {
 }
 
 export async function deleteCategoryAction(id: string) {
-  const session = requireRole(AdminRole.OWNER)
+  const session = await requireRole(AdminRole.OWNER)
   await prisma.category.delete({ where: { id } })
   await writeAuditLog({ actorId: session.adminId, action: 'category.delete', entity: 'Category', entityId: id })
   revalidatePath('/categories')

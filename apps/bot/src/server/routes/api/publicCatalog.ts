@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { getFullCatalog } from '../../../domain/catalog.js'
 import { countAvailableForPlans } from '../../../domain/stock.js'
-import { isPoolBacked } from '@tgshop/core'
+import { isPoolBacked, applyPercentDiscount } from '@tgshop/core'
 import { sendError } from '../../../lib/httpErrors.js'
 import { requestLocale } from './context.js'
 
@@ -24,9 +24,7 @@ interface PublicPlan {
 }
 
 function effectivePrice(plan: { priceCents: number; discountPercent: number }): number {
-  return plan.discountPercent > 0
-    ? Math.round((plan.priceCents * (100 - plan.discountPercent)) / 100)
-    : plan.priceCents
+  return applyPercentDiscount(plan.priceCents, plan.discountPercent)
 }
 
 async function handlePublicCatalog(req: FastifyRequest, reply: FastifyReply): Promise<unknown> {
@@ -66,6 +64,12 @@ async function handlePublicCatalog(req: FastifyRequest, reply: FastifyReply): Pr
         ]
       })
     )
+
+    products.sort((a, b) => {
+      if (a.slug === 'mirasim' && b.slug !== 'mirasim') return -1
+      if (b.slug === 'mirasim' && a.slug !== 'mirasim') return 1
+      return 0
+    })
 
     reply.header('cache-control', 'public, max-age=60, stale-while-revalidate=300')
     return { products }

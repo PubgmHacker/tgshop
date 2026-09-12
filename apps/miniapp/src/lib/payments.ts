@@ -15,6 +15,10 @@ const INVOICE_LINK = /^https:\/\/t\.me\/(\$|invoice\/)/
 
 export function openPaymentUrl(url: string): void {
   try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return
+  } catch { return }
+  try {
     if (INVOICE_LINK.test(url) && invoice.open.isAvailable()) {
       void invoice.open(url, 'url')
       return

@@ -37,15 +37,12 @@ export async function registerSecurityPlugins(app: FastifyInstance): Promise<voi
 
   // Preserve the raw request body for CryptoBot webhooks so HMAC signature
   // verification can run over the exact bytes Telegram/CryptoBot sent.
+  const parseJson = app.getDefaultJsonParser('error', 'error')
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
-    try {
-      const raw = body.toString('utf8')
-      req.rawBody = raw
-      const parsed = raw.length > 0 ? JSON.parse(raw) : {}
-      done(null, parsed)
-    } catch (err) {
-      done(err as Error, undefined)
-    }
+    const raw = body.toString('utf8')
+    req.rawBody = raw
+    if (raw.length === 0) return done(null, {})
+    parseJson(req, raw, done)
   })
 
   app.addHook('onRequest', (req, _reply, done) => {

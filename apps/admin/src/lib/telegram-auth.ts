@@ -28,7 +28,7 @@ export function verifyTelegramLogin(payload: TelegramLoginPayload): boolean {
   if (!hash) return false
 
   const now = Math.floor(Date.now() / 1000)
-  if (now - payload.auth_date > MAX_AUTH_AGE_SECONDS) {
+  if (!Number.isSafeInteger(payload.auth_date) || now - payload.auth_date > MAX_AUTH_AGE_SECONDS || payload.auth_date > now + 60) {
     return false
   }
 

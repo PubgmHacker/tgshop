@@ -1,5 +1,5 @@
 import type { Category, Order, Payment, Plan, Product, Subscription } from '@tgshop/db'
-import { decrypt } from '@tgshop/core'
+import { decrypt, applyPercentDiscount } from '@tgshop/core'
 import { planAvailability } from '../../../domain/stock.js'
 import { tronDetailsFromPayment, type TronPaymentDetails } from '../../../domain/payments.js'
 
@@ -127,8 +127,9 @@ export function toProductSummaryDto(
   const planDtos = plans.map((plan) =>
     toPlanDto(plan, product.deliveryType, availability.get(plan.id) ?? 0, product.externalConfig)
   )
-  const effectivePrices = plans.map((plan) =>
-    plan.discountPercent > 0 ? Math.round((plan.priceCents * (100 - plan.discountPercent)) / 100) : plan.priceCents
+  const purchasable = planDtos.filter((plan) => plan.inStock)
+  const effectivePrices = (purchasable.length > 0 ? purchasable : planDtos).map((plan) =>
+    applyPercentDiscount(plan.priceCents, plan.discountPercent)
   )
 
   return {

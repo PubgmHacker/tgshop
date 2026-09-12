@@ -18,7 +18,7 @@ import { Select, Textarea } from '../../../components/ui/form'
 import { Badge } from '../../../components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table'
-import { formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '../../../lib/format'
+import { formatEnum, formatDateTime, fromDateTimeLocalValue, toDateTimeLocalValue } from '../../../lib/format'
 import { t } from '../../../lib/i18n'
 
 export interface BroadcastStats {
@@ -129,20 +129,20 @@ export function BroadcastsClient({
         segment: segment === '' ? null : segment,
         scheduledAt: fromDateTimeLocalValue(scheduledAt)
       })
+      resetForm()
       if (enqueue) {
         await sendBroadcastAction({ id: saved.id })
         setMessage(
           saved.scheduledAt
-            ? `Queued — delivery starts ${formatDateTime(saved.scheduledAt)} UTC`
-            : `Queued for delivery to ~${reach} user(s)`
+            ? `В очереди. Отправка: ${formatDateTime(saved.scheduledAt)} UTC`
+            : `В очереди. Получателей: около ${reach}`
         )
       } else {
-        setMessage(scheduledAt ? 'Saved as scheduled (not queued yet)' : 'Saved as draft')
+        setMessage(scheduledAt ? 'Расписание сохранено. Рассылка ещё не поставлена в очередь.' : 'Черновик сохранён')
       }
-      resetForm()
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -154,40 +154,40 @@ export function BroadcastsClient({
   }
 
   async function onSendExisting(post: BroadcastRow) {
-    const when = post.scheduledAt ? `at ${formatDateTime(post.scheduledAt)} UTC` : 'right now'
-    if (!window.confirm(`Queue this broadcast for delivery ${when}?`)) return
+    const when = post.scheduledAt ? `${formatDateTime(post.scheduledAt)} UTC` : 'сейчас'
+    if (!window.confirm(`Поставить рассылку в очередь на отправку ${when}?`)) return
     setPending(true)
     setError(null)
     setMessage(null)
     try {
       await sendBroadcastAction({ id: post.id })
-      setMessage('Broadcast queued')
+      setMessage('Рассылка поставлена в очередь')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
   }
 
   async function onCancel(post: BroadcastRow) {
-    if (!window.confirm('Pull this broadcast back out of the queue? Nothing has been sent yet.')) return
+    if (!window.confirm('Снять рассылку с очереди? Отправка ещё не началась.')) return
     setPending(true)
     setError(null)
     setMessage(null)
     try {
       await cancelBroadcastAction({ id: post.id })
-      setMessage('Broadcast cancelled — edit and re-queue it when ready')
+      setMessage('Рассылка снята с очереди. Её можно изменить и отправить снова.')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
   }
 
   async function onDelete(id: string) {
-    if (!window.confirm('Delete this broadcast?')) return
+    if (!window.confirm('Удалить рассылку?')) return
     setPending(true)
     setError(null)
     try {
@@ -195,7 +195,7 @@ export function BroadcastsClient({
       if (editingId === id) resetForm()
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -206,12 +206,12 @@ export function BroadcastsClient({
       {canCompose && (
         <Card>
           <CardHeader>
-            <CardTitle>{editingId ? 'Edit broadcast' : t('broadcasts.compose')}</CardTitle>
+            <CardTitle>{editingId ? 'Изменить рассылку' : t('broadcasts.compose')}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <Label htmlFor="text">Message</Label>
+                <Label htmlFor="text">Текст сообщения</Label>
                 <Textarea
                   id="text"
                   value={text}
@@ -219,14 +219,14 @@ export function BroadcastsClient({
                   maxLength={4096}
                   required
                   className="min-h-[140px]"
-                  placeholder="Text sent to every recipient."
+                  placeholder="Сообщение для каждого получателя."
                 />
                 <span className="text-xs text-muted-foreground">{text.length} / 4096</span>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="mediaUrl">Media URL (optional)</Label>
+                  <Label htmlFor="mediaUrl">Ссылка на медиа (необязательно)</Label>
                   <Input
                     id="mediaUrl"
                     type="url"
@@ -234,24 +234,24 @@ export function BroadcastsClient({
                     onChange={(e) => setMediaUrl(e.target.value)}
                     placeholder="https://…"
                   />
-                  <span className="text-xs text-muted-foreground">Appended to the message as a trailing link.</span>
+                  <span className="text-xs text-muted-foreground">Ссылка будет добавлена в конце сообщения.</span>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="segment">Segment</Label>
+                  <Label htmlFor="segment">Получатели</Label>
                   <Select
                     id="segment"
                     value={segment}
                     onChange={(e) => setSegment(e.target.value as BroadcastSegment | '')}
                   >
-                    <option value="">{t('broadcasts.segment.all')} (default)</option>
+                    <option value="">{t('broadcasts.segment.all')}</option>
                     {segments.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label} — {option.count}
                       </option>
                     ))}
                   </Select>
-                  <span className="text-xs text-muted-foreground">Reaches ~{reach} non-blocked user(s).</span>
+                  <span className="text-xs text-muted-foreground">Получателей без блокировки: около {reach}.</span>
                   {selected && !selected.workerSupported && (
                     <span className="text-xs text-destructive">
                       The delivery worker has no branch for “{selected.value}” yet and would reach 0 users. Pick another
@@ -261,14 +261,14 @@ export function BroadcastsClient({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="scheduledAt">Schedule (UTC, optional)</Label>
+                  <Label htmlFor="scheduledAt">Время отправки (UTC, необязательно)</Label>
                   <Input
                     id="scheduledAt"
                     type="datetime-local"
                     value={scheduledAt}
                     onChange={(e) => setScheduledAt(e.target.value)}
                   />
-                  <span className="text-xs text-muted-foreground">Empty = send as soon as it is queued.</span>
+                  <span className="text-xs text-muted-foreground">Без даты — отправить после постановки в очередь.</span>
                 </div>
               </div>
 
@@ -285,28 +285,28 @@ export function BroadcastsClient({
                   </Button>
                 )}
                 {message && <span className="text-sm text-success">{message}</span>}
-                {error && <span className="text-sm text-destructive">{error}</span>}
+                {error && <span role="alert" className="text-sm text-destructive">{error}</span>}
               </div>
               <p className="text-xs text-muted-foreground">
-                Saving alone only stores the post. Nothing is delivered until it is queued, including scheduled posts.
+                Кнопка «Сохранить» создаёт черновик. Чтобы запустить рассылку, нажмите «Отправить сейчас» или «Запланировать».
               </p>
             </form>
           </CardContent>
         </Card>
       )}
 
-      {!canCompose && error && <p className="text-sm text-destructive">{error}</p>}
+      {!canCompose && error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Created</TableHead>
-            <TableHead>Message</TableHead>
-            <TableHead>Segment</TableHead>
+            <TableHead>Создано (UTC)</TableHead>
+            <TableHead>Текст сообщения</TableHead>
+            <TableHead>Получатели</TableHead>
             <TableHead>{t('common.status')}</TableHead>
-            <TableHead>Scheduled</TableHead>
-            <TableHead>Sent</TableHead>
-            <TableHead>Delivery</TableHead>
+            <TableHead>Запланировано</TableHead>
+            <TableHead>Отправлено</TableHead>
+            <TableHead>Выдача</TableHead>
             <TableHead>{t('common.actions')}</TableHead>
           </TableRow>
         </TableHeader>
@@ -328,7 +328,7 @@ export function BroadcastsClient({
                   <Badge variant="secondary">{post.segment ?? 'all'}</Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={statusVariant(post.status)}>{post.status}</Badge>
+                  <Badge variant={statusVariant(post.status)}>{formatEnum(post.status)}</Badge>
                 </TableCell>
                 <TableCell className="whitespace-nowrap">{formatDateTime(post.scheduledAt)}</TableCell>
                 <TableCell className="whitespace-nowrap">{formatDateTime(post.sentAt)}</TableCell>
@@ -368,7 +368,7 @@ export function BroadcastsClient({
                       {t('common.delete')}
                     </Button>
                   )}
-                  {frozen && <span className="text-xs text-muted-foreground">locked</span>}
+                  {frozen && <span className="text-xs text-muted-foreground">Изменение недоступно</span>}
                 </TableCell>
               </TableRow>
             )

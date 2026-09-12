@@ -40,7 +40,7 @@ export function CollectionGrid({
         <Link
           href="/catalog"
           onClick={() => triggerHaptic('light')}
-          className="tile relative flex h-[120px] flex-col justify-between overflow-hidden rounded-[24px] p-4 active:scale-[0.99]"
+          className="tile relative flex min-h-[120px] flex-col justify-between gap-3 rounded-[24px] p-4 active:opacity-80"
         >
           <span className="mark-plate relative flex h-10 w-10 items-center justify-center rounded-[11px]">
             <Icon name="grid" size={20} className="text-black" />
@@ -71,7 +71,7 @@ export function CollectionGrid({
               key={category.id}
               href={`/catalog?cat=${encodeURIComponent(category.slug)}`}
               onClick={() => triggerHaptic('light')}
-              className="tile relative flex h-[120px] flex-col justify-between overflow-hidden rounded-[24px] p-4 active:scale-[0.99]"
+              className="tile relative flex min-h-[120px] flex-col justify-between gap-3 rounded-[24px] p-4 active:opacity-80"
             >
               <span className="mark-plate relative flex h-10 w-10 items-center justify-center rounded-[11px]">
                 <Icon name={CATEGORY_ICON[category.slug] ?? 'grid'} size={20} className="text-black" />
@@ -79,7 +79,7 @@ export function CollectionGrid({
               <span className="relative">
                 <span className="block text-[16px] font-bold tracking-[-0.02em] text-ink">{category.title}</span>
                 <span className="mt-0.5 block text-[13px] font-medium text-muted">
-                  {t('catalog.positions', { count: counts[category.slug] ?? 0 })}
+                  {counts[category.slug] === undefined ? t('catalog.title') : t('catalog.positions', { count: counts[category.slug] ?? 0 })}
                 </span>
               </span>
             </Link>

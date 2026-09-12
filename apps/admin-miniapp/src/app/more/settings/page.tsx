@@ -143,13 +143,13 @@ export default function SettingsPage(): JSX.Element {
                     setDraft(toDraft(setting.kind, setting.value))
                     setEditing(setting)
                   }}
-                  className="flex items-center justify-between gap-3 p-3.5 text-left"
+                  className="flex flex-wrap items-center justify-between gap-2 p-3.5 text-left"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-ink">{labelFor(setting.key, t)}</p>
+                    <p className="text-sm font-semibold text-ink">{labelFor(setting.key, t)}</p>
                     <p className="tnum truncate text-xs text-muted">{setting.key}</p>
                   </div>
-                  <span className="tnum flex shrink-0 items-center gap-1.5 text-sm font-bold text-ink">
+                  <span className="tnum flex min-w-0 max-w-full break-all items-center gap-1.5 text-sm font-bold text-ink">
                     {renderValue(setting.kind, setting.value)}
                     <Icon name="chevron-right" size={15} className="text-faint" />
                   </span>

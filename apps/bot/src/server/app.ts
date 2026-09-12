@@ -55,7 +55,7 @@ export async function buildServer(bot: Bot<BotContext>): Promise<FastifyInstance
         req(request: { method: string; url: string; id: string; headers: Record<string, unknown> }) {
           return {
             method: request.method,
-            url: request.url,
+            url: request.url.split('?')[0]?.replace(/(\/webhook\/telegram\/)[^/]+/, '$1[redacted]'),
             correlationId: request.headers['x-correlation-id'] ?? request.id
           }
         }

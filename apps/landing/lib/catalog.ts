@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { API_URL } from './env'
-import { type DemoProduct, type LandingCopy } from './i18n'
+import { type LandingProduct, type LandingCopy } from './i18n'
 
 const planSchema = z.object({
   id: z.string(),
@@ -28,7 +28,7 @@ const catalogSchema = z.object({
 })
 
 export interface CatalogResult {
-  products: DemoProduct[]
+  products: LandingProduct[]
   isFallback: boolean
 }
 
@@ -46,7 +46,8 @@ export async function getCatalog(copy: LandingCopy): Promise<CatalogResult> {
   try {
     const res = await fetch(`${API_URL}/api/public/catalog`, {
       next: { revalidate: 300 },
-      headers: { accept: 'application/json' }
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(5000)
     })
 
     if (!res.ok) {
@@ -56,7 +57,7 @@ export async function getCatalog(copy: LandingCopy): Promise<CatalogResult> {
     const json = await res.json()
     const parsed = catalogSchema.safeParse(json)
 
-    if (!parsed.success || parsed.data.products.length === 0) {
+    if (!parsed.success) {
       return { products: copy.fallbackProducts, isFallback: true }
     }
 

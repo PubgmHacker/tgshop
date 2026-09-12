@@ -20,7 +20,7 @@ export interface DashboardData {
     orders: number
     paidOrders: number
     conversionPercent: number
-    arpuCents: number
+    averageOrderCents: number
   }
 }
 
@@ -32,7 +32,7 @@ export interface DashboardData {
  * excluded from revenue.
  */
 export async function getDashboardDataAction(days = 30): Promise<DashboardData> {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
 
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
   const settledStatuses: OrderStatus[] = [OrderStatus.PAID, OrderStatus.DELIVERING, OrderStatus.DELIVERED]
@@ -88,7 +88,7 @@ export async function getDashboardDataAction(days = 30): Promise<DashboardData> 
     }
   }
   const stockLevels = plans
-    .filter((plan) => plan.isActive)
+    .filter((plan) => plan.isActive && plan.product.isActive && (plan.product.deliveryType === 'STOCK_POOL' || (plan.product.deliveryType === 'UNIQUE_CODE' && !(plan.product.externalConfig as { codeTemplate?: unknown } | null)?.codeTemplate)))
     .map((plan) => ({
       planId: plan.id,
       planTitle: plan.title,
@@ -101,7 +101,7 @@ export async function getDashboardDataAction(days = 30): Promise<DashboardData> 
   const revenueCents = settledOrders.reduce((sum, o) => sum + o.amountCents, 0)
   const paidOrders = settledOrders.length
   const conversionPercent = allOrdersInRange > 0 ? Math.round((paidOrders / allOrdersInRange) * 10000) / 100 : 0
-  const arpuCents = paidOrders > 0 ? Math.round(revenueCents / paidOrders) : 0
+  const averageOrderCents = paidOrders > 0 ? Math.round(revenueCents / paidOrders) : 0
 
   return {
     revenueByDay,
@@ -118,7 +118,7 @@ export async function getDashboardDataAction(days = 30): Promise<DashboardData> 
       orders: allOrdersInRange,
       paidOrders,
       conversionPercent,
-      arpuCents
+      averageOrderCents
     }
   }
 }

@@ -132,34 +132,34 @@ export function PlansClient({
       resetForm()
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
   }
 
   async function onDelete(id: string) {
-    if (!window.confirm('Delete this plan? Its stock items must be removed first.')) return
+    if (!window.confirm('Удалить тариф? Сначала удалите его складские позиции.')) return
     setError(null)
     try {
       await deletePlanAction(id)
       setPlans((prev) => prev.filter((p) => p.id !== id))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <Label htmlFor="productFilter">Filter by product</Label>
+        <Label htmlFor="productFilter">Фильтр по товару</Label>
         <Select
           id="productFilter"
           value={selectedProductId}
           onChange={(e) => onFilterChange(e.target.value)}
           className="max-w-sm"
         >
-          <option value="">All products</option>
+          <option value="">Все товары</option>
           {products.map((product) => (
             <option key={product.id} value={product.id}>
               {product.title}
@@ -171,9 +171,9 @@ export function PlansClient({
       {canEdit ? (
         <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 rounded-lg border border-border p-4 md:grid-cols-3">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="planProduct">Product</Label>
+            <Label htmlFor="planProduct">Товар</Label>
             <Select id="planProduct" value={productId} onChange={(e) => setProductId(e.target.value)} required>
-              {products.length === 0 && <option value="">— no products yet —</option>}
+              {products.length === 0 && <option value="">— сначала создайте товар —</option>}
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.title}
@@ -182,22 +182,22 @@ export function PlansClient({
             </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="planTitle">Title</Label>
+            <Label htmlFor="planTitle">Название</Label>
             <Input id="planTitle" value={title} onChange={(e) => setTitle(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="durationDays">Duration (days)</Label>
+            <Label htmlFor="durationDays">Срок (дней)</Label>
             <Input
               id="durationDays"
               type="number"
               min={1}
               value={durationDays}
               onChange={(e) => setDurationDays(e.target.value)}
-              placeholder="empty = one-off"
+              placeholder="пусто — разовая покупка"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="priceCents">Price (cents)</Label>
+            <Label htmlFor="priceCents">Цена (центы USD)</Label>
             <Input
               id="priceCents"
               type="number"
@@ -209,18 +209,18 @@ export function PlansClient({
             <span className="text-xs text-muted-foreground">= {formatCents(priceCents)}</span>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="priceStars">Price (Stars override)</Label>
+            <Label htmlFor="priceStars">Цена в Stars (необязательно)</Label>
             <Input
               id="priceStars"
               type="number"
               min={0}
               value={priceStars}
               onChange={(e) => setPriceStars(e.target.value)}
-              placeholder="empty = derive from rate"
+              placeholder="пусто — рассчитать по курсу"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="discountPercent">Discount %</Label>
+            <Label htmlFor="discountPercent">Скидка (%)</Label>
             <Input
               id="discountPercent"
               type="number"
@@ -231,7 +231,7 @@ export function PlansClient({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="lowStockThreshold">Low-stock threshold</Label>
+            <Label htmlFor="lowStockThreshold">Минимальный остаток</Label>
             <Input
               id="lowStockThreshold"
               type="number"
@@ -242,7 +242,7 @@ export function PlansClient({
           </div>
           <div className="flex items-end gap-4">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="planSort">Sort</Label>
+              <Label htmlFor="planSort">Порядок</Label>
               <Input
                 id="planSort"
                 type="number"
@@ -253,10 +253,10 @@ export function PlansClient({
             </div>
             <label className="flex items-center gap-2 pb-2 text-sm">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              Active
+              Активен
             </label>
           </div>
-          <div className="flex items-center gap-3 md:col-span-3">
+          <div className="flex flex-wrap items-center gap-3 md:col-span-3">
             <Button type="submit" disabled={pending || products.length === 0}>
               {editingId ? t('common.save') : t('common.create')}
             </Button>
@@ -265,22 +265,22 @@ export function PlansClient({
                 {t('common.cancel')}
               </Button>
             )}
-            {error && <span className="text-sm text-destructive">{error}</span>}
+            {error && <span role="alert" className="text-sm text-destructive">{error}</span>}
           </div>
         </form>
       ) : (
-        error && <p className="text-sm text-destructive">{error}</p>
+        error && <p role="alert" className="text-sm text-destructive">{error}</p>
       )}
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Plan</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead>Price</TableHead>
+            <TableHead>Тариф</TableHead>
+            <TableHead>Товар</TableHead>
+            <TableHead>Срок</TableHead>
+            <TableHead>Цена</TableHead>
             <TableHead>Stars</TableHead>
-            <TableHead>Discount</TableHead>
+            <TableHead>Скидка</TableHead>
             <TableHead>{t('stock.available')}</TableHead>
             <TableHead>{t('common.status')}</TableHead>
             <TableHead>{t('common.actions')}</TableHead>
@@ -291,7 +291,7 @@ export function PlansClient({
             <TableRow key={plan.id}>
               <TableCell className="font-medium">{plan.title}</TableCell>
               <TableCell>{plan.productTitle}</TableCell>
-              <TableCell className="tabular-nums">{plan.durationDays === null ? '—' : `${plan.durationDays}d`}</TableCell>
+              <TableCell className="tabular-nums">{plan.durationDays === null ? '—' : `${plan.durationDays} дн.`}</TableCell>
               <TableCell className="tabular-nums">{formatCents(plan.priceCents)}</TableCell>
               <TableCell className="tabular-nums">{plan.priceStars === null ? '—' : plan.priceStars}</TableCell>
               <TableCell className="tabular-nums">{plan.discountPercent}%</TableCell>
@@ -301,7 +301,7 @@ export function PlansClient({
                 </Badge>
               </TableCell>
               <TableCell>
-                <Badge variant={plan.isActive ? 'success' : 'secondary'}>{plan.isActive ? 'active' : 'inactive'}</Badge>
+                <Badge variant={plan.isActive ? 'success' : 'secondary'}>{plan.isActive ? 'Активен' : 'Отключён'}</Badge>
               </TableCell>
               <TableCell className="flex gap-2">
                 {canEdit && (

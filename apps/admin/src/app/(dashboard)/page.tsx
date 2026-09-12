@@ -18,10 +18,10 @@ export default async function DashboardPage() {
       <h1 className="text-2xl font-semibold">{t('dashboard.title')}</h1>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatTile label={t('dashboard.revenue')} value={`$${centsToDisplay(data.totals.revenueCents)}`} sub="30d" />
-        <StatTile label={t('dashboard.orders')} value={String(data.totals.orders)} sub="30d" />
-        <StatTile label={t('dashboard.conversion')} value={`${data.totals.conversionPercent}%`} sub="30d" />
-        <StatTile label={t('dashboard.arpu')} value={`$${centsToDisplay(data.totals.arpuCents)}`} sub="30d" />
+        <StatTile label={t('dashboard.revenue')} value={`$${centsToDisplay(data.totals.revenueCents)}`} sub="За 30 дней" />
+        <StatTile label={t('dashboard.orders')} value={String(data.totals.orders)} sub="За 30 дней" />
+        <StatTile label={t('dashboard.conversion')} value={`${data.totals.conversionPercent}%`} sub="За 30 дней" />
+        <StatTile label={t('dashboard.averageOrder')} value={`$${centsToDisplay(data.totals.averageOrderCents)}`} sub="За 30 дней" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -70,9 +70,9 @@ export default async function DashboardPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-muted-foreground">
-                <th className="py-1">Product</th>
-                <th className="py-1">Orders</th>
-                <th className="py-1">Revenue</th>
+                <th className="py-1">Товар</th>
+                <th className="py-1">Заказы</th>
+                <th className="py-1">Выручка</th>
               </tr>
             </thead>
             <tbody>

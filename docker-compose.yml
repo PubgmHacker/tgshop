@@ -117,6 +117,14 @@ services:
     build:
       context: .
       dockerfile: apps/landing/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_BOT_USERNAME: ${NEXT_PUBLIC_BOT_USERNAME}
+        NEXT_PUBLIC_LANDING_URL: ${NEXT_PUBLIC_LANDING_URL:-https://${DOMAIN}}
+        NEXT_PUBLIC_SUPPORT_URL: ${NEXT_PUBLIC_SUPPORT_URL:-}
+        NEXT_PUBLIC_ANALYTICS_PROVIDER: ${NEXT_PUBLIC_ANALYTICS_PROVIDER:-}
+        NEXT_PUBLIC_ANALYTICS_DOMAIN: ${NEXT_PUBLIC_ANALYTICS_DOMAIN:-}
+        NEXT_PUBLIC_ANALYTICS_SCRIPT_URL: ${NEXT_PUBLIC_ANALYTICS_SCRIPT_URL:-}
     restart: unless-stopped
     env_file: .env
     networks:

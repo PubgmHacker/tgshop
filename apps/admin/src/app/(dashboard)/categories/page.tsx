@@ -7,7 +7,7 @@ import { t } from '../../../lib/i18n'
 export const dynamic = 'force-dynamic'
 
 export default async function CategoriesPage() {
-  const session = requireSession()
+  const session = await requireSession()
 
   const categories = await listCategoriesAction()
 

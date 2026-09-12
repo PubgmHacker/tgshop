@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useI18n } from '@/i18n/I18nProvider'
 import { BottomSheet } from '@/components/BottomSheet'
 import { usePricingPreview } from '@/hooks/useApi'
-import { formatCents } from '@/lib/format'
+import { discountedCents, formatCents } from '@/lib/format'
 import { triggerHaptic, triggerNotificationHaptic } from '@/lib/TelegramProvider'
 import type { Plan } from '@/types/api'
 
@@ -27,9 +27,10 @@ export function BuySheet({
   const [promoError, setPromoError] = useState<string | null>(null)
   const previewMutation = usePricingPreview()
 
-  const unitTotal = plan.priceCents * (100 - plan.discountPercent)
-  const fallbackTotal = Math.round(unitTotal / 100) * qty
-  const breakdown = previewMutation.data
+  const fallbackTotal = discountedCents(plan.priceCents, plan.discountPercent) * qty
+  const quote = previewMutation.data
+  const breakdown = quote?.planId === plan.id && quote.qty === qty &&
+    (quote.promoCode ?? '') === promoCode.trim().toUpperCase() ? quote : undefined
   const totalCents = breakdown?.totalCents ?? fallbackTotal
 
   function adjustQty(delta: number): void {
@@ -58,9 +59,20 @@ export function BuySheet({
     }
   }
 
-  function handleCheckout(): void {
+  async function handleCheckout(): Promise<void> {
+    if (previewMutation.isPending || !plan.inStock) return
+    let appliedPromo = breakdown?.promoCode ?? null
+    if (promoCode.trim() && !breakdown) {
+      try {
+        const result = await previewMutation.mutateAsync({ planId: plan.id, qty, promoCode: promoCode.trim() })
+        appliedPromo = result.promoCode
+      } catch {
+        setPromoError(t('buySheet.promoInvalid'))
+        return
+      }
+    }
     triggerHaptic('medium')
-    onProceedToCheckout({ planId: plan.id, qty, promoCode: promoCode.trim() || null })
+    onProceedToCheckout({ planId: plan.id, qty, promoCode: appliedPromo })
   }
 
   return (
@@ -68,7 +80,7 @@ export function BuySheet({
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between rounded-card border border-line bg-card-strong px-4 py-3">
           <p className="text-sm font-medium text-ink">{plan.title}</p>
-          <p className="tnum text-sm font-bold text-ink">{formatCents(plan.priceCents)}</p>
+          <p className="tnum text-sm font-bold text-ink">{formatCents(discountedCents(plan.priceCents, plan.discountPercent))}</p>
         </div>
 
         <div className="flex items-center justify-between">
@@ -99,6 +111,7 @@ export function BuySheet({
           <div className="flex gap-2">
             <input
               value={promoCode}
+              disabled={previewMutation.isPending}
               onChange={(e) => {
                 setPromoCode(e.target.value.toUpperCase())
                 setPromoError(null)
@@ -130,7 +143,7 @@ export function BuySheet({
 
         <button
           type="button"
-          onClick={handleCheckout}
+          onClick={() => void handleCheckout()}
           disabled={previewMutation.isPending}
           className="rounded-full bg-cta py-3.5 text-center text-sm font-semibold text-cta-ink disabled:opacity-50"
         >

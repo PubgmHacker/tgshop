@@ -21,7 +21,7 @@ export function Footer({ copy }: { copy: LandingCopy }) {
                 {column.links.map((link) => (
                   <li key={link.href + link.label}>
                     <a
-                      href={link.href === '__support__' ? SUPPORT_URL : link.href}
+                      href={link.href === '__support__' ? SUPPORT_URL : link.href.startsWith('#') ? `/${link.href}` : link.href}
                       className="text-sm text-muted transition-colors hover:text-white"
                     >
                       {link.label}

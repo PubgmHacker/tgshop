@@ -44,6 +44,8 @@ export function LoginForm() {
       const next = requested && requested.startsWith('/') && !requested.startsWith('//') ? requested : '/'
       router.push(next)
       router.refresh()
+    } catch {
+      setError('auth.login.error')
     } finally {
       setPending(false)
     }

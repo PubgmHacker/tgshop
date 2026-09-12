@@ -8,7 +8,7 @@ import type { NextRequest } from 'next/server'
 export function middleware(req: NextRequest): NextResponse {
   console.log(
     JSON.stringify({
-      req: `${req.method} ${req.nextUrl.pathname}${req.nextUrl.search}`,
+      req: `${req.method} ${req.nextUrl.pathname}`,
       ua: (req.headers.get('user-agent') ?? '').slice(0, 90)
     })
   )

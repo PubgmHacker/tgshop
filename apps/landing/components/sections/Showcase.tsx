@@ -4,8 +4,8 @@ import { GlowCard } from '../ui/GlowCard'
 import Image from 'next/image'
 import { brandMarkUrl } from '../../lib/brands'
 import { botDeepLink } from '../../lib/env'
-import { formatPriceCents } from '../../lib/format'
-import type { DemoProduct, LandingCopy, Locale } from '../../lib/i18n'
+import { formatPriceCents, formatPlanDuration } from '../../lib/format'
+import type { LandingProduct, LandingCopy, Locale } from '../../lib/i18n'
 
 export function Showcase({
   copy,
@@ -15,11 +15,11 @@ export function Showcase({
 }: {
   copy: LandingCopy
   locale: Locale
-  products: DemoProduct[]
+  products: LandingProduct[]
   isFallback: boolean
 }) {
   return (
-    <section id="showcase" className="py-20 sm:py-28">
+    <section id="showcase" className="scroll-mt-20 py-14 sm:py-20">
       <Container>
         <RevealOnScroll className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold text-white sm:text-4xl">{copy.showcase.title}</h2>
@@ -32,8 +32,12 @@ export function Showcase({
           </p>
         )}
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product, index) => {
+        {!isFallback && products.length === 0 ? (
+          <p className="mt-8 text-center text-muted">{locale === 'ru' ? 'Сейчас нет доступных товаров.' : 'No products are currently available.'}</p>
+        ) : null}
+
+        <div className={`mx-auto mt-10 grid gap-6 ${products.length === 1 ? 'max-w-2xl' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+          {products.filter((product) => product.plans.length > 0).map((product, index) => {
             const cheapestPlan = product.plans.reduce((min, plan) =>
               plan.priceCents < min.priceCents ? plan : min
             )
@@ -61,7 +65,7 @@ export function Showcase({
                       </span>
                     </div>
                     {cheapestPlan.badge && (
-                      <span className="rounded-full bg-accent-gradient px-3 py-1 text-xs font-semibold text-white">
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
                         {cheapestPlan.badge}
                       </span>
                     )}
@@ -72,17 +76,15 @@ export function Showcase({
                     {product.description}
                   </p>
 
-                  <div className="mt-6 flex items-end justify-between border-t border-line pt-5">
+                  <div className="mt-6 flex flex-wrap items-end justify-between gap-4 border-t border-line pt-5">
                     <div>
                       <p className="text-xs uppercase tracking-wide text-muted">
                         {copy.showcase.priceFrom}
                       </p>
                       <p className="text-xl font-bold text-white">
                         {formatPriceCents(cheapestPlan.priceCents, locale)}
-                        <span className="ml-1 text-sm font-normal text-muted">
-                          {cheapestPlan.durationDays
-                            ? copy.showcase.perMonth
-                            : copy.showcase.lifetime}
+                        <span className="mt-1 block text-sm font-normal text-muted">
+                          {formatPlanDuration(cheapestPlan.durationDays, locale)}
                         </span>
                       </p>
                     </div>
@@ -90,7 +92,7 @@ export function Showcase({
                       href={botDeepLink(`product_${product.slug ?? product.id}`)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm font-semibold text-accent-to transition-colors hover:text-white"
+                      className="inline-flex min-h-11 items-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-bg transition-colors hover:bg-white/90"
                     >
                       {copy.showcase.viewInApp} →
                     </a>

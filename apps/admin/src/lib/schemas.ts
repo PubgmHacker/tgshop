@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { DeliveryType, LedgerType, PaymentProvider, PromoType } from '@tgshop/db'
 
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(8).max(1024),
   totp: z.string().optional()
 })
 
@@ -138,52 +138,52 @@ export interface SettingDefinition {
 export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
   {
     key: 'stars_usd_rate',
-    label: 'USD value of one Star',
+    label: 'Курс одной звезды в USD',
     kind: 'decimal',
-    hint: 'Decimal written as a JSON string, e.g. "0.013". Stored as a string to stay float-free.'
+    hint: 'Десятичная строка, например "0.013". Используется для пересчёта цены в Stars.'
   },
   {
     key: 'min_topup_cents',
-    label: 'Minimum top-up (cents)',
+    label: 'Минимальное пополнение (центы USD)',
     kind: 'int',
-    hint: 'Integer cents. 500 = $5.00'
+    hint: 'Целое число центов. 500 = $5.00'
   },
-  { key: 'support_url', label: 'Support URL', kind: 'url', hint: 'Full URL, e.g. https://t.me/tgshop_support' },
+  { key: 'support_url', label: 'Ссылка на поддержку', kind: 'url', hint: 'Полная ссылка на вашу службу поддержки в Telegram.' },
   {
     key: 'referral_percent',
-    label: 'Referral percent',
+    label: 'Реферальное вознаграждение (%)',
     kind: 'percent',
-    hint: 'Integer 0-100. Share of a purchase credited to the referrer.'
+    hint: 'От 0 до 100. Доля покупки, зачисляемая пригласившему пользователю.'
   },
   {
     key: 'price_override',
-    label: 'Price overrides (JSON)',
+    label: 'Индивидуальные цены (JSON)',
     kind: 'json',
-    hint: 'Optional map of plan ids to integer cents.'
+    hint: 'Объект: ID тарифа и его цена в целых центах USD.'
   },
   {
     key: 'manual_fallback_sla_minutes',
-    label: 'Manual delivery SLA (minutes)',
+    label: 'Срок ручной выдачи (минуты)',
     kind: 'int',
-    hint: 'After this time a stuck manual order is sent to the admin alert queue.'
+    hint: 'По истечении срока администратор получит напоминание о невыданном заказе.'
   },
   {
     key: 'broadcast_rate_per_sec',
-    label: 'Broadcast rate (messages/sec)',
+    label: 'Скорость рассылки (сообщений/с)',
     kind: 'int',
-    hint: 'Keep at or below 30 to stay within Telegram limits.'
+    hint: 'Не более 30 сообщений в секунду.'
   },
   {
     key: 'refund_auto_approve_ceiling_cents',
-    label: 'Agent auto-refund ceiling (cents)',
+    label: 'Лимит автоматического возврата (центы USD)',
     kind: 'int',
-    hint: 'Refunds above this amount require a human review.'
+    hint: 'Возвраты выше этого лимита проверяет оператор.'
   },
   {
     key: 'new_product_auto_broadcast',
-    label: 'Auto-queue new product announcements',
+    label: 'Автоматически отправлять анонсы товаров',
     kind: 'boolean',
-    hint: 'When enabled, every newly active product announcement is queued automatically. Review drafts with it off.'
+    hint: 'Анонсы новых активных товаров сразу попадают в очередь. Выключите, чтобы проверять черновики до отправки.'
   }
 ] as const
 
@@ -299,11 +299,11 @@ export interface BroadcastSegmentDefinition {
 }
 
 export const BROADCAST_SEGMENTS: readonly BroadcastSegmentDefinition[] = [
-  { value: 'all', label: 'All users', workerSupported: true },
-  { value: 'buyers', label: 'Buyers (1+ paid order)', workerSupported: true },
-  { value: 'inactive_30d', label: 'Inactive 30 days', workerSupported: true },
-  { value: 'active_subscribers', label: 'Active subscribers', workerSupported: true },
-  { value: 'no_purchases', label: 'No purchases yet', workerSupported: true }
+  { value: 'all', label: 'Все пользователи', workerSupported: true },
+  { value: 'buyers', label: 'Покупатели с оплаченными заказами', workerSupported: true },
+  { value: 'inactive_30d', label: 'Неактивные 30 дней', workerSupported: true },
+  { value: 'active_subscribers', label: 'С действующей подпиской', workerSupported: true },
+  { value: 'no_purchases', label: 'Без покупок', workerSupported: true }
 ] as const
 
 export const broadcastUpsertSchema = z.object({

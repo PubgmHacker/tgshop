@@ -92,8 +92,8 @@ export function registerProfileHandlers(bot: Bot<BotContext>): void {
     const locale = ctx.session.locale
     const items =
       locale === 'ru'
-        ? '1. Как оплатить заказ? — Выберите способ оплаты при оформлении.\n2. Как получить товар? — Сразу после оплаты бот отправит данные в этот чат.\n3. Что делать при проблеме? — Нажмите «Сообщить о проблеме» под сообщением с доставкой.'
-        : '1. How do I pay? — Pick a payment method at checkout.\n2. How do I receive my item? — The bot delivers it to this chat right after payment.\n3. Something went wrong? — Tap "Report a problem" under the delivery message.'
+        ? '1. Как оплатить заказ? — Выберите способ оплаты при оформлении.\n2. Как получить товар? — Статус и инструкции появятся после подтверждения оплаты; для ручной выдачи подключается оператор.\n3. Что делать при проблеме? — Нажмите «Сообщить о проблеме» под сообщением с доставкой.'
+        : '1. How do I pay? — Pick a payment method at checkout.\n2. How do I receive my item? — The order shows its status and instructions after payment; manual fulfilment is handled by an operator.\n3. Something went wrong? — Tap "Report a problem" under the delivery message.'
     await ctx.reply(t(locale, 'faq.title', { items }), { parse_mode: 'HTML' })
   })
 

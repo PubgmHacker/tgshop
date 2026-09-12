@@ -9,8 +9,8 @@ export interface AccordionItemData {
 }
 
 /**
- * OriginKit-style "accordion" (hand-rolled): single-open FAQ accordion with
- * animated height/opacity expand. Height animation is skipped in favor of an
+ * Single-open FAQ accordion with animated height/opacity expand. Height
+ * animation is skipped in favor of an
  * instant toggle when the user prefers reduced motion.
  */
 export function Accordion({ items }: { items: AccordionItemData[] }) {

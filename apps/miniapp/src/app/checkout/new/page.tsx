@@ -8,7 +8,7 @@ import { useMainButton } from '@/hooks/useMainButton'
 import { useConfigData, useCreateOrder, useMeData, usePricingPreview, useProductData } from '@/hooks/useApi'
 import { Icon, type IconName } from '@/components/Icons'
 import { ErrorState } from '@/components/States'
-import { formatCents, generateIdempotencyKey } from '@/lib/format'
+import { discountedCents, formatCents, generateIdempotencyKey } from '@/lib/format'
 import { openPaymentUrl } from '@/lib/payments'
 import { errorMessageKey, mayHaveReachedServer } from '@/lib/errors'
 import { triggerHaptic, triggerNotificationHaptic } from '@/lib/TelegramProvider'
@@ -56,7 +56,7 @@ export default function NewCheckoutPage(): JSX.Element {
 
   // Balance and Stars are guaranteed by the bot's boot contract. Optional
   // rails only appear after /api/config confirms their credentials exist.
-  const configuredProviders: ProviderChoice[] = config.data?.paymentMethods ?? ['BALANCE', 'STARS']
+  const configuredProviders: ProviderChoice[] = config.data?.paymentMethods ?? []
   const availableProviders = PROVIDERS.filter((option) => configuredProviders.includes(option.value))
   const selectedProvider = configuredProviders.includes(provider)
     ? provider
@@ -72,13 +72,15 @@ export default function NewCheckoutPage(): JSX.Element {
     return () => resetPreview()
   }, [planId, qty, promoCode, previewPricing, resetPreview])
 
-  const fallbackTotal = plan ? Math.round((plan.priceCents * (100 - plan.discountPercent)) / 100) * qty : null
+  const fallbackTotal = plan ? discountedCents(plan.priceCents, plan.discountPercent) * qty : null
   const totalCents = preview.data?.totalCents ?? fallbackTotal
+  const quoteMatches = preview.data?.planId === planId && preview.data?.qty === qty &&
+    (preview.data?.promoCode ?? '') === (promoCode ?? '').trim().toUpperCase()
   const balanceShort =
     selectedProvider === 'BALANCE' && me.data && totalCents !== null && me.data.balanceCents < totalCents
 
   async function handlePay(): Promise<void> {
-    if (createOrderMutation.isPending) return
+    if (!canPay || createOrderMutation.isPending) return
     setError(null)
     idempotencyKeyRef.current ??= generateIdempotencyKey()
     try {
@@ -104,7 +106,9 @@ export default function NewCheckoutPage(): JSX.Element {
     }
   }
 
-  const canPay = Boolean(planId) && availableProviders.length > 0 && !isBlocked && !balanceShort
+  const canPay = Boolean(plan?.inStock && me.data && config.data && quoteMatches) &&
+    !preview.isPending && !preview.isError && !product.isError && !me.isError && !config.isError &&
+    availableProviders.length > 0 && !isBlocked && !balanceShort
 
   useMainButton({
     text: totalCents !== null ? `${t('checkout.pay')} · ${formatCents(totalCents)}` : t('checkout.pay'),
@@ -113,7 +117,7 @@ export default function NewCheckoutPage(): JSX.Element {
     onClick: () => void handlePay()
   })
 
-  if (!planId) {
+  if (!planId || !productSlug || (product.data && !plan)) {
     return <ErrorState title={t('checkout.invalidParams')} onRetry={() => router.back()} retryLabel={t('common.back')} />
   }
 
@@ -122,6 +126,13 @@ export default function NewCheckoutPage(): JSX.Element {
       <header>
         <h1 className="text-2xl font-extrabold tracking-tight text-ink">{t('checkout.title')}</h1>
       </header>
+
+      {product.isError || config.isError || me.isError || preview.isError ? (
+        <ErrorState title={t(errorMessageKey(product.error ?? config.error ?? me.error ?? preview.error))}
+          onRetry={() => { void product.refetch(); void config.refetch(); void me.refetch(); previewPricing({ planId, qty, promoCode }) }}
+          retryLabel={t('common.retry')} />
+      ) : null}
+      {plan && !plan.inStock ? <p role="alert" className="text-danger">{t('product.outOfStock')}</p> : null}
 
       <section className="flex flex-col gap-2 rounded-card border border-line bg-card p-4" aria-live="polite">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-faint">{t('checkout.summary')}</p>
@@ -133,7 +144,7 @@ export default function NewCheckoutPage(): JSX.Element {
               <p className="truncate text-sm font-semibold text-ink">{product.data?.title ?? '—'}</p>
               <p className="truncate text-xs text-muted">{plan?.title ?? '—'}</p>
             </div>
-            {plan ? <p className="tnum shrink-0 text-sm font-semibold text-ink">{formatCents(plan.priceCents)}</p> : null}
+            {plan ? <p className="tnum shrink-0 text-sm font-semibold text-ink">{formatCents(discountedCents(plan.priceCents, plan.discountPercent))}</p> : null}
           </div>
         )}
         <div className="flex items-center justify-between text-xs">

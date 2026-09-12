@@ -97,9 +97,10 @@ jobs:
       # Before Test, not after: `turbo run test` includes @tgshop/e2e, whose
       # harness is written against a seeded database (see e2e/src/setup.ts —
       # "never truncate, never delete anything the fixture did not create").
-      # Seeding first also lets the exact-count assertions in verify-seed below
-      # double as proof that the e2e suite kept that promise. Every write in
-      # seed.ts is an upsert, so re-running on a warm database is a no-op.
+      # Seeding first also lets the catalog-count assertions in verify-seed below
+      # double as proof that the e2e suite kept that promise. Catalog writes are
+      # upserts, so re-running on a warm database is a no-op; stock is supplied
+      # separately through the admin flow.
       - name: Seed test database
         run: pnpm db:seed
 
@@ -112,8 +113,8 @@ jobs:
       # path. Each prints PASS/FAIL per check and exits non-zero on failure.
       #
       # These cover what a typecheck structurally cannot: route registration and
-      # auth guards (verify-api), the seed.ts <-> @tgshop/core encryption
-      # contract (verify-seed), and cross-package agreement on BullMQ job
+      # auth guards (verify-api), the catalog/seed invariants (verify-seed), and
+      # cross-package agreement on BullMQ job
       # names/ids between bot, worker and admin (verify-broadcast). Every one of
       # those is a correct-looking call whose effect lands in Postgres or Redis.
       - name: Verify API surface
@@ -133,7 +134,7 @@ jobs:
     needs: ci
     strategy:
       matrix:
-        app: [bot, worker, miniapp, landing, admin]
+        app: [bot, worker, miniapp, landing, admin, admin-miniapp]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

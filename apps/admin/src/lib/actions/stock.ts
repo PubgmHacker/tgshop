@@ -17,7 +17,7 @@ export interface StockImportResult {
 }
 
 export async function listStockAction(planId?: string) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.stockItem.findMany({
     where: planId ? { planId } : undefined,
     orderBy: { createdAt: 'desc' },
@@ -27,7 +27,7 @@ export async function listStockAction(planId?: string) {
 }
 
 export async function stockSummaryAction() {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   const grouped = await prisma.stockItem.groupBy({
     by: ['planId', 'status'],
     _count: { _all: true }
@@ -37,7 +37,7 @@ export async function stockSummaryAction() {
 
 /** One payload per line, pasted directly into a textarea. Each line is encrypted independently. */
 export async function bulkPasteStockAction(input: StockBulkPasteInput): Promise<StockImportResult> {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = stockBulkPasteSchema.parse(input)
 
   const plan = await prisma.plan.findUnique({ where: { id: data.planId } })
@@ -72,7 +72,7 @@ export async function bulkPasteStockAction(input: StockBulkPasteInput): Promise<
  * simple "one secret per line" shape stock payloads take in this store.
  */
 export async function csvImportStockAction(input: StockCsvImportInput): Promise<StockImportResult> {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = stockCsvImportSchema.parse(input)
 
   const plan = await prisma.plan.findUnique({ where: { id: data.planId } })
@@ -117,7 +117,7 @@ export async function csvImportStockAction(input: StockCsvImportInput): Promise<
 }
 
 export async function deleteStockItemAction(id: string) {
-  const session = requireRole(AdminRole.OWNER)
+  const session = await requireRole(AdminRole.OWNER)
   const item = await prisma.stockItem.findUnique({ where: { id } })
   if (!item) return
   if (item.status !== StockStatus.AVAILABLE) {

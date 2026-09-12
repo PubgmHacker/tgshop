@@ -12,6 +12,7 @@ import type { CreateTopupResponse, TopupMethod } from '@/types/api'
 import { CopyButton } from './CopyButton'
 import { QrCode } from './QrCode'
 import { SectionLabel } from './SectionLabel'
+import { ErrorState } from './States'
 
 // The server decides which of these are offered (config.topupMethods). TRON
 // needs no order: the invoice is identified by its unique tagged amount, so a
@@ -51,7 +52,7 @@ export function TopupPanel(): JSX.Element {
   // can answer with the invoice it may already have created.
   const idempotencyKeyRef = useRef<string | null>(null)
 
-  const availableMethodValues: TopupMethod[] = config.data?.topupMethods ?? ['STARS']
+  const availableMethodValues: TopupMethod[] = config.data?.topupMethods ?? []
   const availableMethods = TOPUP_METHODS.filter((option) => availableMethodValues.includes(option.value))
   const selectedMethod = availableMethodValues.includes(method) ? method : (availableMethodValues[0] ?? 'STARS')
   const minTopupCents = config.data?.minTopupCents ?? 500
@@ -60,7 +61,7 @@ export function TopupPanel(): JSX.Element {
   const amountTooSmall = amountCents > 0 && amountCents < minTopupCents
   const amountTooLarge = amountCents > MAX_TOPUP_CENTS
   const canCreate =
-    amountCents >= minTopupCents && !amountTooLarge && !createTopup.isPending && availableMethods.length > 0
+    Boolean(config.data) && !config.isError && amountCents >= minTopupCents && !amountTooLarge && !createTopup.isPending && availableMethods.length > 0
 
   function resetAttempt(): void {
     idempotencyKeyRef.current = null
@@ -104,6 +105,9 @@ export function TopupPanel(): JSX.Element {
       </section>
     )
   }
+
+  if (config.isLoading) return <div className="skeleton h-44 rounded-card" />
+  if (config.isError) return <ErrorState title={t(errorMessageKey(config.error))} onRetry={() => void config.refetch()} retryLabel={t('common.retry')} />
 
   return (
     <section id="topup" className="flex flex-col gap-2.5">

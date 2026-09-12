@@ -15,12 +15,12 @@ export function ThemeToggle() {
     const next = !isDark
     setIsDark(next)
     document.documentElement.classList.toggle('dark', next)
-    window.localStorage.setItem('tgshop-admin-theme', next ? 'dark' : 'light')
+    try { window.localStorage.setItem('tgshop-admin-theme', next ? 'dark' : 'light') } catch { /* Theme still changes when storage is unavailable. */ }
   }
 
   return (
-    <Button variant="outline" size="sm" onClick={toggle} aria-label="Toggle theme">
-      {isDark ? 'Light' : 'Dark'}
+    <Button variant="outline" size="sm" onClick={toggle} aria-label={isDark ? 'Включить светлую тему' : 'Включить тёмную тему'}>
+      {isDark ? 'Светлая тема' : 'Тёмная тема'}
     </Button>
   )
 }

@@ -27,7 +27,11 @@ const CODE_KEYS: Record<string, DictionaryKey> = {
   PAYMENT_METHOD_UNAVAILABLE: 'checkout.methodUnavailable',
   STOCK_UNAVAILABLE: 'checkout.stockUnavailable',
   PROMO_INVALID: 'buySheet.promoInvalid',
-  USER_BLOCKED: 'common.error.blocked'
+  USER_BLOCKED: 'common.error.blocked',
+  NO_INIT_DATA: 'common.error.auth',
+  AUTH_FAILED: 'common.error.auth',
+  UNAUTHORIZED: 'common.error.auth',
+  INVALID_INIT_DATA: 'common.error.auth'
 }
 
 /** Translation key for a failed query/mutation: a specific server code, a network failure, or the generic fallback. */

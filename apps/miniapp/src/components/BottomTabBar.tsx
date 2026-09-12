@@ -80,8 +80,8 @@ export function BottomTabBar(): JSX.Element {
               <span
                 className={
                   isActive
-                    ? 'whitespace-nowrap text-[10px] font-bold leading-none tracking-[-0.02em] text-ink'
-                    : 'whitespace-nowrap text-[10px] font-medium leading-none text-faint'
+                    ? 'whitespace-nowrap text-[11px] font-bold leading-tight text-ink'
+                    : 'whitespace-nowrap text-[11px] font-medium leading-tight text-faint'
                 }
               >
                 {t(tab.labelKey)}

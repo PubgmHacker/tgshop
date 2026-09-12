@@ -20,7 +20,7 @@ export function UsersSearch({ initialQuery }: { initialQuery: string }) {
       <Input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="username, first name, user ID or Telegram ID"
+        placeholder="Имя, username или ID покупателя"
         className="max-w-md"
         aria-label={t('common.search')}
       />
@@ -34,7 +34,7 @@ export function UsersSearch({ initialQuery }: { initialQuery: string }) {
             router.push('/users')
           }}
         >
-          Reset
+          Сбросить
         </Button>
       )}
     </form>

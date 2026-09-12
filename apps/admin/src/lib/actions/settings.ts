@@ -7,12 +7,12 @@ import { writeAuditLog } from '../audit'
 import { settingUpsertSchema, parseSettingValue, type SettingUpsertInput } from '../schemas'
 
 export async function listSettingsAction() {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.setting.findMany({ orderBy: { key: 'asc' } })
 }
 
 export async function upsertSettingAction(input: SettingUpsertInput) {
-  const session = requireRole(AdminRole.OWNER)
+  const session = await requireRole(AdminRole.OWNER)
   const data = settingUpsertSchema.parse(input)
 
   // Shape check per known key (unknown keys pass through as arbitrary JSON).
@@ -38,7 +38,7 @@ export async function upsertSettingAction(input: SettingUpsertInput) {
 }
 
 export async function deleteSettingAction(key: string) {
-  const session = requireRole(AdminRole.OWNER)
+  const session = await requireRole(AdminRole.OWNER)
   await prisma.setting.delete({ where: { key } })
   await writeAuditLog({ actorId: session.adminId, action: 'setting.delete', entity: 'Setting', entityId: key })
   revalidatePath('/settings')

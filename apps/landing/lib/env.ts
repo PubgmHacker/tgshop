@@ -1,9 +1,9 @@
-export const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME ?? 'your_shop_bot';
-export const SUPPORT_URL = process.env.NEXT_PUBLIC_SUPPORT_URL ?? 'https://t.me/tgshop_support';
+export const BOT_USERNAME = process.env.NEXT_PUBLIC_BOT_USERNAME || 'your_shop_bot';
+export const SUPPORT_URL = process.env.NEXT_PUBLIC_SUPPORT_URL || 'https://t.me/tgshop_support';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
-export const LANDING_URL = process.env.NEXT_PUBLIC_LANDING_URL ?? 'https://example.com';
+export const LANDING_URL = process.env.NEXT_PUBLIC_LANDING_URL || 'https://example.com';
 
 export const ANALYTICS_PROVIDER = process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER ?? '';
 export const ANALYTICS_DOMAIN = process.env.NEXT_PUBLIC_ANALYTICS_DOMAIN ?? '';

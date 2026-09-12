@@ -17,6 +17,9 @@ dist
 
 .turbo
 **/.turbo
+.playwright-cli
+.impeccable
+**/*.tsbuildinfo
 
 coverage
 **/coverage

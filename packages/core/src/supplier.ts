@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@tgshop/db'
 import { DeliveryFailedError } from './errors.js'
 import type { ExternalSupplier } from './delivery.js'
+import { postSupplierJson } from './supplier-http.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EXTERNAL_API fulfilment over HTTP.
@@ -55,12 +56,11 @@ function readPayload(body: unknown): string | null {
 /**
  * Builds the HTTP ExternalSupplier for a given Prisma client.
  *
- * No timeout or retry here on purpose: deliver() wraps every call in both, and
- * duplicating them would multiply out to nine upstream requests per order.
+ * Retry belongs to deliver(). Its abort signal also cancels the network request.
  */
 export function createHttpExternalSupplier(prisma: PrismaClient): ExternalSupplier {
   return {
-    async fulfill({ orderId, planId, qty }): Promise<{ payload: string }> {
+    async fulfill({ orderId, planId, qty }, signal): Promise<{ payload: string }> {
       const plan = await prisma.plan.findUnique({
         where: { id: planId },
         select: { product: { select: { externalConfig: true } } }
@@ -74,17 +74,13 @@ export function createHttpExternalSupplier(prisma: PrismaClient): ExternalSuppli
         )
       }
 
-      const res = await fetch(endpoint.url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...endpoint.headers },
-        body: JSON.stringify({ orderId, planId, qty })
-      })
-
-      if (!res.ok) {
-        throw new DeliveryFailedError(orderId, `external delivery API returned HTTP ${res.status}`)
-      }
-
-      const payload = readPayload(await res.json())
+      const body = await postSupplierJson(
+        endpoint.url,
+        { ...endpoint.headers, 'Idempotency-Key': `delivery:${orderId}` },
+        JSON.stringify({ orderId, planId, qty }),
+        signal ?? AbortSignal.timeout(10_000)
+      )
+      const payload = readPayload(body)
       if (payload === null) {
         throw new DeliveryFailedError(orderId, 'external delivery API returned no payload')
       }

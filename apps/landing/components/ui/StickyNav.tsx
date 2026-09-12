@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import { Container } from './Container';
 import { MotionButton } from './MotionButton';
 
@@ -11,9 +12,8 @@ export interface NavLink {
 }
 
 /**
- * OriginKit-style "sticky nav" (hand-rolled): fixed header that gains a
- * translucent blurred background once the page is scrolled, plus a mobile
- * slide-down menu.
+ * Fixed header that gains a translucent blurred background once the page is
+ * scrolled, plus a mobile slide-down menu.
  */
 export function StickyNav({
   brand,
@@ -30,6 +30,8 @@ export function StickyNav({
   localeSwitcherHref: string;
   localeSwitcherLabel: string;
 }) {
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const menuLabel = localeSwitcherLabel === 'EN' ? 'Меню' : 'Menu';
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -40,6 +42,15 @@ export function StickyNav({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus(); }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [menuOpen]);
+
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
@@ -47,9 +58,9 @@ export function StickyNav({
       }`}
     >
       <Container className="flex h-16 items-center justify-between">
-        <a href="#top" className="text-lg font-bold tracking-tight text-white">
+        <Link href="/#top" className="text-lg font-bold tracking-tight text-white">
           {brand}
-        </a>
+        </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
           {links.map((link) => (
@@ -70,19 +81,23 @@ export function StickyNav({
 
         <button
           type="button"
-          aria-label="Menu"
+          ref={menuButton}
+          aria-label={menuLabel}
+          aria-controls="mobile-navigation"
           aria-expanded={menuOpen}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-white md:hidden"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-line text-white md:hidden"
           onClick={() => setMenuOpen((v) => !v)}
         >
-          <span className="sr-only">Menu</span>
-          {menuOpen ? '✕' : '☰'}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <path d={menuOpen ? 'M6 6l12 12M6 18L18 6' : 'M4 6h16M4 12h16M4 18h16'} />
+          </svg>
         </button>
       </Container>
 
       <AnimatePresence>
         {menuOpen && (
           <motion.div
+            id="mobile-navigation"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -95,12 +110,12 @@ export function StickyNav({
                   key={link.href}
                   href={link.href}
                   onClick={() => setMenuOpen(false)}
-                  className="text-base text-white"
+                  className="flex min-h-11 items-center text-base text-white"
                 >
                   {link.label}
                 </a>
               ))}
-              <a href={localeSwitcherHref} className="text-base text-muted">
+              <a href={localeSwitcherHref} className="flex min-h-11 items-center text-base text-muted">
                 {localeSwitcherLabel}
               </a>
               <MotionButton href={ctaHref} target="_blank" rel="noopener noreferrer" className="mt-2 w-full">

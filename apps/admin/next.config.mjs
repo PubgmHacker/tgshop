@@ -1,5 +1,8 @@
+import { fileURLToPath } from 'node:url'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
   reactStrictMode: true,
   webpack(config) {
     // BullMQ exposes an optional Valkey backend from its barrel export. The
@@ -15,7 +18,8 @@ const nextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: '5mb'
-    },
+    }
+  },
     // Prisma's query engine is a .node binary that @prisma/client resolves by
     // path at runtime rather than through require(), so Next's output tracing
     // cannot see it: `output: 'standalone'` produced a bundle that booted fine
@@ -32,9 +36,8 @@ const nextConfig = {
     // at standalone/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/
     // client — the first location Prisma's loader searches, per the error's own
     // "following locations have been searched" list.
-    outputFileTracingIncludes: {
+  outputFileTracingIncludes: {
       '**/*': ['../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**/*']
-    }
   },
   transpilePackages: ['@tgshop/db', '@tgshop/core']
 }

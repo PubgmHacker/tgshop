@@ -83,11 +83,15 @@ export function registerCatalogRoutes(app: FastifyInstance): void {
       // In-stock first, then cheapest — a stable, useful default until real
       // sales-volume ranking is wired in from /internal/top-products.
       bestsellers.sort((a, b) => {
+        if (a.slug === 'mirasim' && b.slug !== 'mirasim') return -1
+        if (b.slug === 'mirasim' && a.slug !== 'mirasim') return 1
         if (a.inStock !== b.inStock) return a.inStock ? -1 : 1
         return a.minPriceCents - b.minPriceCents
       })
 
-      const categoryDtos: CategoryDto[] = categories.map(toCategoryDto)
+      const categoryDtos: CategoryDto[] = categories.map((category) => ({
+        ...toCategoryDto(category), productCount: category.products.length
+      }))
 
       return {
         banners,

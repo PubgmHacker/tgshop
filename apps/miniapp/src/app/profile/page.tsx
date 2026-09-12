@@ -19,7 +19,7 @@ export default function ProfilePage(): JSX.Element {
 
   useBackButton(false)
 
-  if (me.isError && profile.isError) {
+  if (me.isError || profile.isError) {
     return (
       <ErrorState
         title={t(errorMessageKey(me.error ?? profile.error))}
@@ -93,8 +93,10 @@ export default function ProfilePage(): JSX.Element {
             <p className="tnum mt-1 text-lg font-semibold text-ink">{formatCents(me.data?.referral.earningsCents ?? 0)}</p>
           </div>
         </div>
+        {referralLink ? <p className="mt-3 select-all break-all text-xs text-muted">{referralLink}</p> : null}
         <button
           type="button"
+          disabled={!referralLink}
           onClick={() => void copyReferral()}
           className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-full bg-card-strong py-2.5 text-[13px] font-semibold text-ink ring-1 ring-line"
         >

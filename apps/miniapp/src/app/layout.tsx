@@ -26,7 +26,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }): JSX.Element {
   return (
     <html lang="ru" data-theme="dark">
-      <body>
+      <body data-release={(process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7)}>
         <div className="stage" aria-hidden />
         <Providers>
           <div
@@ -38,9 +38,6 @@ export default function RootLayout({ children }: { children: ReactNode }): JSX.E
           </div>
           <BottomTabBar />
         </Providers>
-        <div aria-hidden className="pointer-events-none fixed bottom-1 right-2 z-[1] text-[9px] text-faint opacity-60">
-          {`v.${(process.env.RAILWAY_GIT_COMMIT_SHA ?? 'dev').slice(0, 7)}`}
-        </div>
       </body>
     </html>
   )

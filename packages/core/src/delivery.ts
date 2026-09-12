@@ -35,7 +35,7 @@ export interface DeliveryResult {
 }
 
 export interface ExternalSupplier {
-  fulfill(input: { orderId: string; planId: string; qty: number }): Promise<{ payload: string }>
+  fulfill(input: { orderId: string; planId: string; qty: number }, signal?: AbortSignal): Promise<{ payload: string }>
 }
 
 export interface DeliveryDeps {
@@ -329,7 +329,7 @@ async function deliverFromExternalApi(
   for (let attempt = 1; attempt <= EXTERNAL_ATTEMPTS; attempt++) {
     try {
       const response = await withTimeout(
-        supplier.fulfill({ orderId: order.id, planId: order.planId, qty: order.qty }),
+        (signal) => supplier.fulfill({ orderId: order.id, planId: order.planId, qty: order.qty }, signal),
         timeoutMs,
         order.id
       )
@@ -388,11 +388,12 @@ async function failAndRefund(
   })
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number, orderId: string): Promise<T> {
+async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, ms: number, orderId: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
+  const controller = new AbortController()
   try {
     return await Promise.race([
-      promise,
+      run(controller.signal),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(
           () => reject(new DeliveryFailedError(orderId, `external supplier timed out after ${ms}ms`)),
@@ -402,5 +403,6 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, orderId: string):
     ])
   } finally {
     if (timer !== undefined) clearTimeout(timer)
+    controller.abort()
   }
 }

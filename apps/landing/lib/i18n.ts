@@ -18,7 +18,7 @@ export interface WhyUsItem {
   description: string
 }
 
-export interface DemoPlan {
+export interface LandingPlan {
   id: string
   title: string
   priceCents: number
@@ -26,14 +26,14 @@ export interface DemoPlan {
   badge?: string
 }
 
-export interface DemoProduct {
+export interface LandingProduct {
   id: string
   slug?: string
   title: string
   description: string
   categoryTitle: string
   imageUrl?: string | null
-  plans: DemoPlan[]
+  plans: LandingPlan[]
 }
 
 export interface LandingCopy {
@@ -98,7 +98,7 @@ export interface LandingCopy {
     legalLinks: { label: string; href: string }[]
     copyright: string
   }
-  fallbackProducts: DemoProduct[]
+  fallbackProducts: LandingProduct[]
 }
 
 const ruCopy: LandingCopy = {
@@ -114,7 +114,6 @@ const ruCopy: LandingCopy = {
     links: [
       { label: 'Как это работает', href: '#how-it-works' },
       { label: 'Каталог', href: '#showcase' },
-      { label: 'Почему мы', href: '#why-us' },
       { label: 'Вопросы', href: '#faq' }
     ],
     cta: 'Открыть в Telegram'
@@ -150,8 +149,8 @@ const ruCopy: LandingCopy = {
     ]
   },
   showcase: {
-    title: 'Доступный каталог',
-    subtitle: 'Товары и тарифы, которые можно проверить перед оформлением заказа.',
+    title: 'Каталог',
+    subtitle: 'Доступные товары и стоимость доступа. Оформление — в Telegram.',
     fallbackNotice: 'Основной каталог сейчас недоступен. Проверьте актуальные наличие и цену в боте.',
     priceFrom: 'от',
     perMonth: '/мес',
@@ -267,7 +266,6 @@ const enCopy: LandingCopy = {
     links: [
       { label: 'How it works', href: '#how-it-works' },
       { label: 'Catalog', href: '#showcase' },
-      { label: 'Why us', href: '#why-us' },
       { label: 'FAQ', href: '#faq' }
     ],
     cta: 'Open in Telegram'

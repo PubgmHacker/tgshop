@@ -9,12 +9,13 @@ import { Badge } from '../../../../components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/table'
 import { orderStatusVariant, paymentStatusVariant } from '../status-variant'
 import { OrderActions } from './order-actions'
-import { formatCents, formatDateTime, formatJson } from '../../../../lib/format'
+import { formatEnum, formatCents, formatDateTime, formatJson } from '../../../../lib/format'
 
 export const dynamic = 'force-dynamic'
 
-export default async function OrderDetailPage({ params }: { params: { id: string } }) {
-  const session = requireSession()
+export default async function OrderDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const session = await requireSession()
+  const params = await paramsPromise
 
   const order = await getOrderDetailAction(params.id).catch(() => null)
   if (!order) notFound()
@@ -30,38 +31,38 @@ export default async function OrderDetailPage({ params }: { params: { id: string
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Order</h1>
+          <h1 className="text-2xl font-semibold">Заказ</h1>
           <p className="font-mono text-xs text-muted-foreground">{order.id}</p>
         </div>
-        <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
+        <Badge variant={orderStatusVariant(order.status)}>{formatEnum(order.status)}</Badge>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Summary</CardTitle>
+            <CardTitle>Детали заказа</CardTitle>
           </CardHeader>
           <CardContent>
             <dl className="grid grid-cols-2 gap-y-2 text-sm">
-              <dt className="text-muted-foreground">Created</dt>
+              <dt className="text-muted-foreground">Создано (UTC)</dt>
               <dd>{formatDateTime(order.createdAt)}</dd>
-              <dt className="text-muted-foreground">Delivered</dt>
+              <dt className="text-muted-foreground">Выдано</dt>
               <dd>{formatDateTime(order.deliveredAt)}</dd>
-              <dt className="text-muted-foreground">Amount</dt>
+              <dt className="text-muted-foreground">Сумма</dt>
               <dd className="tabular-nums">{formatCents(order.amountCents)}</dd>
-              <dt className="text-muted-foreground">Provider</dt>
-              <dd>{order.provider}</dd>
-              <dt className="text-muted-foreground">External ID</dt>
+              <dt className="text-muted-foreground">Способ оплаты</dt>
+              <dd>{formatEnum(order.provider)}</dd>
+              <dt className="text-muted-foreground">ID платежа</dt>
               <dd className="font-mono text-xs">{order.externalId ?? '—'}</dd>
-              <dt className="text-muted-foreground">Product</dt>
+              <dt className="text-muted-foreground">Товар</dt>
               <dd>{order.plan.product.title}</dd>
-              <dt className="text-muted-foreground">Plan</dt>
+              <dt className="text-muted-foreground">Тариф</dt>
               <dd>{order.plan.title}</dd>
-              <dt className="text-muted-foreground">Promo</dt>
+              <dt className="text-muted-foreground">Промокод</dt>
               <dd>{order.promo ? order.promo.code : '—'}</dd>
-              <dt className="text-muted-foreground">Stock item</dt>
+              <dt className="text-muted-foreground">Позиция склада</dt>
               <dd className="font-mono text-xs">{order.stockItem ? order.stockItem.id : '—'}</dd>
-              <dt className="text-muted-foreground">Customer email</dt>
+              <dt className="text-muted-foreground">Почта покупателя</dt>
               <dd className="font-mono text-xs">{order.customerEmail ?? '—'}</dd>
             </dl>
           </CardContent>
@@ -69,17 +70,17 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
         <Card>
           <CardHeader>
-            <CardTitle>User</CardTitle>
+            <CardTitle>Покупатель</CardTitle>
           </CardHeader>
           <CardContent>
             <dl className="grid grid-cols-2 gap-y-2 text-sm">
               <dt className="text-muted-foreground">Telegram ID</dt>
               <dd className="tabular-nums">{String(order.user.tgId)}</dd>
-              <dt className="text-muted-foreground">Username</dt>
+              <dt className="text-muted-foreground">Имя в Telegram</dt>
               <dd>{order.user.username ? `@${order.user.username}` : '—'}</dd>
-              <dt className="text-muted-foreground">Name</dt>
+              <dt className="text-muted-foreground">Имя</dt>
               <dd>{order.user.firstName ?? '—'}</dd>
-              <dt className="text-muted-foreground">Profile</dt>
+              <dt className="text-muted-foreground">Профиль</dt>
               <dd>
                 <Link className="underline underline-offset-4" href={`/users/${order.userId}`}>
                   Open user
@@ -92,7 +93,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle>Действия</CardTitle>
         </CardHeader>
         <CardContent>
           <OrderActions
@@ -108,27 +109,27 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
       <Card>
         <CardHeader>
-          <CardTitle>Payments</CardTitle>
+          <CardTitle>Платежи</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Created</TableHead>
-                <TableHead>Provider</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Network / tx</TableHead>
-                <TableHead>Invoice ID</TableHead>
+                <TableHead>Создано (UTC)</TableHead>
+                <TableHead>Способ оплаты</TableHead>
+                <TableHead>Статус</TableHead>
+                <TableHead>Сумма</TableHead>
+                <TableHead>Сеть / транзакция</TableHead>
+                <TableHead>ID счёта</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {order.payments.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell className="whitespace-nowrap">{formatDateTime(payment.createdAt)}</TableCell>
-                  <TableCell>{payment.provider}</TableCell>
+                  <TableCell>{formatEnum(payment.provider)}</TableCell>
                   <TableCell>
-                    <Badge variant={paymentStatusVariant(payment.status)}>{payment.status}</Badge>
+                    <Badge variant={paymentStatusVariant(payment.status)}>{formatEnum(payment.status)}</Badge>
                   </TableCell>
                   {/* Payment.amount is a BigInt in the asset's smallest unit — shown raw, not as cents. */}
                   <TableCell className="tabular-nums">
@@ -167,16 +168,16 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
       <Card>
         <CardHeader>
-          <CardTitle>Ledger entries</CardTitle>
+          <CardTitle>Операции по балансу</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Created</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Comment</TableHead>
+                <TableHead>Создано (UTC)</TableHead>
+                <TableHead>Тип</TableHead>
+                <TableHead>Сумма</TableHead>
+                <TableHead>Комментарий</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -184,7 +185,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                 <TableRow key={entry.id}>
                   <TableCell className="whitespace-nowrap">{formatDateTime(entry.createdAt)}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{entry.type}</Badge>
+                    <Badge variant="secondary">{formatEnum(entry.type)}</Badge>
                   </TableCell>
                   <TableCell
                     className={

@@ -336,7 +336,7 @@ describe('deliver: EXTERNAL_API', () => {
 
     expect(result.payload).toBe('uc-topup-ok')
     expect(fulfill).toHaveBeenCalledTimes(1)
-    expect(fulfill).toHaveBeenCalledWith({ orderId: 'order_1', planId: 'plan_1', qty: 1 })
+    expect(fulfill).toHaveBeenCalledWith({ orderId: 'order_1', planId: 'plan_1', qty: 1 }, expect.any(AbortSignal))
     expect(order.status).toBe(OrderStatus.DELIVERED)
   })
 
@@ -404,9 +404,13 @@ describe('deliver: EXTERNAL_API', () => {
   })
 
   it('times out a hanging supplier instead of blocking forever', async () => {
+    const signals: AbortSignal[] = []
     const supplier: ExternalSupplier = {
       fulfill: vi.fn(
-        () => new Promise<{ payload: string }>(() => undefined) // never settles
+        (_input: FulfillInput, signal?: AbortSignal) => {
+          if (signal) signals.push(signal)
+          return new Promise<{ payload: string }>(() => undefined)
+        }
       )
     }
     const { db, order } = makeDb({ deliveryType: DeliveryType.EXTERNAL_API })
@@ -414,6 +418,9 @@ describe('deliver: EXTERNAL_API', () => {
     await expect(
       deliver(db, 'order_1', { supplier, sleep: noSleep, timeoutMs: 5 })
     ).rejects.toThrow(/timed out/)
+    expect(signals).toHaveLength(3)
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+    expect(new Set(signals).size).toBe(3)
     expect(order.status).toBe(OrderStatus.FAILED)
   })
 

@@ -3,7 +3,7 @@ import { CryptoError } from './errors.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AES-256-GCM encrypt/decrypt — MUST stay byte-identical to the ciphertext
-// format produced by packages/db/prisma/seed.ts (encryptPayload/loadEncryptionKey).
+// format used by the database and admin stock flows.
 //
 // Format: v1:<ivB64>:<tagB64>:<ctB64>
 //   v1     literal version prefix, allows future format migrations

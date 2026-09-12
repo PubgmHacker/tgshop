@@ -8,7 +8,7 @@ import { t } from '../../../lib/i18n'
 export const dynamic = 'force-dynamic'
 
 export default async function PromosPage() {
-  const session = requireSession()
+  const session = await requireSession()
 
   const [promos, plans] = await Promise.all([listPromosAction(), listPlansAction()])
 

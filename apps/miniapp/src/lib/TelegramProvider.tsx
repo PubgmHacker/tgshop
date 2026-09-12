@@ -146,7 +146,7 @@ export function TelegramProvider({ children }: { children: ReactNode }): JSX.Ele
         nav: navigationUrl.includes('#') ? describeParams(navigationUrl.slice(navigationUrl.indexOf('#'))) : '-',
         tgobj: (window as { Telegram?: { WebApp?: unknown } }).Telegram?.WebApp ? '1' : '0',
         plat: platform,
-        sdk: sdkError.slice(0, 120)
+        sdk: sdkError ? 'failed' : 'ok'
       })
     }
   }, [])

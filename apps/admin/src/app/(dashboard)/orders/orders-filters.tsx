@@ -7,6 +7,7 @@ import { Input } from '../../../components/ui/input'
 import { Label } from '../../../components/ui/label'
 import { Select } from '../../../components/ui/form'
 import { t } from '../../../lib/i18n'
+import { formatEnum } from '../../../lib/format'
 
 export interface OrderFilterValues {
   status: string
@@ -53,44 +54,44 @@ export function OrdersFilters({
       <div className="flex flex-col gap-1">
         <Label htmlFor="status">{t('common.status')}</Label>
         <Select id="status" value={values.status} onChange={(e) => set('status', e.target.value)}>
-          <option value="">All</option>
+          <option value="">Все</option>
           {statuses.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {formatEnum(status)}
             </option>
           ))}
         </Select>
       </div>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="provider">Provider</Label>
+        <Label htmlFor="provider">Способ оплаты</Label>
         <Select id="provider" value={values.provider} onChange={(e) => set('provider', e.target.value)}>
-          <option value="">All</option>
+          <option value="">Все</option>
           {providers.map((provider) => (
             <option key={provider} value={provider}>
-              {provider}
+              {formatEnum(provider)}
             </option>
           ))}
         </Select>
       </div>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="dateFrom">From (UTC)</Label>
+        <Label htmlFor="dateFrom">С (UTC)</Label>
         <Input id="dateFrom" type="date" value={values.dateFrom} onChange={(e) => set('dateFrom', e.target.value)} />
       </div>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="dateTo">To (UTC)</Label>
+        <Label htmlFor="dateTo">По (UTC)</Label>
         <Input id="dateTo" type="date" value={values.dateTo} onChange={(e) => set('dateTo', e.target.value)} />
       </div>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="userId">User ID</Label>
+        <Label htmlFor="userId">ID покупателя</Label>
         <Input id="userId" value={values.userId} onChange={(e) => set('userId', e.target.value)} className="w-48" />
       </div>
       <div className="flex flex-col gap-1">
-        <Label htmlFor="query">Order / external ID</Label>
+        <Label htmlFor="query">ID заказа или платежа</Label>
         <Input id="query" value={values.query} onChange={(e) => set('query', e.target.value)} className="w-56" />
       </div>
       <Button type="submit">{t('common.search')}</Button>
       <Button type="button" variant="outline" onClick={onReset}>
-        Reset
+        Сбросить
       </Button>
     </form>
   )

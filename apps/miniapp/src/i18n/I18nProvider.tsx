@@ -41,7 +41,8 @@ function detectInitialLocale(): Locale {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [locale, setLocale] = useState<Locale>(() => detectInitialLocale())
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE)
+  useEffect(() => { setLocale(detectInitialLocale()) }, [])
   useEffect(() => {
     document.documentElement.lang = locale
   }, [locale])

@@ -19,11 +19,11 @@ function toStats(value: unknown): BroadcastStats | null {
     const raw = record[key]
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : 0
   }
-  return { total: read('total'), sent: read('sent'), blocked: read('blocked'), failed: read('failed') }
+  return { total: read('total'), sent: read('sent'), blocked: read('Заблокирован'), failed: read('failed') }
 }
 
 export default async function BroadcastsPage() {
-  const session = requireSession()
+  const session = await requireSession()
 
   const [posts, counts] = await Promise.all([listBroadcastsAction(), segmentCountsAction()])
 

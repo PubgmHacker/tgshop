@@ -4,10 +4,9 @@ import { listOrdersAction } from '../../../lib/actions/orders'
 import { requireSession } from '../../../lib/rbac'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table'
 import { Badge } from '../../../components/ui/badge'
-import { Button } from '../../../components/ui/button'
 import { OrdersFilters } from './orders-filters'
 import { orderStatusVariant } from './status-variant'
-import { formatCents, formatDateTime } from '../../../lib/format'
+import { formatEnum, formatCents, formatDateTime } from '../../../lib/format'
 import { t } from '../../../lib/i18n'
 
 export const dynamic = 'force-dynamic'
@@ -22,8 +21,9 @@ function first(params: SearchParams, key: string): string {
   return value ?? ''
 }
 
-export default async function OrdersPage({ searchParams }: { searchParams: SearchParams }) {
-  requireSession()
+export default async function OrdersPage({ searchParams: searchParamsPromise }: { searchParams: Promise<SearchParams> }) {
+  await requireSession()
+  const searchParams = await searchParamsPromise
 
   const statusParam = first(searchParams, 'status')
   const providerParam = first(searchParams, 'provider')
@@ -83,18 +83,18 @@ export default async function OrdersPage({ searchParams }: { searchParams: Searc
       />
 
       <div className="text-sm text-muted-foreground">
-        {result.total} order{result.total === 1 ? '' : 's'} · page {result.page} / {totalPages}
+        Заказов: {result.total} · Страница {result.page} из {totalPages}
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Created</TableHead>
-            <TableHead>Order</TableHead>
-            <TableHead>User</TableHead>
-            <TableHead>Product / plan</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Provider</TableHead>
+            <TableHead>Создано (UTC)</TableHead>
+            <TableHead>Заказ</TableHead>
+            <TableHead>Покупатель</TableHead>
+            <TableHead>Товар / тариф</TableHead>
+            <TableHead>Сумма</TableHead>
+            <TableHead>Способ оплаты</TableHead>
             <TableHead>{t('common.status')}</TableHead>
             <TableHead>{t('common.actions')}</TableHead>
           </TableRow>
@@ -114,17 +114,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Searc
               </TableCell>
               <TableCell className="tabular-nums">{formatCents(order.amountCents)}</TableCell>
               <TableCell>
-                <Badge variant="secondary">{order.provider}</Badge>
+                <Badge variant="secondary">{formatEnum(order.provider)}</Badge>
               </TableCell>
               <TableCell>
-                <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
+                <Badge variant={orderStatusVariant(order.status)}>{formatEnum(order.status)}</Badge>
               </TableCell>
               <TableCell>
-                <Link href={`/orders/${order.id}`}>
-                  <Button size="sm" variant="outline">
-                    Details
-                  </Button>
-                </Link>
+                <Link href={`/orders/${order.id}`} className="inline-flex min-h-11 items-center rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+                    Подробнее
+                  </Link>
               </TableCell>
             </TableRow>
           ))}
@@ -140,18 +138,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Searc
 
       <div className="flex items-center gap-2">
         {page > 1 && (
-          <Link href={pageHref(page - 1)}>
-            <Button variant="outline" size="sm">
-              ← Prev
-            </Button>
-          </Link>
+          <Link href={pageHref(page - 1)} className="inline-flex min-h-11 items-center rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+              ← Назад
+            </Link>
         )}
         {page < totalPages && (
-          <Link href={pageHref(page + 1)}>
-            <Button variant="outline" size="sm">
-              Next →
-            </Button>
-          </Link>
+          <Link href={pageHref(page + 1)} className="inline-flex min-h-11 items-center rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+              Далее →
+            </Link>
         )}
       </div>
     </div>

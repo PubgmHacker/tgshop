@@ -1,4 +1,4 @@
-import { AdminRole } from '@tgshop/db'
+import { AdminRole, prisma } from '@tgshop/db'
 import { getSession, type SessionPayload } from './session'
 
 export class UnauthorizedError extends Error {
@@ -22,12 +22,14 @@ const ROLE_RANK: Record<AdminRole, number> = {
 }
 
 /** Throws UnauthorizedError if there is no valid session; otherwise returns it. Call at the top of every server action / route handler. */
-export function requireSession(): SessionPayload {
-  const session = getSession()
+export async function requireSession(): Promise<SessionPayload> {
+  const session = await getSession()
   if (!session) {
     throw new UnauthorizedError()
   }
-  return session
+  const admin = await prisma.adminUser.findUnique({ where: { id: session.adminId }, select: { role: true, email: true } })
+  if (!admin) throw new UnauthorizedError()
+  return { ...session, role: admin.role, email: admin.email }
 }
 
 /**
@@ -35,8 +37,8 @@ export function requireSession(): SessionPayload {
  * in the OWNER > ADMIN > SUPPORT hierarchy. Must be called server-side inside every
  * mutating server action / route handler — never trust client-side role checks alone.
  */
-export function requireRole(minRole: AdminRole): SessionPayload {
-  const session = requireSession()
+export async function requireRole(minRole: AdminRole): Promise<SessionPayload> {
+  const session = await requireSession()
   if (ROLE_RANK[session.role] < ROLE_RANK[minRole]) {
     throw new ForbiddenError(`Requires role >= ${minRole}, session has ${session.role}`)
   }

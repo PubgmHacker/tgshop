@@ -61,6 +61,7 @@ export default function MorePage(): JSX.Element {
             <button
               key={option.value}
               type="button"
+              aria-pressed={locale === option.value}
               onClick={() => {
                 triggerHaptic('light')
                 setLocale(option.value)

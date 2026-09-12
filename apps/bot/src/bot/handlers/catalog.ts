@@ -1,4 +1,5 @@
 import type { Bot } from 'grammy'
+import { applyPercentDiscount } from '@tgshop/core'
 import type { BotContext } from '../context.js'
 import { t } from '../../i18n/index.js'
 import { formatUsd } from '../../lib/format.js'
@@ -66,7 +67,7 @@ export async function showPlanDetails(ctx: BotContext, planId: string): Promise<
   const stock = await getAvailableStockCount(planId)
   const poolBacked = isPoolBacked(plan.product.deliveryType, plan.product.externalConfig)
   const price = formatUsd(
-    plan.discountPercent > 0 ? Math.round((plan.priceCents * (100 - plan.discountPercent)) / 100) : plan.priceCents
+    applyPercentDiscount(plan.priceCents, plan.discountPercent)
   )
 
   await ctx.reply(

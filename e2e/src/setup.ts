@@ -23,8 +23,8 @@ import { credit, debit, encrypt, markPaid } from '@tgshop/core'
 // golden rule here is: never truncate, never delete anything the fixture did
 // not create. Each fixture owns a private Category → Product → Plan → StockItem
 // chain plus its own User, all tagged with a per-fixture random id, and tears
-// down exactly those rows. The 3 seeded categories / 6 products / 12 plans /
-// 20 stock items must still be there when the suite finishes, and the suite
+// down exactly those rows. The 3 seeded categories / 7 products / 13 plans
+// must still be there when the suite finishes, and the suite
 // must be runnable twice in a row with no manual reset in between.
 // ─────────────────────────────────────────────────────────────────────────────
 

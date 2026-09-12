@@ -22,7 +22,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        app: [bot, worker, miniapp, landing, admin]
+        app: [bot, worker, miniapp, landing, admin, admin-miniapp]
 
     steps:
       - name: Checkout
@@ -63,6 +63,11 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_BOT_USERNAME=${{ vars.NEXT_PUBLIC_BOT_USERNAME }}
+            NEXT_PUBLIC_SUPPORT_URL=${{ vars.NEXT_PUBLIC_SUPPORT_URL }}
+            NEXT_PUBLIC_LANDING_URL=${{ vars.NEXT_PUBLIC_LANDING_URL }}
+            NEXT_PUBLIC_ANALYTICS_PROVIDER=${{ vars.NEXT_PUBLIC_ANALYTICS_PROVIDER }}
+            NEXT_PUBLIC_ANALYTICS_DOMAIN=${{ vars.NEXT_PUBLIC_ANALYTICS_DOMAIN }}
+            NEXT_PUBLIC_ANALYTICS_SCRIPT_URL=${{ vars.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

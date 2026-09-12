@@ -8,11 +8,12 @@ import { t } from '../../../lib/i18n'
 export const dynamic = 'force-dynamic'
 
 export default async function PlansPage({
-  searchParams
+  searchParams: searchParamsPromise
 }: {
-  searchParams: { productId?: string | string[] }
+  searchParams: Promise<{ productId?: string | string[] }>
 }) {
-  const session = requireSession()
+  const session = await requireSession()
+  const searchParams = await searchParamsPromise
   const raw = searchParams.productId
   const productId = Array.isArray(raw) ? raw[0] : raw
 
