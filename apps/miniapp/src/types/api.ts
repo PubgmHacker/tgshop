@@ -34,7 +34,8 @@ export const CategorySchema = z.object({
   id: z.string(),
   title: z.string(),
   slug: z.string(),
-  emoji: z.string().nullable()
+  emoji: z.string().nullable(),
+  productCount: z.number().int().nonnegative().optional()
 })
 export type Category = z.infer<typeof CategorySchema>
 

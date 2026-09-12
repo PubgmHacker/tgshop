@@ -42,7 +42,7 @@ function describeStateError(err: unknown, action: string, orderId: string): neve
 }
 
 export async function listOrdersAction(input: OrderFilterInput) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   const data = orderFilterSchema.parse(input)
 
   const where: Prisma.OrderWhereInput = {
@@ -70,7 +70,7 @@ export async function listOrdersAction(input: OrderFilterInput) {
       orderBy: { createdAt: 'desc' },
       skip: (data.page - 1) * data.pageSize,
       take: data.pageSize,
-      include: { user: true, plan: { include: { product: true } }, payments: true }
+      include: { user: true, plan: { include: { product: { select: { id: true, title: true, deliveryType: true } } } }, payments: true }
     }),
     prisma.order.count({ where })
   ])
@@ -79,12 +79,12 @@ export async function listOrdersAction(input: OrderFilterInput) {
 }
 
 export async function getOrderDetailAction(orderId: string) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.order.findUnique({
     where: { id: orderId },
     include: {
       user: true,
-      plan: { include: { product: true } },
+      plan: { include: { product: { select: { id: true, title: true, deliveryType: true } } } },
       payments: true,
       stockItem: true,
       promo: true,
@@ -110,7 +110,7 @@ export async function getOrderDetailAction(orderId: string) {
  * is already DELIVERING).
  */
 export async function redeliverOrderAction(input: OrderRedeliverInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = orderRedeliverSchema.parse(input)
 
   const order = await prisma.order.findUnique({
@@ -205,7 +205,7 @@ async function notifyBuyerDelivered(
  * encrypted on the order row.
  */
 export async function deliverOrderManuallyAction(input: OrderManualDeliverInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = orderManualDeliverSchema.parse(input)
 
   const order = await prisma.order.findUnique({
@@ -270,7 +270,7 @@ export async function deliverOrderManuallyAction(input: OrderManualDeliverInput)
  * refund path — so a double-clicked button credits the buyer exactly once.
  */
 export async function refundOrderAction(input: OrderRefundInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = orderRefundSchema.parse(input)
 
   const order = await prisma.order.findUnique({ where: { id: data.orderId } })

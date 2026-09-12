@@ -3,9 +3,7 @@
 // This is the only way to get into the admin panel. Everything else is a dead
 // end by design:
 //
-//   • the seed writes a `seed$<sha256>` placeholder, which bcrypt.compare()
-//     can never match (it is not a bcrypt hash at all — packages/db has no
-//     bcrypt dependency), so the seeded account cannot log in;
+//   • the database seed creates no admin credentials;
 //   • the panel has no "manage admins" page, so an existing admin cannot mint
 //     the first one;
 //   • telegramLoginAction() requires an AdminUser row whose email is already
@@ -19,7 +17,7 @@
 //   node scripts/create-admin.mjs --email you@example.com --role OWNER
 //   node scripts/create-admin.mjs --email you@example.com --password '...' --role OWNER
 //   node scripts/create-admin.mjs --telegram-id 123456789 --role OWNER
-//   node scripts/create-admin.mjs --delete admin@tgshop.local
+//   node scripts/create-admin.mjs --delete <email>
 //
 // With no --password the script generates a strong one and prints it once.
 // Re-running for an existing email resets that account's password (and role, if
@@ -72,7 +70,7 @@ Options:
                  your shell history.
   --role         Defaults to OWNER, the only role that can manage other admins.
   --force        Overwrite (or delete) an existing account without the prompt.
-  --delete       Remove the named account, e.g. the seeded demo OWNER. Refuses
+  --delete       Remove the named account. Refuses
                  to remove the last remaining OWNER.
 
 Requires DATABASE_URL (set -a; source .env; set +a) and a prior 'pnpm build'.`)
@@ -101,7 +99,7 @@ const args = parseArgs(process.argv.slice(2))
 
 if (args.help || args.h) usage()
 
-// ── --delete: the pre-production step for the seeded demo OWNER ─────────────
+// ── --delete: remove an explicitly named admin ──────────────────────────────
 if (args.delete !== undefined) {
   if (args.delete === true) usage('--delete needs the email of the account to remove')
   const target = String(args.delete).trim().toLowerCase()
@@ -182,8 +180,7 @@ if (existing && !args.force) {
 const passwordHash = await bcrypt.hash(password, BCRYPT_COST)
 
 // Verify before writing: a hash that does not round-trip would lock the panel
-// exactly like the seed placeholder does, and the failure would only surface at
-// the login screen.
+// and the failure would only surface at the login screen.
 if (!(await bcrypt.compare(password, passwordHash))) {
   console.error('error: generated hash failed its own verification, refusing to write')
   await prisma.$disconnect()
@@ -207,19 +204,6 @@ if (args['telegram-id']) {
 } else if (generated) {
   console.log(`\n  password: ${password}\n`)
   console.log('this is shown once and is not stored anywhere in plaintext — save it now.')
-}
-
-// The seeded placeholder cannot log in, but it is still an OWNER row that a
-// future auth change might start honouring. Flag it while an operator is here.
-const SEED_EMAIL = 'admin@tgshop.local'
-if (email !== SEED_EMAIL) {
-  const seeded = await prisma.adminUser.findUnique({ where: { email: SEED_EMAIL } })
-  if (seeded && seeded.passwordHash.startsWith('seed$')) {
-    console.log(
-      `\nnote: the demo account ${SEED_EMAIL} still holds its unusable seed placeholder.\n` +
-        `      delete it before going live:  node scripts/create-admin.mjs --delete ${SEED_EMAIL}`
-    )
-  }
 }
 
 await prisma.$disconnect()

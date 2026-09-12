@@ -85,9 +85,13 @@ export function describeError(err: unknown, locale: Locale): { status: number; b
   // as route validation failures instead of misreporting them as 500s.
   if (isFastifyClientError(err)) {
     return {
-      status: err.code === 'FST_ERR_CTP_BODY_TOO_LARGE' ? 413 : 400,
+      status: err.code === 'FST_ERR_CTP_BODY_TOO_LARGE' ? 413 : err.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE' ? 415 : 400,
       body: toApiErrorBody('VALIDATION_ERROR', locale, 'api.errors.validation')
     }
+  }
+
+  if (err && typeof err === 'object' && (err as { statusCode?: unknown }).statusCode === 429) {
+    return { status: 429, body: toApiErrorBody('RATE_LIMITED', locale, 'errors.rate_limited') }
   }
 
   // core's setSetting throws this for a value that fails the key's schema; it is
@@ -139,7 +143,9 @@ export function describeError(err: unknown, locale: Locale): { status: number; b
 function isFastifyClientError(err: unknown): err is { code: string } {
   if (!err || typeof err !== 'object') return false
   const code = (err as { code?: unknown }).code
-  return code === 'FST_ERR_CTP_INVALID_JSON' || code === 'FST_ERR_CTP_BODY_TOO_LARGE'
+  return code === 'FST_ERR_CTP_INVALID_JSON' || code === 'FST_ERR_CTP_INVALID_JSON_BODY' ||
+    code === 'FST_ERR_CTP_EMPTY_JSON_BODY' || code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE' ||
+    code === 'FST_ERR_CTP_BODY_TOO_LARGE'
 }
 
 /** Sends a mapped error response, logging 5xx causes with full context. */

@@ -71,20 +71,20 @@ export function CategoriesClient({
       })
       resetForm()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
   }
 
   async function onDelete(id: string) {
-    if (!window.confirm('Delete this category?')) return
+    if (!window.confirm('Удалить категорию?')) return
     setError(null)
     try {
       await deleteCategoryAction(id)
       setCategories((prev) => prev.filter((c) => c.id !== id))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     }
   }
 
@@ -93,19 +93,19 @@ export function CategoriesClient({
       {canEdit ? (
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-4">
         <div className="flex flex-col gap-1">
-          <Label htmlFor="title">Title</Label>
+          <Label htmlFor="title">Название</Label>
           <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="slug">Slug</Label>
+          <Label htmlFor="slug">Адрес в каталоге</Label>
           <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} required />
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="emoji">Emoji</Label>
+          <Label htmlFor="emoji">Эмодзи</Label>
           <Input id="emoji" value={emoji} onChange={(e) => setEmoji(e.target.value)} className="w-16" />
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="sortOrder">Sort</Label>
+          <Label htmlFor="sortOrder">Порядок</Label>
           <Input
             id="sortOrder"
             type="number"
@@ -116,7 +116,7 @@ export function CategoriesClient({
         </div>
         <label className="flex items-center gap-2 pb-1 text-sm">
           <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-          Active
+          Активен
         </label>
         <Button type="submit" disabled={pending}>
           {editing ? t('common.save') : t('common.create')}
@@ -126,18 +126,18 @@ export function CategoriesClient({
             {t('common.cancel')}
           </Button>
         )}
-        {error && <span className="text-sm text-destructive">{error}</span>}
+        {error && <span role="alert" className="text-sm text-destructive">{error}</span>}
       </form>
       ) : (
-        error && <p className="text-sm text-destructive">{error}</p>
+        error && <p role="alert" className="text-sm text-destructive">{error}</p>
       )}
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Slug</TableHead>
-            <TableHead>Products</TableHead>
+            <TableHead>Название</TableHead>
+            <TableHead>Адрес в каталоге</TableHead>
+            <TableHead>Товары</TableHead>
             <TableHead>{t('common.status')}</TableHead>
             <TableHead>{t('common.actions')}</TableHead>
           </TableRow>
@@ -153,7 +153,7 @@ export function CategoriesClient({
               <TableCell>{category._count.products}</TableCell>
               <TableCell>
                 <Badge variant={category.isActive ? 'success' : 'secondary'}>
-                  {category.isActive ? 'active' : 'inactive'}
+                  {category.isActive ? 'Активен' : 'Отключён'}
                 </Badge>
               </TableCell>
               <TableCell className="flex gap-2">

@@ -2,6 +2,8 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
+      "env": ["NEXT_PUBLIC_*", "RAILWAY_GIT_COMMIT_SHA"],
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "ENCRYPTION_KEY", "SESSION_SECRET", "BOT_TOKEN", "BOT_USERNAME"],
       "dependsOn": [
         "^build"
       ],
@@ -27,10 +29,12 @@
       "outputs": [],
       "env": [
         "DATABASE_URL",
+        "REDIS_URL",
         "ENCRYPTION_KEY"
       ]
     },
     "dev": {
+      "passThroughEnv": ["*"],
       "cache": false,
       "persistent": true
     }

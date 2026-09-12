@@ -10,10 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "14.2.35",
+    "framer-motion": "^11.11.17",
+    "next": "15.5.24",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "framer-motion": "^11.11.17",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -21,7 +21,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
+    "postcss": "8.5.28",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.2"
   }

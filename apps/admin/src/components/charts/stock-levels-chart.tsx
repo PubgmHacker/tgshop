@@ -1,6 +1,4 @@
-'use client'
-
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import Link from 'next/link'
 
 export interface StockLevelDatum {
   planId: string
@@ -10,38 +8,32 @@ export interface StockLevelDatum {
   threshold: number
 }
 
+/** Exact counts remain legible even when every plan has zero stock. */
 export function StockLevelsChart({ data }: { data: StockLevelDatum[] }) {
-  const chartData = data.slice(0, 15).map((d) => ({ ...d, label: `${d.productTitle} / ${d.planTitle}` }))
-
+  if (!data.length) return <p className="py-12 text-center text-sm text-muted-foreground">Нет тарифов с выдачей со склада.</p>
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 16, bottom: 0, left: 16 }}>
-        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-        <YAxis
-          type="category"
-          dataKey="label"
-          width={180}
-          tick={{ fontSize: 11 }}
-          className="fill-muted-foreground"
-        />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--popover))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: 8,
-            color: 'hsl(var(--popover-foreground))'
-          }}
-        />
-        <Bar dataKey="available" radius={[0, 4, 4, 0]}>
-          {chartData.map((entry) => (
-            <Cell
-              key={entry.planId}
-              fill={entry.available <= entry.threshold ? 'hsl(var(--destructive))' : 'hsl(var(--success))'}
-            />
+    <div className="max-h-80 overflow-auto" tabIndex={0} role="region" aria-label="Остатки по тарифам">
+      <table className="w-full text-sm">
+        <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
+          <tr><th className="py-2 pr-3">Товар / тариф</th><th className="py-2 text-right">Доступно</th></tr>
+        </thead>
+        <tbody>
+          {data.slice(0, 15).map((entry) => (
+            <tr key={entry.planId} className="border-t border-border">
+              <td className="py-3 pr-3">
+                <Link className="font-medium underline-offset-4 hover:underline" href={`/stock?planId=${encodeURIComponent(entry.planId)}`}>
+                  {entry.productTitle}
+                </Link>
+                <p className="text-xs text-muted-foreground">{entry.planTitle}</p>
+              </td>
+              <td className="py-3 text-right tabular-nums">
+                <span className={entry.available <= entry.threshold ? 'font-semibold text-destructive' : ''}>{entry.available}</span>
+                {entry.available <= entry.threshold && <p className="text-xs text-muted-foreground">Минимум: {entry.threshold}</p>}
+              </td>
+            </tr>
           ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+        </tbody>
+      </table>
+    </div>
   )
 }

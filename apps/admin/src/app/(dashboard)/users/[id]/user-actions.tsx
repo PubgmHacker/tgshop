@@ -29,7 +29,7 @@ export function UserActions({
   const [pending, setPending] = useState(false)
 
   if (!canAct) {
-    return <p className="text-sm text-muted-foreground">Your role cannot adjust balances or ban users.</p>
+    return <p className="text-sm text-muted-foreground">У вашей роли нет доступа к изменению балансов и блокировке пользователей.</p>
   }
 
   async function onAdjust() {
@@ -52,7 +52,7 @@ export function UserActions({
       setComment('')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -60,7 +60,7 @@ export function UserActions({
 
   async function onToggleBan() {
     const next = !isBlocked
-    if (!window.confirm(next ? 'Ban this user?' : 'Unban this user?')) return
+    if (!window.confirm(next ? 'Заблокировать покупателя?' : 'Разблокировать покупателя?')) return
     setPending(true)
     setError(null)
     setMessage(null)
@@ -69,7 +69,7 @@ export function UserActions({
       setMessage(next ? 'User banned' : 'User unbanned')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -79,7 +79,7 @@ export function UserActions({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <Label htmlFor="amountCents">Amount (cents)</Label>
+          <Label htmlFor="amountCents">Сумма (центы USD)</Label>
           <Input
             id="amountCents"
             type="number"
@@ -92,7 +92,7 @@ export function UserActions({
           </span>
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="ledgerType">Ledger type</Label>
+          <Label htmlFor="ledgerType">Тип операции</Label>
           <Select id="ledgerType" value={type} onChange={(e) => setType(e.target.value as LedgerType)}>
             {Object.values(LedgerType).map((value) => (
               <option key={value} value={value}>
@@ -102,7 +102,7 @@ export function UserActions({
           </Select>
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="comment">Comment</Label>
+          <Label htmlFor="comment">Комментарий</Label>
           <Input
             id="comment"
             value={comment}
@@ -119,8 +119,8 @@ export function UserActions({
           {isBlocked ? t('users.unban') : t('users.ban')}
         </Button>
       </div>
-      {message && <p className="text-sm text-success">{message}</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {message && <p role="status" className="text-sm text-success">{message}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }

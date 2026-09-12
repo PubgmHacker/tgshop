@@ -46,6 +46,7 @@ export default function OrdersPage(): JSX.Element {
           <button
             key={option.value}
             type="button"
+            aria-pressed={filter === option.value}
             onClick={() => {
               triggerHaptic('light')
               setFilter(option.value)

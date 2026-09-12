@@ -18,14 +18,14 @@ export default function PrivacyPage() {
     <main>
       <StickyNav
         brand={copy.nav.brand}
-        links={copy.nav.links}
+        links={copy.nav.links.map((link) => ({ ...link, href: `/${link.href}` }))}
         ctaLabel={copy.nav.cta}
         ctaHref={botLink}
-        localeSwitcherHref="/en/privacy/"
+        localeSwitcherHref="/en/"
         localeSwitcherLabel="EN"
       />
       <Container className="max-w-3xl pt-32 pb-20 sm:pt-40">
-        <h1 className="text-3xl font-bold text-white sm:text-4xl">Политика конфиденциальности</h1>
+        <h1 className="break-words text-2xl font-bold text-white [overflow-wrap:anywhere] sm:text-4xl">Политика конфиденциальности</h1>
         <div className="mt-8 space-y-6 text-sm leading-relaxed text-muted">
           <p>
             Мы обрабатываем минимально необходимый набор данных: ваш Telegram ID, имя пользователя, язык интерфейса и

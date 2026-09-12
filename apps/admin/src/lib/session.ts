@@ -59,8 +59,8 @@ export function decodeSession(cookieValue: string | undefined): SessionPayload |
 }
 
 /** Reads and validates the current request's session cookie (server components / route handlers / server actions). */
-export function getSession(): SessionPayload | null {
-  const raw = cookies().get(SESSION_COOKIE_NAME)?.value
+export async function getSession(): Promise<SessionPayload | null> {
+  const raw = (await cookies()).get(SESSION_COOKIE_NAME)?.value
   return decodeSession(raw)
 }
 

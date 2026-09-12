@@ -16,3 +16,11 @@ export function formatPriceCents(cents: number, locale: Locale): string {
   }).format(amount)
   return `$${formatted}`
 }
+
+/** Price covers this whole duration; one-off codes do not imply lifetime access. */
+export function formatPlanDuration(days: number | null, locale: Locale): string {
+  if (days === null) return locale === 'ru' ? 'разовая покупка' : 'one-time purchase'
+  if (locale === 'en') return `for ${days} ${days === 1 ? 'day' : 'days'}`
+  const unit = new Intl.PluralRules('ru').select(days)
+  return `за ${days} ${unit === 'one' ? 'день' : unit === 'few' ? 'дня' : 'дней'}`
+}

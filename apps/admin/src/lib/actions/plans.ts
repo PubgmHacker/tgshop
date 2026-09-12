@@ -7,19 +7,19 @@ import { writeAuditLog } from '../audit'
 import { planUpsertSchema, type PlanUpsertInput } from '../schemas'
 
 export async function listPlansAction(productId?: string) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.plan.findMany({
     where: productId ? { productId } : undefined,
     orderBy: [{ sortOrder: 'asc' }, { title: 'asc' }],
     include: {
-      product: true,
+      product: { select: { id: true, title: true, deliveryType: true } },
       _count: { select: { stockItems: { where: { status: 'AVAILABLE' } } } }
     }
   })
 }
 
 export async function upsertPlanAction(input: PlanUpsertInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = planUpsertSchema.parse(input)
 
   const fields = {
@@ -51,7 +51,7 @@ export async function upsertPlanAction(input: PlanUpsertInput) {
 }
 
 export async function deletePlanAction(id: string) {
-  const session = requireRole(AdminRole.OWNER)
+  const session = await requireRole(AdminRole.OWNER)
   await prisma.plan.delete({ where: { id } })
   await writeAuditLog({ actorId: session.adminId, action: 'plan.delete', entity: 'Plan', entityId: id })
   revalidatePath('/plans')

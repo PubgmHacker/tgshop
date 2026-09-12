@@ -1,8 +1,9 @@
 # Admin
 
-`apps/admin` is a Next.js 14 App Router panel for shop operators, backed by
-`AdminUser` (`AdminRole`: `OWNER`, `ADMIN`, `SUPPORT`) and talking to
-`apps/bot`'s `/api/*`/`/internal/*` endpoints (JWT session, `JWT_SECRET`).
+`apps/admin` is a Next.js 15 App Router panel for shop operators, backed by
+`AdminUser` (`AdminRole`: `OWNER`, `ADMIN`, `SUPPORT`). Its server actions use
+Prisma and a signed HttpOnly session cookie (`SESSION_SECRET`). The Telegram
+admin Mini App uses the separate JWT-protected `/api/admin/*` surface.
 
 ## Roles
 
@@ -26,10 +27,9 @@ mandatory as well.
 
 What does **not** exist is any way to create an account from the UI. There is no
 "manage admins" page, the Telegram widget path deliberately never creates
-admins, and the `admin@tgshop.local` row written by the seed carries a
-`seed$<sha256>` placeholder that is not a bcrypt hash at all, so
-`bcrypt.compare()` can never match it. **A fresh deployment therefore has no
-usable login until you create one**, using `scripts/create-admin.mjs` — it needs
+admins, and the database seed creates no admin credentials. **A fresh deployment
+therefore has no usable login until you create one**, using
+`scripts/create-admin.mjs` — it needs
 `DATABASE_URL` in the environment and a prior `pnpm build`:
 
 ```bash
@@ -39,12 +39,10 @@ set -a; source .env; set +a
 #    it exactly once; only its bcrypt hash is ever stored.
 node scripts/create-admin.mjs --email you@example.com --role OWNER
 
-# 2. Sign in, confirm it works, then remove the unusable seeded demo account.
-node scripts/create-admin.mjs --delete admin@tgshop.local
+# 2. Sign in and confirm the new account works.
 ```
 
-Do those in that order: the script refuses to delete the last remaining `OWNER`,
-which is what stops step 2 from locking everyone out. Re-running step 1 for an
+The script refuses to delete the last remaining `OWNER`. Re-running step 1 for an
 existing email resets that account's password, which is also the recovery path
 for a locked-out owner — there is no self-service password reset.
 
@@ -127,3 +125,23 @@ relying on it.
   `docs/AGENT_PLAN.md`) show up in the same admin **Audit log** view with
   `actorType="agent"`, so operators have one place to review both human and
   automated changes.
+
+
+## September 2026 security changes
+
+Password login uses an atomic Redis rate limit (10 attempts per account per
+15 minutes and a global 300 per minute). Redis failure refuses login. Existing
+sessions recheck the administrator record and current role on every action.
+Telegram widget login does not bypass configured two-factor authentication.
+
+Supplier JSON configuration is available only to ADMIN/OWNER. Product audit
+entries record that configuration changed without copying its credentials;
+clearing the editor now clears the saved configuration. Earlier audit records
+are not rewritten automatically.
+
+External delivery requires HTTPS and public IP addresses. DNS answers are
+validated and the selected IP is pinned to the request; redirects and reserved
+HTTP headers are rejected. Responses are limited to 256 KiB, and the delivery
+timeout cancels the network request. Providers must deduplicate the stable
+`Idempotency-Key: delivery:<orderId>` across retries. Cancellation cannot undo
+an operation already completed by a remote provider.

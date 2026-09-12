@@ -7,16 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../../components
 import { StatTile } from '../../../../components/stat-tile'
 import { Badge } from '../../../../components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../../components/ui/table'
-import { Button } from '../../../../components/ui/button'
 import { orderStatusVariant } from '../../orders/status-variant'
 import { UserActions } from './user-actions'
-import { formatCents, formatDateTime } from '../../../../lib/format'
+import { formatEnum, formatCents, formatDateTime } from '../../../../lib/format'
 import { t } from '../../../../lib/i18n'
 
 export const dynamic = 'force-dynamic'
 
-export default async function UserDetailPage({ params }: { params: { id: string } }) {
-  const session = requireSession()
+export default async function UserDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const session = await requireSession()
+  const params = await paramsPromise
 
   const [detail, ledger] = await Promise.all([
     getUserDetailAction(params.id).catch(() => null),
@@ -39,7 +39,7 @@ export default async function UserDetailPage({ params }: { params: { id: string 
             {user.id} · tg {String(user.tgId)}
           </p>
         </div>
-        <Badge variant={user.isBlocked ? 'destructive' : 'success'}>{user.isBlocked ? 'blocked' : 'active'}</Badge>
+        <Badge variant={user.isBlocked ? 'destructive' : 'success'}>{user.isBlocked ? 'Заблокирован' : 'Активен'}</Badge>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -56,7 +56,7 @@ export default async function UserDetailPage({ params }: { params: { id: string 
 
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle>Действия</CardTitle>
         </CardHeader>
         <CardContent>
           <UserActions
@@ -69,17 +69,17 @@ export default async function UserDetailPage({ params }: { params: { id: string 
 
       <Card>
         <CardHeader>
-          <CardTitle>Ledger history</CardTitle>
+          <CardTitle>История баланса</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Created</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Order</TableHead>
-                <TableHead>Comment</TableHead>
+                <TableHead>Создано (UTC)</TableHead>
+                <TableHead>Тип</TableHead>
+                <TableHead>Сумма</TableHead>
+                <TableHead>Заказ</TableHead>
+                <TableHead>Комментарий</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -87,7 +87,7 @@ export default async function UserDetailPage({ params }: { params: { id: string 
                 <TableRow key={entry.id}>
                   <TableCell className="whitespace-nowrap">{formatDateTime(entry.createdAt)}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{entry.type}</Badge>
+                    <Badge variant="secondary">{formatEnum(entry.type)}</Badge>
                   </TableCell>
                   <TableCell
                     className={entry.amountCents < 0 ? 'tabular-nums text-destructive' : 'tabular-nums text-success'}
@@ -126,10 +126,10 @@ export default async function UserDetailPage({ params }: { params: { id: string 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Created</TableHead>
-                <TableHead>Product / plan</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Provider</TableHead>
+                <TableHead>Создано (UTC)</TableHead>
+                <TableHead>Товар / тариф</TableHead>
+                <TableHead>Сумма</TableHead>
+                <TableHead>Способ оплаты</TableHead>
                 <TableHead>{t('common.status')}</TableHead>
                 <TableHead>{t('common.actions')}</TableHead>
               </TableRow>
@@ -142,16 +142,14 @@ export default async function UserDetailPage({ params }: { params: { id: string 
                     {order.plan.product.title} / {order.plan.title}
                   </TableCell>
                   <TableCell className="tabular-nums">{formatCents(order.amountCents)}</TableCell>
-                  <TableCell>{order.provider}</TableCell>
+                  <TableCell>{formatEnum(order.provider)}</TableCell>
                   <TableCell>
-                    <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
+                    <Badge variant={orderStatusVariant(order.status)}>{formatEnum(order.status)}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Link href={`/orders/${order.id}`}>
-                      <Button size="sm" variant="outline">
-                        Details
-                      </Button>
-                    </Link>
+                    <Link href={`/orders/${order.id}`} className="inline-flex min-h-11 items-center rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+                        Подробнее
+                      </Link>
                   </TableCell>
                 </TableRow>
               ))}

@@ -6,36 +6,21 @@ import { triggerHaptic } from '@/lib/TelegramProvider'
 import { useI18n } from '@/i18n/I18nProvider'
 import type { ProductSummary } from '@/types/api'
 
-// Shown only while the catalog is empty, so the rail keeps its showcase look.
-// These slugs have no product pages behind them, so the tiles lead to the
-// catalog (which owns the honest empty state) — never to /product/<missing>.
-const SHOWCASE = [
-  { slug: 'mirasim', title: 'Mirasim' },
-  { slug: 'chatgpt-plus', title: 'ChatGPT' },
-  { slug: 'claude-pro', title: 'Claude' },
-  { slug: 'midjourney', title: 'Midjourney' },
-  { slug: 'flux-pro', title: 'Flux' },
-  { slug: 'github-copilot', title: 'Copilot' },
-  { slug: 'cursor-pro', title: 'Cursor' }
-] as const
-
 export function ModelRail({
   products,
   isLoading = false
 }: {
   products: ProductSummary[]
   isLoading?: boolean
-}): JSX.Element {
+}): JSX.Element | null {
   const { t } = useI18n()
+  const tiles = products.filter((product) => product.inStock).map((product) => ({
+    slug: product.slug,
+    title: product.title,
+    href: `/product/${encodeURIComponent(product.slug)}`
+  }))
 
-  const tiles =
-    products.length > 0
-      ? products.map((product) => ({
-          slug: product.slug,
-          title: product.title,
-          href: `/product/${encodeURIComponent(product.slug)}`
-        }))
-      : SHOWCASE.map((item) => ({ slug: item.slug, title: item.title, href: '/catalog' }))
+  if (!isLoading && tiles.length === 0) return null
 
   return (
     <section className="flex min-w-0 flex-col gap-3">
@@ -46,7 +31,7 @@ export function ModelRail({
             <div key={i} className="skeleton h-[112px] w-[100px] shrink-0 rounded-[22px]" />
           ))}
         </div>
-      ) : (
+      ) : tiles.length > 0 ? (
         <div className="min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar py-2">
           <div className="flex w-max gap-2.5">
             {tiles.map((item) => (
@@ -66,7 +51,7 @@ export function ModelRail({
             ))}
           </div>
         </div>
-      )}
+      ) : null}
     </section>
   )
 }

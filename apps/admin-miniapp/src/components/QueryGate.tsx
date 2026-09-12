@@ -39,7 +39,8 @@ export function QueryGate<T>({ data, isLoading, error, onRetry, skeleton, childr
         </div>
       )
     }
-    const message = error instanceof ApiClientError ? error.message : t('common.error.generic')
+    const message = error instanceof ApiClientError && error.status === 401
+      ? t('common.error.auth') : error instanceof ApiClientError ? error.message : t('common.error.generic')
     return <ErrorState title={message} onRetry={onRetry} retryLabel={t('common.retry')} />
   }
 

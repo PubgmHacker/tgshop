@@ -9,7 +9,7 @@ import { Label } from '../../../components/ui/label'
 import { Select } from '../../../components/ui/form'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table'
 import { Badge } from '../../../components/ui/badge'
-import { formatCents, formatDate, fromDateTimeLocalValue, toDateTimeLocalValue } from '../../../lib/format'
+import { formatEnum, formatCents, formatDate, fromDateTimeLocalValue, toDateTimeLocalValue } from '../../../lib/format'
 import { t } from '../../../lib/i18n'
 
 export interface PromoRow {
@@ -107,7 +107,7 @@ export function PromosClient({
       setPromos((prev) => (editingId ? prev.map((p) => (p.id === row.id ? row : p)) : [...prev, row]))
       resetForm()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -120,7 +120,7 @@ export function PromosClient({
       await deletePromoAction(id)
       setPromos((prev) => prev.filter((promo) => promo.id !== id))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     }
   }
 
@@ -129,28 +129,28 @@ export function PromosClient({
       {canEdit ? (
         <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 rounded-lg border border-border p-4 md:grid-cols-3">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="code">Code</Label>
+            <Label htmlFor="code">Промокод</Label>
             <Input
               id="code"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               required
               pattern="[A-Z0-9_-]{3,64}"
-              title="3-64 uppercase letters, digits, dash or underscore"
+              title="От 3 до 64 заглавных латинских букв, цифр, дефисов или подчёркиваний"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="type">Type</Label>
+            <Label htmlFor="type">Тип</Label>
             <Select id="type" value={type} onChange={(e) => setType(e.target.value as PromoType)}>
               {Object.values(PromoType).map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {formatEnum(option)}
                 </option>
               ))}
             </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="value">{type === PromoType.PERCENT ? 'Percent off' : 'Amount off (cents)'}</Label>
+            <Label htmlFor="value">{type === PromoType.PERCENT ? 'Скидка (%)' : 'Скидка (центы USD)'}</Label>
             <Input
               id="value"
               type="number"
@@ -161,22 +161,22 @@ export function PromosClient({
               required
             />
             <span className="text-xs text-muted-foreground">
-              {type === PromoType.PERCENT ? `${value}% off` : `${formatCents(value)} off`}
+              {type === PromoType.PERCENT ? `Скидка ${value}%` : `Скидка ${formatCents(value)}`}
             </span>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="maxUses">Max uses</Label>
+            <Label htmlFor="maxUses">Лимит применений</Label>
             <Input
               id="maxUses"
               type="number"
               min={1}
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
-              placeholder="empty = unlimited"
+              placeholder="пусто — без лимита"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="expiresAt">Expires at (UTC)</Label>
+            <Label htmlFor="expiresAt">Действует до (UTC)</Label>
             <Input
               id="expiresAt"
               type="datetime-local"
@@ -185,9 +185,9 @@ export function PromosClient({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="planId">Scoped to plan</Label>
+            <Label htmlFor="planId">Применяется к тарифу</Label>
             <Select id="planId" value={planId} onChange={(e) => setPlanId(e.target.value)}>
-              <option value="">Any plan</option>
+              <option value="">Любой тариф</option>
               {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
                   {plan.title}
@@ -195,10 +195,10 @@ export function PromosClient({
               ))}
             </Select>
           </div>
-          <div className="flex items-center gap-3 md:col-span-3">
+          <div className="flex flex-wrap items-center gap-3 md:col-span-3">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              Active
+              Активен
             </label>
             <Button type="submit" disabled={pending}>
               {editingId ? t('common.save') : t('common.create')}
@@ -208,22 +208,22 @@ export function PromosClient({
                 {t('common.cancel')}
               </Button>
             )}
-            {error && <span className="text-sm text-destructive">{error}</span>}
+            {error && <span role="alert" className="text-sm text-destructive">{error}</span>}
           </div>
         </form>
       ) : (
-        error && <p className="text-sm text-destructive">{error}</p>
+        error && <p role="alert" className="text-sm text-destructive">{error}</p>
       )}
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Code</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Value</TableHead>
-            <TableHead>Used</TableHead>
-            <TableHead>Expires</TableHead>
-            <TableHead>Plan</TableHead>
+            <TableHead>Промокод</TableHead>
+            <TableHead>Тип</TableHead>
+            <TableHead>Значение</TableHead>
+            <TableHead>Использовано</TableHead>
+            <TableHead>Действует до</TableHead>
+            <TableHead>Тариф</TableHead>
             <TableHead>{t('common.status')}</TableHead>
             <TableHead>{t('common.actions')}</TableHead>
           </TableRow>
@@ -235,7 +235,7 @@ export function PromosClient({
               <TableRow key={promo.id}>
                 <TableCell className="font-mono font-medium">{promo.code}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{promo.type}</Badge>
+                  <Badge variant="secondary">{formatEnum(promo.type)}</Badge>
                 </TableCell>
                 <TableCell className="tabular-nums">
                   {promo.type === PromoType.PERCENT ? `${promo.value}%` : formatCents(promo.value)}
@@ -246,10 +246,10 @@ export function PromosClient({
                   </Badge>
                 </TableCell>
                 <TableCell>{formatDate(promo.expiresAt)}</TableCell>
-                <TableCell>{promo.planTitle ?? 'Any'}</TableCell>
+                <TableCell>{promo.planTitle ?? 'Любой'}</TableCell>
                 <TableCell>
                   <Badge variant={promo.isActive ? 'success' : 'secondary'}>
-                    {promo.isActive ? 'active' : 'inactive'}
+                    {promo.isActive ? 'Активен' : 'Отключён'}
                   </Badge>
                 </TableCell>
                 <TableCell className="flex gap-2">

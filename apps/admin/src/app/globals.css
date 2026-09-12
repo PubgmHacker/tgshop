@@ -14,7 +14,7 @@
   --secondary: 220 14% 96%;
   --secondary-foreground: 224 15% 12%;
   --muted: 220 14% 96%;
-  --muted-foreground: 220 9% 46%;
+  --muted-foreground: 220 9% 40%;
   --accent: 220 14% 96%;
   --accent-foreground: 224 15% 12%;
   --destructive: 0 72% 51%;
@@ -62,4 +62,20 @@
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+}
+
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+
+::selection { background: hsl(var(--primary) / 0.2); }
+input, textarea { caret-color: hsl(var(--primary)); }
+
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']), select, textarea { font-size: 16px; }
+  button, select, input:not([type='checkbox']):not([type='radio']) { min-height: 44px; }
 }

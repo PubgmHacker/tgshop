@@ -29,7 +29,7 @@ export interface SegmentCount {
  * to pick recipients — so this preview cannot drift from the real send.
  */
 export async function segmentCountsAction(): Promise<SegmentCount[]> {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
 
   return Promise.all(
     BROADCAST_SEGMENTS.map(async (definition) => ({
@@ -41,12 +41,12 @@ export async function segmentCountsAction(): Promise<SegmentCount[]> {
 }
 
 export async function listBroadcastsAction() {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.broadcastPost.findMany({ orderBy: { createdAt: 'desc' }, take: 200 })
 }
 
 export async function getBroadcastAction(id: string) {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.broadcastPost.findUnique({ where: { id } })
 }
 
@@ -59,7 +59,7 @@ export async function getBroadcastAction(id: string) {
  * so the operator does not have to sequence two clicks correctly.
  */
 export async function upsertBroadcastAction(input: BroadcastUpsertInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = broadcastUpsertSchema.parse(input)
 
   if (data.id) {
@@ -114,7 +114,7 @@ export async function upsertBroadcastAction(input: BroadcastUpsertInput) {
  *    sweep, so a post cannot be armed twice and go out twice.
  */
 export async function sendBroadcastAction(input: BroadcastSendInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = broadcastSendSchema.parse(input)
 
   const post = await prisma.broadcastPost.findUnique({ where: { id: data.id } })
@@ -171,7 +171,7 @@ export async function sendBroadcastAction(input: BroadcastSendInput) {
  * the send proceeds anyway.
  */
 export async function cancelBroadcastAction(input: BroadcastSendInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = broadcastSendSchema.parse(input)
 
   const post = await prisma.broadcastPost.findUnique({ where: { id: data.id } })
@@ -201,7 +201,7 @@ export async function cancelBroadcastAction(input: BroadcastSendInput) {
 }
 
 export async function deleteBroadcastAction(id: string) {
-  const session = requireRole(AdminRole.OWNER)
+  const session = await requireRole(AdminRole.OWNER)
   const post = await prisma.broadcastPost.findUnique({ where: { id } })
   if (post && isBroadcastFrozen(post.status)) {
     throw new Error(`Broadcast ${id} has already been sent/is sending and cannot be deleted`)

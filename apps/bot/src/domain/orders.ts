@@ -286,7 +286,7 @@ export function decryptDeliveredPayload(order: Order): string {
   return decrypt(order.deliveredPayloadEnc)
 }
 
-/** Encrypts a raw stock payload for storage, matching the seed.ts / core format. */
+/** Encrypts a raw stock payload for storage using the shared core format. */
 export function encryptStockPayload(plaintext: string): string {
   return encrypt(plaintext)
 }

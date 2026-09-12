@@ -9,7 +9,7 @@ import { Label } from '../../../components/ui/label'
 import { Select, Textarea } from '../../../components/ui/form'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table'
 import { Badge } from '../../../components/ui/badge'
-import { formatJson } from '../../../lib/format'
+import { formatEnum, formatJson } from '../../../lib/format'
 import { t } from '../../../lib/i18n'
 
 export interface ProductRow {
@@ -95,10 +95,10 @@ export function ProductsClient({
     try {
       parsed = JSON.parse(raw)
     } catch {
-      throw new Error('externalConfig is not valid JSON')
+      throw new Error('Параметры поставщика: некорректный JSON')
     }
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new Error('externalConfig must be a JSON object')
+      throw new Error('Параметры поставщика должны быть JSON-объектом')
     }
     return parsed as Record<string, unknown>
   }
@@ -137,20 +137,20 @@ export function ProductsClient({
       setProducts((prev) => (editingId ? prev.map((p) => (p.id === row.id ? row : p)) : [...prev, row]))
       resetForm()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
   }
 
   async function onDelete(id: string) {
-    if (!window.confirm('Delete this product? Its plans and stock must be removed first.')) return
+    if (!window.confirm('Удалить товар? Сначала удалите его тарифы и складские позиции.')) return
     setError(null)
     try {
       await deleteProductAction(id)
       setProducts((prev) => prev.filter((p) => p.id !== id))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     }
   }
 
@@ -159,24 +159,24 @@ export function ProductsClient({
       {canEdit ? (
         <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 rounded-lg border border-border p-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">Название</Label>
             <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="slug">Slug</Label>
+            <Label htmlFor="slug">Адрес в каталоге</Label>
             <Input
               id="slug"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               required
               pattern="[a-z0-9-]+"
-              title="lowercase letters, digits and dashes"
+              title="Строчные латинские буквы, цифры и дефисы"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="categoryId">Category</Label>
+            <Label htmlFor="categoryId">Категория</Label>
             <Select id="categoryId" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-              {categories.length === 0 && <option value="">— no categories yet —</option>}
+              {categories.length === 0 && <option value="">— сначала создайте категорию —</option>}
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.title}
@@ -185,7 +185,7 @@ export function ProductsClient({
             </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="deliveryType">Delivery type</Label>
+            <Label htmlFor="deliveryType">Способ выдачи</Label>
             <Select
               id="deliveryType"
               value={deliveryType}
@@ -193,13 +193,13 @@ export function ProductsClient({
             >
               {deliveryTypes.map((type) => (
                 <option key={type} value={type}>
-                  {type}
+                  {formatEnum(type)}
                 </option>
               ))}
             </Select>
           </div>
           <div className="flex flex-col gap-1 md:col-span-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Описание</Label>
             <Textarea
               id="description"
               value={description}
@@ -209,7 +209,7 @@ export function ProductsClient({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <Label htmlFor="imageUrl">Image URL</Label>
+            <Label htmlFor="imageUrl">Ссылка на изображение</Label>
             <Input
               id="imageUrl"
               type="url"
@@ -220,7 +220,7 @@ export function ProductsClient({
           </div>
           <div className="flex items-end gap-4">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="sortOrder">Sort</Label>
+              <Label htmlFor="sortOrder">Порядок</Label>
               <Input
                 id="sortOrder"
                 type="number"
@@ -231,23 +231,23 @@ export function ProductsClient({
             </div>
             <label className="flex items-center gap-2 pb-2 text-sm">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-              Active
+              Активен
             </label>
           </div>
           <div className="flex flex-col gap-1 md:col-span-2">
             <Label htmlFor="externalConfig">
-              externalConfig (JSON, used by EXTERNAL_API delivery)
+              Параметры поставщика (JSON)
             </Label>
             <Textarea
               id="externalConfig"
               value={externalConfigText}
               onChange={(e) => setExternalConfigText(e.target.value)}
               spellCheck={false}
-              placeholder='{ "endpoint": "https://…", "apiKeyRef": "…" }'
+              placeholder='{ "deliveryUrl": "https://supplier.example/deliver", "headers": {} }'
               className="font-mono text-xs"
             />
           </div>
-          <div className="flex items-center gap-3 md:col-span-2">
+          <div className="flex flex-wrap items-center gap-3 md:col-span-2">
             <Button type="submit" disabled={pending || categories.length === 0}>
               {editingId ? t('common.save') : t('common.create')}
             </Button>
@@ -256,21 +256,21 @@ export function ProductsClient({
                 {t('common.cancel')}
               </Button>
             )}
-            {error && <span className="text-sm text-destructive">{error}</span>}
+            {error && <span role="alert" className="text-sm text-destructive">{error}</span>}
           </div>
         </form>
       ) : (
-        error && <p className="text-sm text-destructive">{error}</p>
+        error && <p role="alert" className="text-sm text-destructive">{error}</p>
       )}
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Delivery</TableHead>
-            <TableHead>Plans</TableHead>
-            <TableHead>Sort</TableHead>
+            <TableHead>Название</TableHead>
+            <TableHead>Категория</TableHead>
+            <TableHead>Выдача</TableHead>
+            <TableHead>Тарифы</TableHead>
+            <TableHead>Порядок</TableHead>
             <TableHead>{t('common.status')}</TableHead>
             <TableHead>{t('common.actions')}</TableHead>
           </TableRow>
@@ -285,7 +285,7 @@ export function ProductsClient({
               <TableCell>{product.categoryTitle}</TableCell>
               <TableCell>
                 <Badge variant={product.deliveryType === 'MANUAL_FALLBACK' ? 'warning' : 'secondary'}>
-                  {product.deliveryType}
+                  {formatEnum(product.deliveryType)}
                 </Badge>
               </TableCell>
               <TableCell className="tabular-nums">
@@ -296,7 +296,7 @@ export function ProductsClient({
               <TableCell className="tabular-nums">{product.sortOrder}</TableCell>
               <TableCell>
                 <Badge variant={product.isActive ? 'success' : 'secondary'}>
-                  {product.isActive ? 'active' : 'inactive'}
+                  {product.isActive ? 'Активен' : 'Отключён'}
                 </Badge>
               </TableCell>
               <TableCell className="flex gap-2">

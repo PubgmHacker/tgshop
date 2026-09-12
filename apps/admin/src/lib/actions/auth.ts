@@ -10,6 +10,8 @@ import { verifyTotp } from '../totp'
 import { verifyTelegramLogin } from '../telegram-auth'
 import { writeAuditLog } from '../audit'
 import { getEnv } from '../env'
+import { getRedis } from '../redis'
+import { allowLoginAttempt } from '../login-limit'
 
 export interface LoginResult {
   ok: boolean
@@ -27,12 +29,13 @@ export async function loginAction(input: LoginInput): Promise<LoginResult> {
     return { ok: false, error: 'auth.login.error' }
   }
   const { email, password, totp } = parsed.data
+  if (!(await allowLoginAttempt(getRedis(), email))) return { ok: false, error: 'auth.login.error' }
 
   const admin = await prisma.adminUser.findUnique({ where: { email } })
 
   // Dummy bcrypt hash of a random value, used to keep comparison timing constant
   // when the email does not exist, so we never short-circuit before the hash check.
-  const DUMMY_HASH = '$2a$10$abcdefghijklmnopqrstuuC0aXo0m2N9Sxs2v5tOWJ0i7fH6mHQ.K'
+  const DUMMY_HASH = '$2a$12$YCLBkg8CR69HyfrkMpc.1u3544wRss3iIr/x2/idNJSBiGko.sWDK'
   const passwordOk = await compare(password, admin?.passwordHash ?? DUMMY_HASH)
 
   if (!admin || !passwordOk) {
@@ -46,7 +49,8 @@ export async function loginAction(input: LoginInput): Promise<LoginResult> {
   }
 
   const value = createSessionValue(admin)
-  cookies().set(SESSION_COOKIE_NAME, value, {
+  const cookieStore = await cookies()
+  cookieStore.set(SESSION_COOKIE_NAME, value, {
     httpOnly: true,
     secure: getEnv().NODE_ENV === 'production',
     sameSite: 'lax',
@@ -88,12 +92,13 @@ export async function telegramLoginAction(payload: unknown): Promise<LoginResult
 
   const linkedEmail = `tg:${parsed.data.id}`
   const admin = await prisma.adminUser.findUnique({ where: { email: linkedEmail } })
-  if (!admin) {
+  if (!admin || admin.totpSecret) {
     return { ok: false, error: 'auth.login.error' }
   }
 
   const value = createSessionValue(admin)
-  cookies().set(SESSION_COOKIE_NAME, value, {
+  const cookieStore = await cookies()
+  cookieStore.set(SESSION_COOKIE_NAME, value, {
     httpOnly: true,
     secure: getEnv().NODE_ENV === 'production',
     sameSite: 'lax',
@@ -112,6 +117,7 @@ export async function telegramLoginAction(payload: unknown): Promise<LoginResult
 }
 
 export async function logoutAction(): Promise<void> {
-  cookies().delete(SESSION_COOKIE_NAME)
+  const cookieStore = await cookies()
+  cookieStore.delete(SESSION_COOKIE_NAME)
   redirect('/login')
 }

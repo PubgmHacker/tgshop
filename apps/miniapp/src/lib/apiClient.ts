@@ -57,13 +57,15 @@ async function authenticate(): Promise<void> {
     ? await fetch(`${API_URL}/api/auth/telegram`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ initData })
+        body: JSON.stringify({ initData }),
+        signal: requestTimeoutSignal(REQUEST_TIMEOUT_MS)
       })
     : process.env.NODE_ENV === 'development' && API_URL
       ? await fetch(`${API_URL}/api/auth/dev`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: '{}'
+          body: '{}',
+          signal: requestTimeoutSignal(REQUEST_TIMEOUT_MS)
         })
       : null
 

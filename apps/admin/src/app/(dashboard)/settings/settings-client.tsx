@@ -37,23 +37,23 @@ function toValue(kind: SettingKind, raw: string): unknown {
   switch (kind) {
     case 'int': {
       const parsed = Number(trimmed)
-      if (!Number.isInteger(parsed) || parsed < 0) throw new Error('must be a non-negative integer')
+      if (!Number.isInteger(parsed) || parsed < 0) throw new Error('Введите целое число от 0')
       return parsed
     }
     case 'percent': {
       const parsed = Number(trimmed)
-      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) throw new Error('must be an integer 0-100')
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) throw new Error('Введите целое число от 0 до 100')
       return parsed
     }
     case 'decimal': {
-      if (!/^\d+(\.\d+)?$/.test(trimmed)) throw new Error('must be a decimal written as a string, e.g. "0.013"')
+      if (!/^\d+(\.\d+)?$/.test(trimmed)) throw new Error('Введите десятичную строку, например "0.013"')
       return trimmed
     }
     case 'url': {
       try {
         new URL(trimmed)
       } catch {
-        throw new Error('must be a full URL, e.g. https://t.me/tgshop_support')
+        throw new Error('Введите полную ссылку, например https://t.me/tgshop_support')
       }
       return trimmed
     }
@@ -62,7 +62,7 @@ function toValue(kind: SettingKind, raw: string): unknown {
     case 'json':
       return JSON.parse(trimmed) as unknown
     default: {
-      if (!trimmed) throw new Error('must not be empty')
+      if (!trimmed) throw new Error('Заполните значение')
       return trimmed
     }
   }
@@ -97,24 +97,24 @@ export function SettingsClient({
     try {
       const value = toValue(row.kind, drafts[row.key] ?? '')
       const saved = await upsertSettingAction({ key: row.key, value })
-      setStatus((prev) => ({ ...prev, [row.key]: `Saved ${formatDateTime(saved.updatedAt)}` }))
+      setStatus((prev) => ({ ...prev, [row.key]: `Сохранено: ${formatDateTime(saved.updatedAt)}` }))
       router.refresh()
     } catch (err) {
-      setErrors((prev) => ({ ...prev, [row.key]: err instanceof Error ? err.message : 'Unknown error' }))
+      setErrors((prev) => ({ ...prev, [row.key]: err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.' }))
     } finally {
       setPendingKey(null)
     }
   }
 
   async function onDelete(row: SettingRow) {
-    if (!window.confirm(`Delete setting "${row.key}"?`)) return
+    if (!window.confirm(`Удалить настройку «${row.key}»?`)) return
     setPendingKey(row.key)
     setErrors((prev) => ({ ...prev, [row.key]: '' }))
     try {
       await deleteSettingAction(row.key)
       router.refresh()
     } catch (err) {
-      setErrors((prev) => ({ ...prev, [row.key]: err instanceof Error ? err.message : 'Unknown error' }))
+      setErrors((prev) => ({ ...prev, [row.key]: err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.' }))
     } finally {
       setPendingKey(null)
     }
@@ -124,7 +124,7 @@ export function SettingsClient({
     event.preventDefault()
     setNewError(null)
     if (!newKey.trim()) {
-      setNewError('Key is required')
+      setNewError('Укажите ключ настройки')
       return
     }
     setPendingKey(newKey)
@@ -135,7 +135,7 @@ export function SettingsClient({
       setNewValue('""')
       router.refresh()
     } catch (err) {
-      setNewError(err instanceof Error ? err.message : 'Unknown error')
+      setNewError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPendingKey(null)
     }
@@ -145,7 +145,7 @@ export function SettingsClient({
     <div className="flex flex-col gap-6">
       {!canEdit && (
         <p className="text-sm text-muted-foreground">
-          Read-only: only an OWNER may change settings. Values below are shown as stored.
+          Просмотр настроек. Изменять их может только владелец магазина.
         </p>
       )}
 
@@ -162,11 +162,11 @@ export function SettingsClient({
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <Badge variant={row.known ? 'secondary' : 'warning'}>{row.kind}</Badge>
-                  {!row.exists && <Badge variant="destructive">not set</Badge>}
+                  {!row.exists && <Badge variant="destructive">Не задано</Badge>}
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col gap-2">
-                <Label htmlFor={`setting-${row.key}`}>Value</Label>
+                <Label htmlFor={`setting-${row.key}`}>Значение</Label>
                 {row.kind === 'boolean' ? (
                   <Select
                     id={`setting-${row.key}`}
@@ -210,7 +210,7 @@ export function SettingsClient({
                     </Button>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {row.updatedAt ? `updated ${formatDateTime(row.updatedAt)}` : 'never saved'}
+                    {row.updatedAt ? `Обновлено: ${formatDateTime(row.updatedAt)}` : 'Ещё не сохранено'}
                   </span>
                 </div>
                 {status[row.key] && <p className="text-sm text-success">{status[row.key]}</p>}
@@ -224,13 +224,13 @@ export function SettingsClient({
       {canEdit && (
         <Card>
           <CardHeader>
-            <CardTitle>Add a setting</CardTitle>
+            <CardTitle>Добавить настройку</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={onCreate} className="flex flex-col gap-3">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="newKey">Key</Label>
+                  <Label htmlFor="newKey">Ключ</Label>
                   <Input
                     id="newKey"
                     value={newKey}
@@ -240,7 +240,7 @@ export function SettingsClient({
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="newValue">Value (JSON)</Label>
+                  <Label htmlFor="newValue">Значение (JSON)</Label>
                   <Textarea
                     id="newValue"
                     value={newValue}
@@ -249,12 +249,12 @@ export function SettingsClient({
                   />
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit" disabled={pendingKey !== null}>
                   {t('common.create')}
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  Free-form keys accept any JSON. Known keys are validated against their kind server-side.
+                  Укажите ключ и значение в JSON. Для стандартных настроек проверяется допустимый формат.
                 </span>
               </div>
               {newError && <p className="text-sm text-destructive">{newError}</p>}

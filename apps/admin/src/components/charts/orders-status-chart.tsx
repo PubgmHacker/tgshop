@@ -2,6 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { OrderStatus } from '@tgshop/db'
+import { formatEnum } from '../../lib/format'
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: 'hsl(38 92% 50%)',
@@ -14,13 +15,15 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export function OrdersByStatusChart({ data }: { data: { status: OrderStatus; count: number }[] }) {
+  if (!data.length) return <p className="py-12 text-center text-sm text-muted-foreground">За выбранный период заказов нет.</p>
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+      <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="status" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+        <XAxis tickFormatter={formatEnum} dataKey="status" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
         <YAxis tick={{ fontSize: 12 }} allowDecimals={false} className="fill-muted-foreground" />
         <Tooltip
+          labelFormatter={(value) => formatEnum(String(value))}
           contentStyle={{
             backgroundColor: 'hsl(var(--popover))',
             border: '1px solid hsl(var(--border))',
@@ -28,7 +31,7 @@ export function OrdersByStatusChart({ data }: { data: { status: OrderStatus; cou
             color: 'hsl(var(--popover-foreground))'
           }}
         />
-        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+        <Bar name="Заказов" isAnimationActive={false} dataKey="count" radius={[4, 4, 0, 0]}>
           {data.map((entry) => (
             <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? 'hsl(var(--primary))'} />
           ))}

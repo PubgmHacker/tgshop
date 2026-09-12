@@ -3,7 +3,6 @@ import { searchUsersAction } from '../../../lib/actions/users'
 import { requireSession } from '../../../lib/rbac'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table'
 import { Badge } from '../../../components/ui/badge'
-import { Button } from '../../../components/ui/button'
 import { UsersSearch } from './users-search'
 import { formatDateTime } from '../../../lib/format'
 import { t } from '../../../lib/i18n'
@@ -13,11 +12,12 @@ export const dynamic = 'force-dynamic'
 const PAGE_SIZE = 20
 
 export default async function UsersPage({
-  searchParams
+  searchParams: searchParamsPromise
 }: {
-  searchParams: { q?: string | string[]; page?: string | string[] }
+  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>
 }) {
-  requireSession()
+  await requireSession()
+  const searchParams = await searchParamsPromise
 
   const rawQuery = searchParams.q
   const query = (Array.isArray(rawQuery) ? rawQuery[0] : rawQuery) ?? ''
@@ -43,17 +43,17 @@ export default async function UsersPage({
       <UsersSearch initialQuery={query} />
 
       <div className="text-sm text-muted-foreground">
-        {result.total} user{result.total === 1 ? '' : 's'} · page {result.page} / {totalPages}
+        Пользователей: {result.total} · Страница {result.page} из {totalPages}
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Telegram ID</TableHead>
-            <TableHead>Username</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Lang</TableHead>
-            <TableHead>Joined</TableHead>
+            <TableHead>Имя в Telegram</TableHead>
+            <TableHead>Имя</TableHead>
+            <TableHead>Язык</TableHead>
+            <TableHead>Регистрация</TableHead>
             <TableHead>{t('common.status')}</TableHead>
             <TableHead>{t('common.actions')}</TableHead>
           </TableRow>
@@ -69,15 +69,13 @@ export default async function UsersPage({
               <TableCell className="whitespace-nowrap">{formatDateTime(user.createdAt)}</TableCell>
               <TableCell>
                 <Badge variant={user.isBlocked ? 'destructive' : 'success'}>
-                  {user.isBlocked ? 'blocked' : 'active'}
+                  {user.isBlocked ? 'Заблокирован' : 'Активен'}
                 </Badge>
               </TableCell>
               <TableCell>
-                <Link href={`/users/${user.id}`}>
-                  <Button size="sm" variant="outline">
-                    Details
-                  </Button>
-                </Link>
+                <Link href={`/users/${user.id}`} className="inline-flex min-h-11 items-center rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+                    Подробнее
+                  </Link>
               </TableCell>
             </TableRow>
           ))}
@@ -93,18 +91,14 @@ export default async function UsersPage({
 
       <div className="flex items-center gap-2">
         {page > 1 && (
-          <Link href={pageHref(page - 1)}>
-            <Button variant="outline" size="sm">
-              ← Prev
-            </Button>
-          </Link>
+          <Link href={pageHref(page - 1)} className="inline-flex min-h-11 items-center rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+              ← Назад
+            </Link>
         )}
         {page < totalPages && (
-          <Link href={pageHref(page + 1)}>
-            <Button variant="outline" size="sm">
-              Next →
-            </Button>
-          </Link>
+          <Link href={pageHref(page + 1)} className="inline-flex min-h-11 items-center rounded-md border border-input px-3 py-2 text-sm hover:bg-accent">
+              Далее →
+            </Link>
         )}
       </div>
     </div>

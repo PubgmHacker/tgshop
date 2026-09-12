@@ -6,7 +6,6 @@ import { Hero } from '../components/sections/Hero';
 import { TrustBar } from '../components/sections/TrustBar';
 import { HowItWorks } from '../components/sections/HowItWorks';
 import { Showcase } from '../components/sections/Showcase';
-import { WhyUs } from '../components/sections/WhyUs';
 import { Faq } from '../components/sections/Faq';
 import { FinalCta } from '../components/sections/FinalCta';
 import { Footer } from '../components/sections/Footer';
@@ -35,9 +34,8 @@ export default async function HomePage() {
       />
       <Hero copy={copy} botLink={botLink} />
       <TrustBar copy={copy} />
-      <HowItWorks copy={copy} />
       <Showcase copy={copy} locale={locale} products={products} isFallback={isFallback} />
-      <WhyUs copy={copy} />
+      <HowItWorks copy={copy} />
       <Faq copy={copy} />
       <FinalCta copy={copy} botLink={botLink} />
       <Footer copy={copy} />

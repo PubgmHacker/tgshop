@@ -2,6 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import type { PaymentProvider } from '@tgshop/db'
+import { formatEnum } from '../../lib/format'
 import { centsToDisplay } from '@tgshop/core/money'
 
 const PROVIDER_COLORS: Record<string, string> = {
@@ -18,18 +19,19 @@ export function PaymentSplitChart({
 }) {
   const chartData = data.map((d) => ({ name: d.provider, value: d.revenueCents, count: d.count }))
 
+  if (!data.length) return <p className="py-12 text-center text-sm text-muted-foreground">Оплаченных заказов пока нет.</p>
   return (
     <ResponsiveContainer width="100%" height={280}>
       <PieChart>
-        <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
+        <Pie isAnimationActive={false} data={chartData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
           {chartData.map((entry) => (
             <Cell key={entry.name} fill={PROVIDER_COLORS[entry.name] ?? 'hsl(var(--primary))'} />
           ))}
         </Pie>
         <Tooltip
           formatter={(value: number, _name, item) => [
-            `$${centsToDisplay(value)} (${(item.payload as { count: number }).count} orders)`,
-            item.payload && 'name' in (item.payload as object) ? (item.payload as { name: string }).name : ''
+            `$${centsToDisplay(value)} (заказов: ${(item.payload as { count: number }).count})`,
+            item.payload && 'name' in (item.payload as object) ? formatEnum((item.payload as { name: string }).name) : ''
           ]}
           contentStyle={{
             backgroundColor: 'hsl(var(--popover))',
@@ -38,7 +40,7 @@ export function PaymentSplitChart({
             color: 'hsl(var(--popover-foreground))'
           }}
         />
-        <Legend />
+        <Legend formatter={formatEnum} />
       </PieChart>
     </ResponsiveContainer>
   )

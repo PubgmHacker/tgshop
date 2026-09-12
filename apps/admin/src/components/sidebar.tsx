@@ -22,16 +22,18 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex w-56 shrink-0 flex-col gap-1 border-r border-border bg-card p-3">
-      <div className="mb-4 px-2 text-lg font-semibold">tgshop admin</div>
+    <nav aria-label="Разделы управления" className="shrink-0 border-b border-border bg-card p-3 md:w-56 md:border-b-0 md:border-r">
+      <div className="mb-3 px-2 text-lg font-semibold">Управление магазином</div>
+      <div className="flex gap-1 overflow-x-auto md:sticky md:top-3 md:flex-col">
       {NAV_ITEMS.map((item) => {
         const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
         return (
           <Link
             key={item.href}
             href={item.href}
+            aria-current={active ? 'page' : undefined}
             className={cn(
-              'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              'flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors',
               active ? 'bg-primary text-primary-foreground' : 'text-foreground/80 hover:bg-accent hover:text-accent-foreground'
             )}
           >
@@ -39,6 +41,7 @@ export function Sidebar() {
           </Link>
         )
       })}
+      </div>
     </nav>
   )
 }

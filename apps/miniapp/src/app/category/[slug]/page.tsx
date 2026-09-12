@@ -30,7 +30,7 @@ export default function CategoryPage(): JSX.Element {
       </header>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="skeleton h-[68px] rounded-[20px]" />
           ))}
@@ -40,14 +40,14 @@ export default function CategoryPage(): JSX.Element {
       ) : (data?.products.length ?? 0) === 0 ? (
         <EmptyState title={t('category.empty')} />
       ) : (
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5">
           {data?.products.map((product) => (
             <ServiceTile
               key={product.id}
               href={`/product/${product.slug}`}
               slug={product.slug}
               title={product.title}
-              meta={`${t('catalog.from')} ${formatCents(product.minPriceCents)}`}
+              meta={product.inStock ? `${t('catalog.from')} ${formatCents(product.minPriceCents)}` : t('catalog.badge.out')}
             />
           ))}
         </div>

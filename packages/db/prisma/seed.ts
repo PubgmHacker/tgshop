@@ -1,97 +1,8 @@
-import { randomBytes, createCipheriv, hash } from 'node:crypto'
-import { PrismaClient, DeliveryType, StockStatus, AdminRole } from '@prisma/client'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stock payload encryption (AES-256-GCM)
-//
-// This helper MUST be kept byte-for-byte compatible with the implementation
-// that ships in @tgshop/core (packages/core). Downstream packages decrypt
-// StockItem.payloadEnc / Order.deliveredPayloadEnc using this exact format:
-//
-//   v1:<ivB64>:<tagB64>:<ciphertextB64>
-//
-// - v1        literal version prefix, allows future format migrations
-// - ivB64     12-byte random IV, base64-encoded
-// - tagB64    16-byte GCM auth tag, base64-encoded
-// - ctB64     ciphertext, base64-encoded
-//
-// ENCRYPTION_KEY env var is the raw 32-byte AES-256 key, provided as either a
-// 64-char hex string or a base64 string (44 chars, padded). We accept both.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CIPHER_ALGO = 'aes-256-gcm'
-const CIPHER_VERSION = 'v1'
-
-function loadEncryptionKey(): Buffer {
-  const raw = process.env.ENCRYPTION_KEY
-  if (!raw) {
-    throw new Error('ENCRYPTION_KEY is not set; required to seed encrypted stock payloads')
-  }
-  const hexPattern = /^[0-9a-fA-F]{64}$/
-  if (hexPattern.test(raw)) {
-    return Buffer.from(raw, 'hex')
-  }
-  const buf = Buffer.from(raw, 'base64')
-  if (buf.length !== 32) {
-    throw new Error(
-      `ENCRYPTION_KEY must decode to exactly 32 bytes (got ${buf.length}); expected 64-char hex or base64`
-    )
-  }
-  return buf
-}
-
-function encryptPayload(plaintext: string, key: Buffer): string {
-  const iv = randomBytes(12)
-  const cipher = createCipheriv(CIPHER_ALGO, key, iv)
-  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return `${CIPHER_VERSION}:${iv.toString('base64')}:${tag.toString('base64')}:${ciphertext.toString(
-    'base64'
-  )}`
-}
+import { PrismaClient, DeliveryType } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 async function main(): Promise<void> {
-  const key = loadEncryptionKey()
-
-  await prisma.plan.updateMany({
-    where: {
-      product: {
-        slug: {
-          in: [
-            'netflix-premium',
-            'spotify-premium',
-            'steam-wallet-code',
-            'pubg-mobile-uc',
-            'windows-11-pro-key',
-            'office-2021-key'
-          ]
-        }
-      }
-    },
-    data: { isActive: false }
-  })
-  await prisma.product.updateMany({
-    where: {
-      slug: {
-        in: [
-          'netflix-premium',
-          'spotify-premium',
-          'steam-wallet-code',
-          'pubg-mobile-uc',
-          'windows-11-pro-key',
-          'office-2021-key'
-        ]
-      }
-    },
-    data: { isActive: false }
-  })
-  await prisma.category.updateMany({
-    where: { slug: { in: ['streaming', 'gaming', 'software'] } },
-    data: { isActive: false }
-  })
-
   // ── Categories ──────────────────────────────────────────────────────────
   const categoriesData = [
     { title: 'Чат', slug: 'chat', emoji: null, sortOrder: 0 },
@@ -103,7 +14,7 @@ async function main(): Promise<void> {
   for (const data of categoriesData) {
     const category = await prisma.category.upsert({
       where: { slug: data.slug },
-      update: { ...data, isActive: true },
+      update: {},
       create: { ...data, isActive: true }
     })
     categories.push(category)
@@ -181,7 +92,7 @@ async function main(): Promise<void> {
   for (const data of productsData) {
     const product = await prisma.product.upsert({
       where: { slug: data.slug },
-      update: { ...data, isActive: true },
+      update: {},
       create: { ...data, isActive: true }
     })
     products.push(product)
@@ -195,17 +106,7 @@ async function main(): Promise<void> {
     if (product.slug === 'mirasim') {
       const plan = await prisma.plan.upsert({
         where: { id: 'mirasim-pro-1m' },
-        update: {
-          productId: product.id,
-          title: 'Mirasim Pro · 1 месяц',
-          durationDays: 30,
-          priceCents: 2900,
-          priceStars: null,
-          discountPercent: 0,
-          lowStockThreshold: 0,
-          isActive: true,
-          sortOrder: 0
-        },
+        update: {},
         create: {
           id: 'mirasim-pro-1m',
           productId: product.id,
@@ -258,36 +159,8 @@ async function main(): Promise<void> {
     plans.push(plan1, plan2)
   }
 
-  // ── Stock items (2 per active pool-backed plan, encrypted) ───────────────
-  // StockItem has no natural unique column, and payloadEnc cannot serve as one
-  // (a fresh IV per encrypt means the same plaintext yields different ciphertext
-  // each run). So the deterministic id is derived from (plan.id, index): keying
-  // on the plan — not on a payload-only hash — means that after a catalog change
-  // (e.g. swapping the old streaming/gaming products for these AI ones) a re-seed
-  // provisions fresh stock for the NEW plans instead of colliding on an id that
-  // still points at a now-inactive plan. update:{} stays empty so a re-seed never
-  // yanks a row back to AVAILABLE after a real order already consumed it.
-  let stockCount = 0
-  for (const plan of plans) {
-    const product = products.find((item) => item.id === plan.productId)
-    if (product?.deliveryType === DeliveryType.MANUAL_FALLBACK) continue
-    const itemsForPlan = 2
-    for (let i = 0; i < itemsForPlan; i++) {
-      const demoPayload = `demo-login:${plan.id}-${i}@example.com|password:Demo${i}!Pass`
-      const seedId = `seed-stock-${plan.id}-${i}`
-      await prisma.stockItem.upsert({
-        where: { id: seedId },
-        update: {},
-        create: {
-          id: seedId,
-          planId: plan.id,
-          payloadEnc: encryptPayload(demoPayload, key),
-          status: StockStatus.AVAILABLE
-        }
-      })
-      stockCount++
-    }
-  }
+  // Stock is intentionally empty after a seed. Operators add encrypted
+  // production payloads through the admin stock flow.
 
   // ── Settings ─────────────────────────────────────────────────────────────
   await prisma.setting.upsert({
@@ -331,21 +204,7 @@ async function main(): Promise<void> {
     create: { key: 'new_product_auto_broadcast', value: false }
   })
 
-  // ── Default admin user ───────────────────────────────────────────────────
-  // NOTE: this is a demo-only bcrypt-shaped placeholder hash, NOT a real bcrypt
-  // hash (no bcrypt dependency in this package). Replace via the admin app's
-  // real auth flow before relying on this account; treat as seed data only.
-  const demoPasswordHash = `seed$${hash('sha256', 'ChangeMe123!').toString()}`
-  await prisma.adminUser.upsert({
-    where: { email: 'admin@tgshop.local' },
-    update: {},
-    create: {
-      email: 'admin@tgshop.local',
-      passwordHash: demoPasswordHash,
-      role: AdminRole.OWNER
-    }
-  })
-
+  const stockCount = 0
   console.log(
     `Seed complete: ${categories.length} categories, ${products.length} products, ${plans.length} plans, ${stockCount} stock items.`
   )

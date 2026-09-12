@@ -58,3 +58,16 @@ function toDate(value: Date | string | null | undefined): Date | null {
   const date = value instanceof Date ? value : new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
 }
+
+const LABELS: Record<string, string> = {
+  PENDING: 'Ожидает оплаты', PAID: 'Оплачен', DELIVERING: 'Выдаётся', DELIVERED: 'Выдан',
+  FAILED: 'Ошибка', REFUNDED: 'Возврат', EXPIRED: 'Истёк',
+  BALANCE: 'Баланс', CRYPTOBOT: 'CryptoBot', STARS: 'Telegram Stars', TRON_TRC20: 'USDT · TRC20',
+  STOCK_POOL: 'Из наличия', UNIQUE_CODE: 'Код активации', EXTERNAL_API: 'Через поставщика', MANUAL_FALLBACK: 'Вручную',
+  AVAILABLE: 'Доступно', RESERVED: 'В резерве', SOLD: 'Продано',
+  PERCENT: 'Процент', FIXED: 'Сумма',
+  DRAFT: 'Черновик', SCHEDULED: 'Запланирована', QUEUED: 'В очереди', SENDING: 'Отправляется', SENT: 'Отправлена', CANCELLED: 'Отменена',
+  TOPUP: 'Пополнение', PURCHASE: 'Покупка', REFUND: 'Возврат', REFERRAL: 'Реферальное начисление', ADJUSTMENT: 'Корректировка'
+}
+
+export function formatEnum(value: string): string { return LABELS[value] ?? value }

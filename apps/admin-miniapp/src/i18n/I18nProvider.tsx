@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DEFAULT_LOCALE, type DictionaryKey, type Locale, dictionaries } from './dictionaries'
 
 interface I18nContextValue {
@@ -32,7 +32,9 @@ function detectInitialLocale(): Locale {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [locale, setLocale] = useState<Locale>(() => detectInitialLocale())
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE)
+  useEffect(() => { setLocale(detectInitialLocale()) }, [])
+  useEffect(() => { document.documentElement.lang = locale }, [locale])
   const changeLocale = useCallback((next: Locale) => {
     setLocale(next)
     try {

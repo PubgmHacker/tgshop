@@ -14,7 +14,7 @@ import { Select, Textarea } from '../../../components/ui/form'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table'
 import { Badge } from '../../../components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
-import { formatDateTime } from '../../../lib/format'
+import { formatEnum, formatDateTime } from '../../../lib/format'
 import { t } from '../../../lib/i18n'
 
 export interface PlanStockSummary {
@@ -67,7 +67,7 @@ export function StockClient({
   async function onBulkPaste(event: FormEvent) {
     event.preventDefault()
     if (!selectedPlanId) {
-      setError('Pick a plan first')
+      setError('Сначала выберите тариф')
       return
     }
     setPending(true)
@@ -78,11 +78,11 @@ export function StockClient({
       // trims lines there, and each payload is encrypted server-side. Plaintext
       // never round-trips back to the browser.
       const result = await bulkPasteStockAction({ planId: selectedPlanId, payloads: paste })
-      setMessage(`Imported ${result.createdCount} payload(s)`)
+      setMessage(`Загружено позиций: ${result.createdCount}`)
       setPaste('')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -91,7 +91,7 @@ export function StockClient({
   async function onCsvImport(event: FormEvent) {
     event.preventDefault()
     if (!selectedPlanId) {
-      setError('Pick a plan first')
+      setError('Сначала выберите тариф')
       return
     }
     setPending(true)
@@ -99,12 +99,12 @@ export function StockClient({
     setMessage(null)
     try {
       const result = await csvImportStockAction({ planId: selectedPlanId, csv })
-      setMessage(`Imported ${result.createdCount} payload(s) from CSV`)
+      setMessage(`Загружено позиций из CSV: ${result.createdCount}`)
       setCsv('')
       if (fileInputRef.current) fileInputRef.current.value = ''
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -117,19 +117,19 @@ export function StockClient({
     try {
       setCsv(await file.text())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not read file')
+      setError(err instanceof Error ? err.message : 'Не удалось прочитать файл')
     }
   }
 
   async function onDelete(id: string) {
-    if (!window.confirm('Delete this stock item?')) return
+    if (!window.confirm('Удалить позицию склада?')) return
     setError(null)
     try {
       await deleteStockItemAction(id)
       setRows((prev) => prev.filter((row) => row.id !== id))
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     }
   }
 
@@ -138,24 +138,24 @@ export function StockClient({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <Label htmlFor="planPicker">Plan</Label>
+        <Label htmlFor="planPicker">Тариф</Label>
         <Select
           id="planPicker"
           value={selectedPlanId}
           onChange={(e) => onPlanChange(e.target.value)}
           className="max-w-lg"
         >
-          <option value="">— select a plan —</option>
+          <option value="">— выберите тариф —</option>
           {summaries.map((summary) => (
             <option key={summary.planId} value={summary.planId}>
-              {summary.productTitle} / {summary.planTitle} ({summary.available} available)
+              {summary.productTitle} / {summary.planTitle} (доступно: {summary.available})
             </option>
           ))}
         </Select>
       </div>
 
       {selected && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>{t('stock.available')}</CardTitle>
@@ -170,7 +170,7 @@ export function StockClient({
               >
                 {selected.available}
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">threshold {selected.lowStockThreshold}</div>
+              <div className="mt-1 text-xs text-muted-foreground">минимум: {selected.lowStockThreshold}</div>
             </CardContent>
           </Card>
           <Card>
@@ -192,8 +192,8 @@ export function StockClient({
         </div>
       )}
 
-      {message && <p className="text-sm text-success">{message}</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {message && <p role="status" className="text-sm text-success">{message}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       {canImport && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -201,7 +201,7 @@ export function StockClient({
             <div className="flex flex-col gap-1">
               <Label htmlFor="bulkPaste">{t('stock.bulkPaste')}</Label>
               <span className="text-xs text-muted-foreground">
-                One payload per line. Encrypted server-side before storage.
+                Одна позиция на строку. Данные шифруются перед сохранением.
               </span>
               <Textarea
                 id="bulkPaste"
@@ -212,9 +212,9 @@ export function StockClient({
                 placeholder={'ABCD-1234-EFGH\nIJKL-5678-MNOP'}
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" disabled={pending || !selectedPlanId || pasteLineCount === 0}>
-                Import {pasteLineCount || ''} line{pasteLineCount === 1 ? '' : 's'}
+                Загрузить позиций: {pasteLineCount}
               </Button>
             </div>
           </form>
@@ -223,7 +223,7 @@ export function StockClient({
             <div className="flex flex-col gap-1">
               <Label htmlFor="csvFile">{t('stock.csvImport')}</Label>
               <span className="text-xs text-muted-foreground">
-                One payload per line; a leading `payload`/`code`/`value` header row is skipped.
+                Одна позиция на строку. Первая строка с заголовком payload, code или value пропускается.
               </span>
               <input
                 ref={fileInputRef}
@@ -235,6 +235,7 @@ export function StockClient({
               />
               <Textarea
                 id="csvText"
+                aria-label="Содержимое CSV"
                 value={csv}
                 onChange={(e) => setCsv(e.target.value)}
                 spellCheck={false}
@@ -242,9 +243,9 @@ export function StockClient({
                 placeholder="payload&#10;ABCD-1234-EFGH"
               />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" disabled={pending || !selectedPlanId || csvLineCount === 0}>
-                Import CSV ({csvLineCount})
+                Загрузить CSV ({csvLineCount})
               </Button>
             </div>
           </form>
@@ -253,13 +254,13 @@ export function StockClient({
 
       <Card>
         <CardHeader>
-          <CardTitle>Per-plan levels</CardTitle>
+          <CardTitle>Остатки по тарифам</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product / plan</TableHead>
+                <TableHead>Товар / тариф</TableHead>
                 <TableHead>{t('stock.available')}</TableHead>
                 <TableHead>{t('stock.reserved')}</TableHead>
                 <TableHead>{t('stock.sold')}</TableHead>
@@ -301,7 +302,7 @@ export function StockClient({
       {selectedPlanId && (
         <Card>
           <CardHeader>
-            <CardTitle>Items in this plan (latest 500)</CardTitle>
+            <CardTitle>Последние 500 позиций тарифа</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -309,9 +310,9 @@ export function StockClient({
                 <TableRow>
                   <TableHead>ID</TableHead>
                   <TableHead>{t('common.status')}</TableHead>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Reserved until</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Заказ</TableHead>
+                  <TableHead>Резерв до (UTC)</TableHead>
+                  <TableHead>Создано (UTC)</TableHead>
                   <TableHead>{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -320,7 +321,7 @@ export function StockClient({
                   <TableRow key={row.id}>
                     <TableCell className="font-mono text-xs">{row.id}</TableCell>
                     <TableCell>
-                      <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+                      <Badge variant={statusVariant(row.status)}>{formatEnum(row.status)}</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {row.orderId ? (

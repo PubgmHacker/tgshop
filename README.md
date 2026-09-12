@@ -10,9 +10,10 @@ CryptoBot, Telegram Stars, and USDT-TRC20 payments.
 apps/
   bot/        grammY Telegram bot (Fastify webhook server, Mini App API, /internal/*)
   worker/     BullMQ workers: payment reconciliation, delivery, TRON polling, broadcasts
-  miniapp/    Next.js 14 App Router — Telegram Mini App storefront
-  landing/    Next.js 14 App Router — public marketing site
-  admin/      Next.js 14 App Router — internal admin panel
+  miniapp/    Next.js 15 App Router — Telegram Mini App storefront
+  landing/    Next.js 15 App Router — public marketing site
+  admin/      Next.js 15 App Router — internal admin panel
+  admin-miniapp/ Next.js 15 App Router — Telegram admin interface
 packages/
   db/         Prisma schema, migrations, seed, generated client (@tgshop/db)
   core/       Domain logic: money, pricing, crypto (payload encryption), ledger, errors (@tgshop/core)
@@ -174,7 +175,7 @@ frontend-only development.
 
 ## How to add a new product
 
-The catalog ships with one seeded product, **Mirasim**
+The catalog migration inserts **Mirasim**
 (`packages/db/prisma/migrations/20260829060000_add_mirasim_catalog`): category
 `code`, `deliveryType = MANUAL_FALLBACK` (an operator issues access by hand), one
 plan `mirasim-pro-1m`. The migration only inserts (`ON CONFLICT DO NOTHING`), so
@@ -182,6 +183,10 @@ edit its price and description in the admin Mini App, not in SQL. Its official
 marks are bundled: `apps/miniapp/public/brands/mirasim*.png` (theme-aware via
 `BrandMark.tsx`) and `apps/landing/public/brands/mirasim.png`; the DB `imageUrl`
 points at the vendor's own asset on mirasim.ai.
+
+The optional seed adds seven catalog entries and thirteen plans, without
+credentials or a default admin account. Pool-backed products require real
+stock before they can be purchased. Catalog upserts preserve operator edits.
 
 1. **Category** (skip if it already exists): insert a `Category` row —
    `title`, unique `slug`, optional `emoji`, `sortOrder`, `isActive`. Easiest
@@ -211,7 +216,7 @@ points at the vendor's own asset on mirasim.ai.
    `docs/AGENT_PLAN.md`).
 4. **Stock** (for `STOCK_POOL`/`UNIQUE_CODE` products): for each unit, encrypt
    the payload with `@tgshop/core`'s `encrypt()` (AES-256-GCM, format
-   `v1:<iv>:<tag>:<ct>`, byte-identical to `packages/db/prisma/seed.ts`) and
+   `v1:<iv>:<tag>:<ct>`) and
    insert a `StockItem` row with `payloadEnc` set to that ciphertext and
    `status=AVAILABLE`. Never store plaintext codes in the database.
 5. Set `Product.isActive` / `Plan.isActive` to `true` once stock is loaded —
@@ -254,12 +259,12 @@ points at the vendor's own asset on mirasim.ai.
 | `./scripts/restore-postgres.sh <file.sql.gz>` | Restore from a backup |
 | `node scripts/create-admin.mjs --email <email> --role OWNER` | Create (or reset) an admin account with a real bcrypt hash — **the only way to get a usable login**, see `docs/ADMIN.md` |
 | `node scripts/verify-api.mjs` | Smoke-tests the bot's `/api` + `/internal` auth surface against a booted Fastify instance |
-| `node scripts/verify-seed.mjs` | Checks the seeded catalog counts and decrypts a `StockItem` payload end-to-end |
+| `node scripts/verify-seed.mjs` | Checks catalog shape, Mirasim, and absence of sellable seed credentials |
 | `node scripts/verify-broadcast.mjs` | Drives the broadcast lifecycle (arm → cancel → re-arm → sweep) against real Postgres + Redis |
 | `node scripts/fake-trongrid.mjs` | Stub TronGrid server for exercising `chain-scan` without touching a real chain |
 
 The three `verify-*` scripts and `create-admin.mjs` need a live Postgres/Redis
-and the environment loaded first (`set -a; source .env; set +a`), and they
+and the environment loaded first (`node --env-file=.env scripts/verify-api.mjs`, for example), and they
 import from `dist/`, so run `pnpm build` before them. Each prints `PASS`/`FAIL` per check and exits
 non-zero on the first failure, so they drop straight into CI. `verify-broadcast`
 cleans up every row and queue job it creates, but it does write to the database

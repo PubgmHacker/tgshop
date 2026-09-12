@@ -21,7 +21,7 @@ function toEditable(kind: SettingKind, value: unknown): string {
 }
 
 export default async function SettingsPage() {
-  const session = requireSession()
+  const session = await requireSession()
 
   const settings = await listSettingsAction()
   const stored = new Map(settings.map((setting) => [setting.key, setting]))
@@ -48,7 +48,7 @@ export default async function SettingsPage() {
       key: setting.key,
       label: setting.key,
       kind: 'json' as SettingKind,
-      hint: 'Free-form key — stored and returned as raw JSON, with no shape validation.',
+      hint: 'Дополнительный параметр. Значение хранится в формате JSON.',
       editable: toEditable('json', setting.value),
       updatedAt: setting.updatedAt.toISOString(),
       known: false,
@@ -60,7 +60,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold">{t('settings.title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Values the bot and worker read at runtime. Every change is validated server-side and written to the audit log.
+          Настройки оплаты, выдачи и уведомлений. Изменения сохраняются в журнале действий.
         </p>
       </div>
       <SettingsClient rows={[...knownRows, ...extraRows]} canEdit={hasRole(session.role, AdminRole.OWNER)} />

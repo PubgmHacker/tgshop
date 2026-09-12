@@ -9,7 +9,7 @@ import { useProductData } from '@/hooks/useApi'
 import { Icon } from '@/components/Icons'
 import { ErrorState } from '@/components/States'
 import { BrandMark } from '@/components/BrandMark'
-import { formatCents } from '@/lib/format'
+import { discountedCents, formatCents } from '@/lib/format'
 import { triggerHaptic } from '@/lib/TelegramProvider'
 import type { Plan } from '@/types/api'
 import { BuySheet } from './BuySheet'
@@ -27,7 +27,7 @@ export default function ProductPage(): JSX.Element {
 
   const selectedPlan = useMemo<Plan | null>(() => {
     if (!data) return null
-    return data.plans.find((plan) => plan.id === selectedPlanId) ?? data.plans[0] ?? null
+    return data.plans.find((plan) => plan.id === selectedPlanId && plan.inStock) ?? data.plans.find((plan) => plan.inStock) ?? data.plans[0] ?? null
   }, [data, selectedPlanId])
 
   useMainButton({
@@ -71,6 +71,10 @@ export default function ProductPage(): JSX.Element {
         </span>
       </header>
 
+      {data.deliveryType === 'MANUAL_FALLBACK' ? (
+        <p className="text-sm text-muted">{t('product.manualDelivery')}</p>
+      ) : null}
+
       <section className="flex flex-col gap-2.5">
         <p className="text-[13px] font-medium text-muted">{t('product.plans')}</p>
         <div className="flex flex-col gap-2">
@@ -109,6 +113,7 @@ export default function ProductPage(): JSX.Element {
 
       {selectedPlan ? (
         <BuySheet
+          key={selectedPlan.id}
           isOpen={isSheetOpen}
           onClose={() => setIsSheetOpen(false)}
           plan={selectedPlan}
@@ -140,6 +145,7 @@ function PlanRow({
       type="button"
       onClick={onSelect}
       disabled={!plan.inStock}
+      aria-pressed={isSelected}
       className={`tile flex items-center justify-between rounded-card px-4 py-3.5 text-left transition-colors disabled:cursor-not-allowed ${
         isSelected ? 'ring-1 ring-line-strong' : ''
       }`}
@@ -158,7 +164,10 @@ function PlanRow({
         )}
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <p className="tnum text-[17px] font-bold text-ink">{formatCents(plan.priceCents)}</p>
+        {plan.discountPercent > 0 ? (
+          <p className="tnum text-xs text-muted line-through">{formatCents(plan.priceCents)}</p>
+        ) : null}
+        <p className="tnum text-[17px] font-bold text-ink">{formatCents(discountedCents(plan.priceCents, plan.discountPercent))}</p>
         {plan.discountPercent > 0 ? (
           <p className="text-xs font-medium text-success">{t('product.discount', { percent: plan.discountPercent })}</p>
         ) : null}

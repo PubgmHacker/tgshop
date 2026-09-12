@@ -7,12 +7,12 @@ import { writeAuditLog } from '../audit'
 import { promoUpsertSchema, type PromoUpsertInput } from '../schemas'
 
 export async function listPromosAction() {
-  requireRole(AdminRole.SUPPORT)
+  await requireRole(AdminRole.SUPPORT)
   return prisma.promo.findMany({ orderBy: { code: 'asc' }, include: { plan: true } })
 }
 
 export async function upsertPromoAction(input: PromoUpsertInput) {
-  const session = requireRole(AdminRole.ADMIN)
+  const session = await requireRole(AdminRole.ADMIN)
   const data = promoUpsertSchema.parse(input)
 
   const fields = {
@@ -42,7 +42,7 @@ export async function upsertPromoAction(input: PromoUpsertInput) {
 }
 
 export async function deletePromoAction(id: string) {
-  const session = requireRole(AdminRole.OWNER)
+  const session = await requireRole(AdminRole.OWNER)
   await prisma.promo.delete({ where: { id } })
   await writeAuditLog({ actorId: session.adminId, action: 'promo.delete', entity: 'Promo', entityId: id })
   revalidatePath('/promos')

@@ -15,7 +15,7 @@ export const httpRequestDuration = new client.Histogram({
 
 export async function registerMetricsPlugin(app: FastifyInstance): Promise<void> {
   app.addHook('onResponse', (req, reply, done) => {
-    const route = req.routeOptions?.url ?? req.url
+    const route = req.routeOptions?.url ?? 'unmatched'
     httpRequestDuration.observe(
       { method: req.method, route, status_code: String(reply.statusCode) },
       reply.elapsedTime / 1000

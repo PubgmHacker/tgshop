@@ -8,7 +8,7 @@ import { t } from '../../../lib/i18n'
 export const dynamic = 'force-dynamic'
 
 export default async function ProductsPage() {
-  const session = requireSession()
+  const session = await requireSession()
   const [products, categories] = await Promise.all([listProductsAction(), listCategoriesAction()])
 
   const rows: ProductRow[] = products.map((product) => ({

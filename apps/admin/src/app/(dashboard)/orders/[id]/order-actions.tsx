@@ -35,11 +35,11 @@ export function OrderActions({
   const [pending, setPending] = useState(false)
 
   if (!canAct) {
-    return <p className="text-sm text-muted-foreground">Your role cannot re-deliver or refund orders.</p>
+    return <p className="text-sm text-muted-foreground">У вашей роли нет доступа к повторной выдаче и возвратам.</p>
   }
 
   async function onRedeliver() {
-    if (!window.confirm('Re-attach the issued payload so the buyer can view it again?')) return
+    if (!window.confirm('Восстановить доступ покупателя к ранее выданным данным?')) return
     setPending(true)
     setError(null)
     setMessage(null)
@@ -48,7 +48,7 @@ export function OrderActions({
       setMessage('Order re-delivered')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -59,7 +59,7 @@ export function OrderActions({
       setError('The delivery payload is required')
       return
     }
-    if (!window.confirm('Deliver this payload to the buyer? The order becomes DELIVERED.')) return
+    if (!window.confirm('Выдать эти данные покупателю и отметить заказ выполненным?')) return
     setPending(true)
     setError(null)
     setMessage(null)
@@ -73,7 +73,7 @@ export function OrderActions({
       setPayload('')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -84,7 +84,7 @@ export function OrderActions({
       setError('A refund reason is required')
       return
     }
-    if (!window.confirm('Refund this order? The amount is credited to the user ledger.')) return
+    if (!window.confirm('Вернуть стоимость заказа на баланс покупателя?')) return
     setPending(true)
     setError(null)
     setMessage(null)
@@ -96,7 +96,7 @@ export function OrderActions({
       setReason('')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : 'Не удалось выполнить действие. Повторите попытку.')
     } finally {
       setPending(false)
     }
@@ -135,7 +135,7 @@ export function OrderActions({
           {t('orders.redeliver')}
         </Button>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="refundReason">Refund reason</Label>
+          <Label htmlFor="refundReason">Причина возврата</Label>
           <Input
             id="refundReason"
             value={reason}
@@ -159,8 +159,8 @@ export function OrderActions({
           This order cannot be refunded: it is unpaid, expired, or already refunded.
         </p>
       )}
-      {message && <p className="text-sm text-success">{message}</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {message && <p role="status" className="text-sm text-success">{message}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }
