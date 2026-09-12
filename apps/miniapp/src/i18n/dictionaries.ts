@@ -10,6 +10,7 @@ export const dictionaries = {
   ru: {
     'common.loading': 'Загрузка…',
     'common.retry': 'Повторить',
+    'common.openBot': 'Открыть бота',
     'common.error.generic': 'Что-то пошло не так',
     'common.error.network': 'Нет соединения с сервером',
     'common.error.auth': 'Откройте магазин через бота в Telegram, чтобы войти.',
@@ -214,6 +215,7 @@ export const dictionaries = {
   en: {
     'common.loading': 'Loading…',
     'common.retry': 'Retry',
+    'common.openBot': 'Open bot',
     'common.error.generic': 'Something went wrong',
     'common.error.network': 'No connection to the server',
     'common.error.auth': 'Open the store through the Telegram bot to sign in.',

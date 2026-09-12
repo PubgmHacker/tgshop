@@ -25,9 +25,11 @@ interface ErrorStateProps {
   title: string
   onRetry?: () => void
   retryLabel?: string
+  actionHref?: string
+  actionLabel?: string
 }
 
-export function ErrorState({ title, onRetry, retryLabel }: ErrorStateProps): JSX.Element {
+export function ErrorState({ title, onRetry, retryLabel, actionHref, actionLabel }: ErrorStateProps): JSX.Element {
   const { t } = useI18n()
   return (
     <div role="alert" className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
@@ -35,7 +37,11 @@ export function ErrorState({ title, onRetry, retryLabel }: ErrorStateProps): JSX
         <Icon name="alert" size={24} />
       </div>
       <p className="font-medium text-ink">{title}</p>
-      {onRetry ? (
+      {actionHref && actionLabel ? (
+        <a href={actionHref} className="btn-primary min-h-11 rounded-full px-5 py-2.5 text-sm font-semibold">
+          {actionLabel}
+        </a>
+      ) : onRetry ? (
         <button
           type="button"
           onClick={onRetry}

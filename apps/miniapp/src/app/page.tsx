@@ -26,6 +26,26 @@ export default function HomePage(): JSX.Element {
     return next
   }, [home.data?.categories])
 
+  const authError = [me.error, home.error].find((error) => error && errorMessageKey(error) === 'common.error.auth')
+  const sharedError = authError ?? (me.isError && home.isError ? home.error : null)
+  if (sharedError) {
+    const username = process.env.NEXT_PUBLIC_BOT_USERNAME?.trim().replace(/^@/, '')
+    const botUrl = authError && username && /^[a-zA-Z0-9_]{5,32}$/.test(username)
+      ? `https://t.me/${username}` : undefined
+    return (
+      <div className="page-enter min-w-0 flex-1 px-4 pt-2">
+        <section className="glass rounded-card">
+          <ErrorState
+            title={t(errorMessageKey(sharedError))}
+            onRetry={() => { void Promise.all([me.refetch(), home.refetch()]) }}
+            actionHref={botUrl}
+            actionLabel={t('common.openBot')}
+          />
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="page-enter flex min-w-0 flex-1 flex-col gap-5 overflow-x-hidden px-4 pt-2">
       {me.isError ? (
