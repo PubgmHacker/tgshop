@@ -37,7 +37,7 @@ function SettingRow({
         <span className="text-sm font-semibold text-ink">{title}</span>
         <span className="text-xs text-faint">{subtitle}</span>
       </span>
-      <span className="w-full shrink-0">{trailing}</span>
+      <span className={onClick ? 'shrink-0' : 'w-full shrink-0'}>{trailing}</span>
     </Wrapper>
   )
 }
