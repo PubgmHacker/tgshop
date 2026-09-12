@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { prisma, PaymentProvider, PaymentStatus } from '@tgshop/db'
 import { TRON_TAG_MAX, tronTagOfAmountUsdt6 } from '@tgshop/core'
 import { env } from '../config/env.js'
@@ -62,7 +63,7 @@ function reservationKey(tag: number): string {
 function shuffled<T>(items: T[]): T[] {
   const out = [...items]
   for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = randomInt(i + 1)
     const tmp = out[i] as T
     out[i] = out[j] as T
     out[j] = tmp

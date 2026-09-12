@@ -34,5 +34,5 @@ export function openPaymentUrl(url: string): void {
   } catch {
     // fall through to the plain browser navigation below
   }
-  window.open(url, '_blank', 'noopener')
+  window.open(url, '_blank', 'noopener,noreferrer')
 }

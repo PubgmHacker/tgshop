@@ -4,6 +4,14 @@ import { fileURLToPath } from 'node:url'
 const nextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
   reactStrictMode: true,
+  async headers() {
+    return [{ source: '/(.*)', headers: [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' }
+    ] }]
+  },
   webpack(config) {
     // BullMQ exposes an optional Valkey backend from its barrel export. The
     // admin uses ioredis, so make that optional branch explicit to Next's

@@ -30,6 +30,7 @@ export const dictionaries = {
     'common.continue': 'Продолжить',
 
     'tabs.home': 'Главная',
+    'tabs.navigation': 'Основная навигация',
     'tabs.catalog': 'Каталог',
     'tabs.orders': 'Заказы',
     'tabs.balance': 'Баланс',
@@ -240,6 +241,7 @@ export const dictionaries = {
     'common.continue': 'Continue',
 
     'tabs.home': 'Home',
+    'tabs.navigation': 'Main navigation',
     'tabs.catalog': 'Catalog',
     'tabs.orders': 'Orders',
     'tabs.balance': 'Balance',

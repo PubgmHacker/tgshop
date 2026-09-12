@@ -48,6 +48,7 @@ export function BottomTabBar(): JSX.Element {
 
   return (
     <nav
+      aria-label={t('tabs.navigation')}
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4"
       style={{ paddingBottom: 'calc(12px + var(--safe-bottom))' }}
     >
