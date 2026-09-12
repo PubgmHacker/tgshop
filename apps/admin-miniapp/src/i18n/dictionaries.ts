@@ -30,6 +30,7 @@ export const dictionaries = {
     'common.notFound': 'Не найдено',
 
     'tabs.home': 'Сводка',
+    'tabs.navigation': 'Основная навигация',
     'tabs.orders': 'Заказы',
     'tabs.catalog': 'Каталог',
     'tabs.users': 'Клиенты',
@@ -327,6 +328,7 @@ export const dictionaries = {
     'common.notFound': 'Not found',
 
     'tabs.home': 'Home',
+    'tabs.navigation': 'Main navigation',
     'tabs.orders': 'Orders',
     'tabs.catalog': 'Catalog',
     'tabs.users': 'Users',

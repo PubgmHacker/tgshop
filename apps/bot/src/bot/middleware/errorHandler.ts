@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { Bot, GrammyError, HttpError } from 'grammy'
 import type { NextFunction } from 'grammy'
 import type { BotContext } from '../context.js'
@@ -34,7 +35,7 @@ export function registerErrorHandler(bot: Bot<BotContext>): void {
 }
 
 async function report(ctx: BotContext, error: unknown): Promise<void> {
-  const correlationId = Math.random().toString(36).slice(2, 10)
+  const correlationId = randomBytes(6).toString('hex')
 
   if (error instanceof GrammyError) {
     logger.error({ correlationId, err: error, description: error.description }, 'grammY API error')

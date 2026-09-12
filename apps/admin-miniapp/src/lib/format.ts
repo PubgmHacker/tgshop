@@ -20,8 +20,14 @@ export function formatDate(input: string | Date, locale: 'ru' | 'en'): string {
 
 /** Generates a client-side idempotency key for order/topup creation requests. */
 export function generateIdempotencyKey(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
+  const secureCrypto = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto : null
+  if (secureCrypto && typeof secureCrypto.randomUUID === 'function') {
+    return secureCrypto.randomUUID()
   }
-  return `idem_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  if (secureCrypto && typeof secureCrypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16)
+    secureCrypto.getRandomValues(bytes)
+    return `idem_${Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')}`
+  }
+  throw new Error('Secure randomness is unavailable')
 }
