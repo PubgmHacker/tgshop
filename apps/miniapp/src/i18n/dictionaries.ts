@@ -200,8 +200,8 @@ export const dictionaries = {
     'settings.theme.light': 'Светлая',
     'settings.language': 'Язык',
     'settings.language.desc': 'Язык магазина и сообщений бота',
-    'settings.support': 'Связь с поддержкой',
-    'settings.support.desc': 'Telegram',
+    'settings.support': 'Помощь и поддержка',
+    'settings.support.desc': 'Вопросы о покупке и заказах',
 
     'order.status.PENDING': 'Ожидает оплаты',
     'order.status.PAID': 'Оплачен',
@@ -404,8 +404,8 @@ export const dictionaries = {
     'settings.theme.light': 'Light',
     'settings.language': 'Language',
     'settings.language.desc': 'Store and bot message language',
-    'settings.support': 'Contact support',
-    'settings.support.desc': 'Telegram',
+    'settings.support': 'Help and support',
+    'settings.support.desc': 'Help with purchases and orders',
 
     'order.status.PENDING': 'Awaiting payment',
     'order.status.PAID': 'Paid',

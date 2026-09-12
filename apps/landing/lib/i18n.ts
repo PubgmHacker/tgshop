@@ -229,7 +229,7 @@ const ruCopy: LandingCopy = {
         title: 'Поддержка',
         links: [
           { label: 'Вопросы', href: '#faq' },
-          { label: 'Написать в поддержку', href: '__support__' }
+          { label: 'Бот магазина', href: '__support__' }
         ]
       }
     ],
@@ -380,7 +380,7 @@ const enCopy: LandingCopy = {
         title: 'Support',
         links: [
           { label: 'FAQ', href: '#faq' },
-          { label: 'Contact support', href: '__support__' }
+          { label: 'Store bot', href: '__support__' }
         ]
       }
     ],
